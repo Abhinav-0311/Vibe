@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root {
+  --void: #000000;
+  --bone: #ffffff;
+  --charcoal: #1d1a1a;
+  --ink: #111212;
+  --graphite: #3d3d3d;
+  --mist: #d9d9d9;
+  --neon: #fc74dd;
+  --ember: #ff4c33;
+  --success: #a7f35b;
+  --warning: #ffd166;
+  --danger: #ff5a5f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--void);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--void);
+  color: var(--bone);
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  text-rendering: geometricPrecision;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--neon);
+  outline-offset: 4px;
+}
+
+::selection {
+  background: var(--neon);
+  color: var(--ink);
+}
+
+.mono {
+  font-family:
+    "JetBrains Mono", "IBM Plex Mono", "Space Mono", ui-monospace, SFMono-Regular,
+    Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.heartbeat {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 8%,
+    var(--neon) 8%,
+    var(--neon) 11%,
+    transparent 11%,
+    transparent 19%,
+    var(--neon) 19%,
+    var(--neon) 21%,
+    transparent 21%,
+    transparent 100%
+  );
+  background-size: 220px 2px;
+  animation: heartbeat 2.8s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+  0% {
+    background-position: -220px 0;
+    opacity: 0.35;
+  }
+  45%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 220px 0;
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

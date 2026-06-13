@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ScanRecord {
+  id           String   @id @default(cuid())
+  scanHash     String   @unique
+  projectName  String
+  appType      String
+  stage        String
+  score        Int
+  findingCount Int
+  scannedAt    DateTime
+  payload      Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([stage, createdAt])
+  @@index([appType, createdAt])
+  @@index([score, createdAt])
+}
