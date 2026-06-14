@@ -7,12 +7,14 @@ import {
   Clipboard,
   Code2,
   FileSearch,
+  Github,
   History,
   Loader2,
   RefreshCw,
   Server,
   ShieldAlert,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { AuditContext } from "@/lib/checklist/types";
@@ -98,6 +100,8 @@ export function AuditDashboard() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [auditContext, setAuditContext] = useState<AuditContext>(defaultAuditContext);
   const [projectPath, setProjectPath] = useState(defaultProjectPath);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [githubError, setGithubError] = useState<string | null>(null);
   const [workspaceProjects, setWorkspaceProjects] = useState<WorkspaceProjectsApiResponse | null>(null);
   const [projectDiscoveryState, setProjectDiscoveryState] = useState<ProjectDiscoveryState>("loading");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, FindingStatus>>({});
@@ -119,6 +123,14 @@ export function AuditDashboard() {
     () => reportWithStatuses.findings.find((finding) => finding.id === selectedId),
     [reportWithStatuses.findings, selectedId],
   );
+
+  function applyCompletedScan(scan: ScanApiResponse) {
+    setScanData(scan);
+    setSelectedId(scan.checklist.findings[0]?.id);
+    saveScanToHistory(scan);
+    void refreshSavedScans();
+    setViewState("report");
+  }
 
   function updateFindingStatus(findingId: string, status: FindingStatus) {
     setStatusOverrides((current) => ({ ...current, [findingId]: status }));
@@ -215,6 +227,7 @@ export function AuditDashboard() {
 
   async function runScan(context = auditContext, targetPath = projectPath) {
     setScanError(null);
+    setGithubError(null);
     setViewState("loading");
 
     try {
@@ -233,13 +246,81 @@ export function AuditDashboard() {
       }
 
       const data = (await response.json()) as ScanApiResponse;
-      setScanData(data);
-      setSelectedId(data.checklist.findings[0]?.id);
-      saveScanToHistory(data);
-      void refreshSavedScans();
-      setViewState("report");
+      applyCompletedScan(data);
     } catch (error) {
       setScanError(error instanceof Error ? error.message : "Unknown scan failure");
+      setViewState("error");
+    }
+  }
+
+  async function runUploadScan(file: File, context = auditContext) {
+    setScanError(null);
+    setUploadError(null);
+    setGithubError(null);
+    setViewState("loading");
+
+    try {
+      const formData = new FormData();
+      formData.set("project", file);
+      formData.set("appType", context.appType);
+      formData.set("stage", context.stage);
+      formData.set("hasPayments", String(context.hasPayments));
+      formData.set("hasUserAccounts", String(context.hasUserAccounts));
+      formData.set("storesUserData", String(context.storesUserData));
+
+      const response = await fetch("/api/upload-scan", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `Upload scan failed with status ${response.status}`);
+      }
+
+      const data = (await response.json()) as ScanApiResponse;
+      applyCompletedScan(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Upload scan failed";
+      setUploadError(message);
+      setScanError(message);
+      setViewState("error");
+    }
+  }
+
+  async function runGitHubScan(repoUrl: string, context = auditContext) {
+    setScanError(null);
+    setUploadError(null);
+    setGithubError(null);
+    setViewState("loading");
+
+    try {
+      const response = await fetch("/api/github-scan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          repoUrl,
+          appType: context.appType,
+          stage: context.stage,
+          hasPayments: context.hasPayments,
+          hasUserAccounts: context.hasUserAccounts,
+          storesUserData: context.storesUserData,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `GitHub scan failed with status ${response.status}`);
+      }
+
+      const data = (await response.json()) as ScanApiResponse;
+      applyCompletedScan(data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "GitHub scan failed";
+      setGithubError(message);
+      setScanError(message);
       setViewState("error");
     }
   }
@@ -284,6 +365,10 @@ export function AuditDashboard() {
           onProjectPathChange={setProjectPath}
           onRefreshProjects={() => void refreshWorkspaceProjects()}
           onRunScan={(context) => void runScan(context, projectPath)}
+          uploadError={uploadError}
+          githubError={githubError}
+          onUploadScan={(file, context) => void runUploadScan(file, context)}
+          onGitHubScan={(repoUrl, context) => void runGitHubScan(repoUrl, context)}
         />
         <StateSwitch active={viewState} onChange={setViewState} />
 
@@ -468,6 +553,10 @@ function ContextControls({
   onProjectPathChange,
   onRefreshProjects,
   onRunScan,
+  uploadError,
+  githubError,
+  onUploadScan,
+  onGitHubScan,
 }: {
   context: AuditContext;
   projectPath: string;
@@ -477,6 +566,10 @@ function ContextControls({
   onProjectPathChange: (projectPath: string) => void;
   onRefreshProjects: () => void;
   onRunScan: (context: AuditContext) => void;
+  uploadError: string | null;
+  githubError: string | null;
+  onUploadScan: (file: File, context: AuditContext) => void;
+  onGitHubScan: (repoUrl: string, context: AuditContext) => void;
 }) {
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
   const appTypes: AuditContext["appType"][] = ["saas", "internal-tool", "content-site", "api"];
@@ -565,6 +658,9 @@ function ContextControls({
         </div>
       </div>
 
+      <GitHubScanPanel context={context} githubError={githubError} onGitHubScan={onGitHubScan} />
+      <ProjectUploadPanel context={context} uploadError={uploadError} onUploadScan={onUploadScan} />
+
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <SegmentedControl
           label="Project stage"
@@ -631,6 +727,123 @@ function SegmentedControl<T extends string>({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function GitHubScanPanel({
+  context,
+  githubError,
+  onGitHubScan,
+}: {
+  context: AuditContext;
+  githubError: string | null;
+  onGitHubScan: (repoUrl: string, context: AuditContext) => void;
+}) {
+  const [repoUrl, setRepoUrl] = useState("");
+
+  function submitGitHubScan() {
+    const trimmedUrl = repoUrl.trim();
+
+    if (!trimmedUrl) {
+      return;
+    }
+
+    onGitHubScan(trimmedUrl, context);
+  }
+
+  return (
+    <div className="mt-5 rounded-[22px] border border-[#3d3d3d] bg-black p-4">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <label className="block min-w-0 flex-1">
+          <span className="mono text-[10px] text-[#fc74dd]">GitHub repository</span>
+          <span className="mt-2 block max-w-2xl text-sm leading-6 text-[#d9d9d9]">
+            Paste a public repository URL when the project is already on GitHub.
+          </span>
+          <input
+            value={repoUrl}
+            onChange={(event) => setRepoUrl(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                submitGitHubScan();
+              }
+            }}
+            className="mt-4 w-full rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#5f5858] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
+            placeholder="https://github.com/owner/repo"
+          />
+        </label>
+
+        <button
+          onClick={submitGitHubScan}
+          disabled={repoUrl.trim().length === 0}
+          className="mono inline-flex items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#3d3d3d] disabled:text-[#9b9696]"
+        >
+          <Github className="h-4 w-4" aria-hidden="true" />
+          Scan GitHub
+        </button>
+      </div>
+
+      {githubError && (
+        <p className="mt-4 border-t border-[#3d3d3d] pt-4 text-sm leading-6 text-[#ff8f8f]">
+          {githubError}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ProjectUploadPanel({
+  context,
+  uploadError,
+  onUploadScan,
+}: {
+  context: AuditContext;
+  uploadError: string | null;
+  onUploadScan: (file: File, context: AuditContext) => void;
+}) {
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+
+  return (
+    <div className="mt-5 rounded-[22px] border border-[#3d3d3d] bg-black p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-2xl">
+          <p className="mono text-[10px] text-[#fc74dd]">Upload project</p>
+          <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
+            Upload a ZIP archive when the project is not inside the local workspace picker.
+          </p>
+          <p className="mt-2 text-xs leading-5 text-[#9b9696]">
+            The archive is extracted to a temporary folder, scanned without executing code, then removed.
+          </p>
+        </div>
+
+        <label className="mono inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95">
+          <Upload className="h-4 w-4" aria-hidden="true" />
+          Upload ZIP
+          <input
+            type="file"
+            accept=".zip,application/zip,application/x-zip-compressed"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+
+              if (!file) return;
+
+              setSelectedFileName(file.name);
+              onUploadScan(file, context);
+            }}
+          />
+        </label>
+      </div>
+
+      {(selectedFileName || uploadError) && (
+        <div className="mt-4 border-t border-[#3d3d3d] pt-4">
+          {selectedFileName && (
+            <p className="mono text-[10px] text-[#d9d9d9]">Selected: {selectedFileName}</p>
+          )}
+          {uploadError && <p className="mt-2 text-sm leading-6 text-[#ff8f8f]">{uploadError}</p>}
+        </div>
+      )}
     </div>
   );
 }
