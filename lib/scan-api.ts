@@ -5,6 +5,11 @@ import type { ScannerFacts } from "@/lib/scanner/types";
 
 export type ScanApiResponse = {
   scannedProject: string;
+  scanSource?: {
+    type: "local" | "upload" | "github";
+    label: string;
+    detail?: string;
+  };
   scannedAt: string;
   facts: ScannerFacts;
   checklist: ChecklistResult;

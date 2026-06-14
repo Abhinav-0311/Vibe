@@ -75,6 +75,14 @@ function formatScannedAt(value: string) {
   }).format(new Date(value));
 }
 
+function formatScanSource(scan: ScanApiResponse | null | undefined) {
+  return scan?.scanSource?.label ?? "Local workspace";
+}
+
+function formatScanSourceDetail(scan: ScanApiResponse | null | undefined) {
+  return scan?.scanSource?.detail ?? scan?.facts.projectRoot ?? "Project source";
+}
+
 function createReportFromScan(scan: ScanApiResponse | null): AuditReport {
   if (!scan) return auditReport;
 
@@ -880,7 +888,7 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
     { label: "Project", value: scan?.scannedProject ?? "Scanning..." },
     { label: "Context", value: scan ? scan.checklist.context.stage : "Scanning..." },
     { label: "Findings", value: scan ? `${scan.checklist.findings.length} open` : "Scanning..." },
-    { label: "Report", value: scan ? scan.report.readinessLabel : "Scanning..." },
+    { label: "Source", value: scan ? formatScanSource(scan) : "Scanning..." },
   ];
   const evidence = scan
     ? [
@@ -975,7 +983,7 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
                 {detectedCount} of {evidence.length} key signals detected.
               </h3>
             </div>
-            <p className="mono text-[10px] text-[#d9d9d9]">{scan.facts.projectRoot}</p>
+            <p className="mono text-[10px] text-[#d9d9d9]">{formatScanSourceDetail(scan)}</p>
           </div>
 
           <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -1078,6 +1086,7 @@ function ScanHistory({
                     <p className="mt-2 text-lg font-semibold tracking-[-0.03em] text-white">
                       {item.scan.report.readinessLabel}
                     </p>
+                    <p className="mono mt-2 text-[9px] text-[#9b9696]">{formatScanSource(item.scan)}</p>
                   </div>
                   <span className="mono rounded-full bg-[#fc74dd] px-3 py-1 text-[10px] text-black">
                     {item.scan.checklist.score}
@@ -1204,6 +1213,7 @@ function DatabaseArchive({
                     <p className="mt-2 text-lg font-semibold tracking-[-0.03em] text-white">
                       {restoringRecordId === record.id ? "Restoring scan" : record.readinessLabel}
                     </p>
+                    <p className="mono mt-2 text-[9px] text-[#9b9696]">{record.sourceLabel}</p>
                   </div>
                   <span className="mono rounded-full bg-white px-3 py-1 text-[10px] text-black">{record.score}</span>
                 </div>

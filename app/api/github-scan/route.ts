@@ -32,7 +32,11 @@ export async function POST(request: Request) {
     });
     const archive = await downloadGitHubRepoZip(body.repoUrl);
     uploadedProject = await extractProjectZipBuffer(archive.buffer);
-    const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(params));
+    const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(params), {
+      type: "github",
+      label: "GitHub repository",
+      detail: body.repoUrl,
+    });
 
     return NextResponse.json({
       ...response,

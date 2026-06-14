@@ -6,7 +6,15 @@ import { generateReport } from "@/lib/report/report-generator";
 import type { ScanApiResponse } from "@/lib/scan-api";
 import { scanProject } from "@/lib/scanner/project-scanner";
 
-export async function createScanResponse(projectPath: string, context: AuditContext): Promise<ScanApiResponse> {
+export async function createScanResponse(
+  projectPath: string,
+  context: AuditContext,
+  source: NonNullable<ScanApiResponse["scanSource"]> = {
+    type: "local",
+    label: "Local workspace",
+    detail: projectPath,
+  },
+): Promise<ScanApiResponse> {
   const facts = await scanProject(projectPath);
   const checklist = runChecklist(facts, context);
   const scannedAt = new Date().toISOString();
@@ -14,6 +22,7 @@ export async function createScanResponse(projectPath: string, context: AuditCont
 
   const response: ScanApiResponse = {
     scannedProject: path.basename(projectPath),
+    scanSource: source,
     scannedAt,
     facts,
     checklist,

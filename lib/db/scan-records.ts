@@ -13,6 +13,7 @@ export type ScanPersistenceResult = {
 export type SavedScanRecord = {
   id: string;
   projectName: string;
+  sourceLabel: string;
   appType: string;
   stage: string;
   score: number;
@@ -42,6 +43,7 @@ function toSavedScanRecord(record: {
   return {
     id: record.id,
     projectName: record.projectName,
+    sourceLabel: payload.scanSource?.label ?? "Local workspace",
     appType: record.appType,
     stage: record.stage,
     score: record.score,

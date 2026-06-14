@@ -25,11 +25,16 @@ export async function POST(request: Request) {
       }
     }
 
-    const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(searchParams));
+    const projectName = file.name.replace(/\.zip$/i, "");
+    const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(searchParams), {
+      type: "upload",
+      label: "ZIP upload",
+      detail: file.name,
+    });
 
     return NextResponse.json({
       ...response,
-      scannedProject: file.name.replace(/\.zip$/i, ""),
+      scannedProject: projectName,
     });
   } catch (error) {
     return NextResponse.json(
