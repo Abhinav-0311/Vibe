@@ -27,6 +27,9 @@ Vibe scans a local project, detects production-readiness signals, runs context-a
 - Deduplicates repeated identical scans.
 - Exports reports as copyable Markdown.
 - Restores saved database scans into the full report UI.
+- Scans public or private GitHub repositories on a selected branch.
+- Turns individual findings into GitHub issues after explicit user approval.
+- Reports GitHub rate limits, permission failures, missing branches, and oversized repositories clearly.
 
 ## Why This Exists
 
@@ -61,6 +64,7 @@ Backend:
 - Deterministic checklist engine
 - Prisma ORM
 - PostgreSQL
+- GitHub REST API and OAuth 2.0 with PKCE
 
 Testing and tooling:
 
@@ -118,6 +122,8 @@ The dashboard includes:
 - Markdown report export
 - local scan history
 - PostgreSQL archive
+- GitHub repository and branch picker
+- GitHub issue creation from a selected finding
 
 ### Persistence
 
@@ -143,6 +149,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3005
 OPENAI_API_KEY=sk-placeholder
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/vibe?schema=public
 SENTRY_DSN=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_TOKEN_ENCRYPTION_KEY=replace-with-at-least-32-random-characters
 ```
 
 Generate Prisma Client:
@@ -203,6 +212,19 @@ Docker Compose is also included for machines that prefer containerized Postgres:
 docker compose up -d
 ```
 
+## GitHub Setup
+
+Public repository URLs work without authentication. To scan private repositories, choose branches, and create issues, create a GitHub OAuth App:
+
+1. Open GitHub Settings, Developer settings, OAuth Apps, then choose **New OAuth App**.
+2. Set the homepage URL to `http://localhost:3005`.
+3. Set the authorization callback URL to `http://localhost:3005/api/github/oauth/callback`.
+4. Add the OAuth App client ID and client secret to your local `.env` file.
+5. Generate a random encryption key containing at least 32 characters and set `GITHUB_TOKEN_ENCRYPTION_KEY`.
+6. Restart the development server and use **Connect GitHub** in the audit context panel.
+
+The integration requests GitHub's `repo` scope. This permits private-repository access and issue creation. The access token is encrypted in an HTTP-only cookie, never returned to browser JavaScript, and removed when the user disconnects.
+
 ## Scripts
 
 ```bash
@@ -249,6 +271,22 @@ GET /api/scans/[id]
 
 Loads a saved scan record and restores the full report payload.
 
+```text
+POST /api/github-scan
+```
+
+Scans a public or connected private GitHub repository. Accepts `repoUrl`, optional `branch`, and the audit-context fields.
+
+```text
+GET /api/github/status
+GET /api/github/repos
+GET /api/github/branches
+POST /api/github/issues
+POST /api/github/disconnect
+```
+
+Manage the GitHub connection, repository and branch selection, and explicit issue creation.
+
 ## Security Boundary
 
 The local scanner is intentionally constrained. Project paths must stay inside:
@@ -274,10 +312,12 @@ Built:
 - saved scan restore
 - project discovery
 - evidence ledger
+- private GitHub repository scanning
+- branch selection and rate-limit-aware errors
+- GitHub issue generation
 
 Planned:
 
-- GitHub issue generation
 - AI-assisted report wording
 - hosted multi-user mode
 - auth and team workspaces

@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { parseGitHubRepoUrl } from "@/lib/github/github-repo";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { downloadGitHubRepoZip, parseGitHubRepoUrl } from "@/lib/github/github-repo";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("parseGitHubRepoUrl", () => {
   it("parses a normal GitHub repository URL", () => {
@@ -30,5 +34,53 @@ describe("parseGitHubRepoUrl", () => {
 
   it("rejects invalid URLs", () => {
     expect(() => parseGitHubRepoUrl("not-a-url")).toThrow("Enter a valid GitHub repository URL.");
+  });
+});
+
+describe("downloadGitHubRepoZip", () => {
+  it("downloads the requested branch through the authenticated GitHub API", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await downloadGitHubRepoZip("https://github.com/owner/project", {
+      token: "test-token",
+      branch: "release/candidate",
+    });
+
+    expect(result.branch).toBe("release/candidate");
+    expect(result.repository).toEqual({ owner: "owner", repo: "project" });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.github.com/repos/owner/project/zipball/release%2Fcandidate",
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer test-token" }) }),
+    );
+  });
+
+  it("rejects archives larger than 25 MB before buffering them", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([1]), {
+          status: 200,
+          headers: { "Content-Length": String(26 * 1024 * 1024) },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(downloadGitHubRepoZip("https://github.com/owner/project")).rejects.toMatchObject({
+      code: "archive_too_large",
+      status: 413,
+    });
   });
 });

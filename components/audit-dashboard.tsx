@@ -23,6 +23,10 @@ import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import type {
   SavedScanDetailApiResponse,
   SavedScansApiResponse,
+  GitHubBranchesApiResponse,
+  GitHubRepositoriesApiResponse,
+  GitHubRepository,
+  GitHubStatusApiResponse,
   ScanApiResponse,
   WorkspaceProjectsApiResponse,
 } from "@/lib/scan-api";
@@ -296,7 +300,7 @@ export function AuditDashboard() {
     }
   }
 
-  async function runGitHubScan(repoUrl: string, context = auditContext) {
+  async function runGitHubScan(repoUrl: string, branch: string, context = auditContext) {
     setScanError(null);
     setUploadError(null);
     setGithubError(null);
@@ -310,6 +314,7 @@ export function AuditDashboard() {
         },
         body: JSON.stringify({
           repoUrl,
+          branch,
           appType: context.appType,
           stage: context.stage,
           hasPayments: context.hasPayments,
@@ -319,8 +324,11 @@ export function AuditDashboard() {
       });
 
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? `GitHub scan failed with status ${response.status}`);
+        const body = (await response.json().catch(() => null)) as { error?: string; retryAt?: string } | null;
+        const retryMessage = body?.retryAt
+          ? ` Retry after ${new Date(body.retryAt).toLocaleString()}.`
+          : "";
+        throw new Error(`${body?.error ?? `GitHub scan failed with status ${response.status}`}${retryMessage}`);
       }
 
       const data = (await response.json()) as ScanApiResponse;
@@ -376,7 +384,7 @@ export function AuditDashboard() {
           uploadError={uploadError}
           githubError={githubError}
           onUploadScan={(file, context) => void runUploadScan(file, context)}
-          onGitHubScan={(repoUrl, context) => void runGitHubScan(repoUrl, context)}
+          onGitHubScan={(repoUrl, branch, context) => void runGitHubScan(repoUrl, branch, context)}
         />
         <StateSwitch active={viewState} onChange={setViewState} />
 
@@ -408,6 +416,7 @@ export function AuditDashboard() {
               onSelect={setSelectedId}
               onStatusChange={updateFindingStatus}
               onResetTriage={resetTriage}
+              repository={scanData?.scanSource?.repository}
             />
           </>
         )}
@@ -577,7 +586,7 @@ function ContextControls({
   uploadError: string | null;
   githubError: string | null;
   onUploadScan: (file: File, context: AuditContext) => void;
-  onGitHubScan: (repoUrl: string, context: AuditContext) => void;
+  onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
 }) {
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
   const appTypes: AuditContext["appType"][] = ["saas", "internal-tool", "content-site", "api"];
@@ -746,9 +755,113 @@ function GitHubScanPanel({
 }: {
   context: AuditContext;
   githubError: string | null;
-  onGitHubScan: (repoUrl: string, context: AuditContext) => void;
+  onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
 }) {
   const [repoUrl, setRepoUrl] = useState("");
+  const [manualBranch, setManualBranch] = useState("");
+  const [status, setStatus] = useState<GitHubStatusApiResponse | null>(null);
+  const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
+  const [selectedRepository, setSelectedRepository] = useState("");
+  const [branches, setBranches] = useState<GitHubBranchesApiResponse["branches"]>([]);
+  const [selectedBranch, setSelectedBranch] = useState("");
+  const [connectionState, setConnectionState] = useState<"loading" | "ready" | "error">("loading");
+  const [repositoryState, setRepositoryState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [branchState, setBranchState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [panelError, setPanelError] = useState<string | null>(null);
+
+  async function readError(response: Response, fallback: string) {
+    const body = (await response.json().catch(() => null)) as { error?: string; retryAt?: string } | null;
+    const retry = body?.retryAt ? ` Retry after ${new Date(body.retryAt).toLocaleString()}.` : "";
+    return `${body?.error ?? fallback}${retry}`;
+  }
+
+  async function loadRepositories() {
+    setRepositoryState("loading");
+    setPanelError(null);
+    try {
+      const response = await fetch("/api/github/repos");
+      if (!response.ok) throw new Error(await readError(response, "Could not load GitHub repositories."));
+      const data = (await response.json()) as GitHubRepositoriesApiResponse;
+      setRepositories(data.repositories);
+      setRepositoryState("ready");
+
+      if (data.repositories.length > 0) {
+        const first = data.repositories[0];
+        setSelectedRepository(first.fullName);
+        setSelectedBranch(first.defaultBranch);
+      }
+    } catch (error) {
+      setRepositoryState("error");
+      setPanelError(error instanceof Error ? error.message : "Could not load GitHub repositories.");
+    }
+  }
+
+  async function loadConnection() {
+    setConnectionState("loading");
+    setPanelError(null);
+    try {
+      const response = await fetch("/api/github/status");
+      if (!response.ok) throw new Error("Could not read the GitHub connection.");
+      const data = (await response.json()) as GitHubStatusApiResponse;
+      setStatus(data);
+      setConnectionState("ready");
+      if (data.connected) void loadRepositories();
+    } catch (error) {
+      setConnectionState("error");
+      setPanelError(error instanceof Error ? error.message : "Could not read the GitHub connection.");
+    }
+  }
+
+  useEffect(() => {
+    void loadConnection();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedRepository || !status?.connected) {
+      setBranches([]);
+      setBranchState("idle");
+      return;
+    }
+
+    let cancelled = false;
+    async function loadBranches() {
+      setBranchState("loading");
+      setPanelError(null);
+      try {
+        const response = await fetch(`/api/github/branches?repository=${encodeURIComponent(selectedRepository)}`);
+        if (!response.ok) throw new Error(await readError(response, "Could not load repository branches."));
+        const data = (await response.json()) as GitHubBranchesApiResponse;
+        if (cancelled) return;
+        setBranches(data.branches);
+        setBranchState("ready");
+        const repository = repositories.find((item) => item.fullName === selectedRepository);
+        const preferredBranch = repository?.defaultBranch ?? data.branches[0]?.name ?? "";
+        setSelectedBranch((current) =>
+          data.branches.some((branch) => branch.name === current) ? current : preferredBranch,
+        );
+      } catch (error) {
+        if (cancelled) return;
+        setBranchState("error");
+        setPanelError(error instanceof Error ? error.message : "Could not load repository branches.");
+      }
+    }
+
+    void loadBranches();
+    return () => {
+      cancelled = true;
+    };
+  }, [repositories, selectedRepository, status?.connected]);
+
+  async function disconnect() {
+    await fetch("/api/github/disconnect", { method: "POST" });
+    setStatus((current) => ({ configured: current?.configured ?? true, connected: false }));
+    setRepositories([]);
+    setBranches([]);
+    setSelectedRepository("");
+    setSelectedBranch("");
+    setRepositoryState("idle");
+    setBranchState("idle");
+  }
 
   function submitGitHubScan() {
     const trimmedUrl = repoUrl.trim();
@@ -757,17 +870,114 @@ function GitHubScanPanel({
       return;
     }
 
-    onGitHubScan(trimmedUrl, context);
+    onGitHubScan(trimmedUrl, manualBranch.trim(), context);
+  }
+
+  function scanSelectedRepository() {
+    const repository = repositories.find((item) => item.fullName === selectedRepository);
+    if (!repository || !selectedBranch) return;
+    onGitHubScan(repository.url, selectedBranch, context);
   }
 
   return (
     <div className="mt-5 rounded-[22px] border border-[#3d3d3d] bg-black p-4">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <label className="block min-w-0 flex-1">
-          <span className="mono text-[10px] text-[#fc74dd]">GitHub repository</span>
-          <span className="mt-2 block max-w-2xl text-sm leading-6 text-[#d9d9d9]">
-            Paste a public repository URL when the project is already on GitHub.
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="max-w-2xl">
+          <p className="mono text-[10px] text-[#fc74dd]">GitHub repository</p>
+          <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
+            Connect GitHub for private repositories and branch selection, or scan a public URL without connecting.
+          </p>
+        </div>
+        {connectionState === "loading" ? (
+          <span className="mono inline-flex items-center gap-2 text-[10px] text-[#9b9696]">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Checking connection
           </span>
+        ) : status?.connected ? (
+          <button
+            onClick={() => void disconnect()}
+            className="mono rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
+          >
+            Disconnect
+          </button>
+        ) : status?.configured ? (
+          <a
+            href="/api/github/oauth/start"
+            className="mono inline-flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-[10px] text-black transition hover:bg-[#d9d9d9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
+          >
+            <Github className="h-4 w-4" aria-hidden="true" /> Connect GitHub
+          </a>
+        ) : null}
+      </div>
+
+      {connectionState === "ready" && status?.connected && (
+        <div className="mt-5 border-t border-[#3d3d3d] pt-5">
+          {repositoryState === "loading" && (
+            <p className="inline-flex items-center gap-2 text-sm text-[#d9d9d9]">
+              <Loader2 className="h-4 w-4 animate-spin text-[#fc74dd]" aria-hidden="true" /> Loading repositories
+            </p>
+          )}
+
+          {repositoryState === "ready" && repositories.length === 0 && (
+            <p className="text-sm leading-6 text-[#d9d9d9]">No accessible repositories were returned by GitHub.</p>
+          )}
+
+          {repositories.length > 0 && (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.55fr)_auto] lg:items-end">
+              <label className="block min-w-0">
+                <span className="mono text-[10px] text-[#d9d9d9]">Repository</span>
+                <select
+                  value={selectedRepository}
+                  onChange={(event) => setSelectedRepository(event.target.value)}
+                  className="mt-3 w-full rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm text-white outline-none transition focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
+                >
+                  {repositories.map((repository) => (
+                    <option key={repository.fullName} value={repository.fullName} disabled={repository.archived}>
+                      {repository.fullName} ({repository.private ? "private" : "public"})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block min-w-0">
+                <span className="mono text-[10px] text-[#d9d9d9]">Branch</span>
+                <select
+                  value={selectedBranch}
+                  onChange={(event) => setSelectedBranch(event.target.value)}
+                  disabled={branchState !== "ready" || branches.length === 0}
+                  className="mt-3 w-full rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm text-white outline-none transition focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30 disabled:cursor-wait disabled:text-[#9b9696]"
+                >
+                  {branchState === "loading" && <option>Loading branches</option>}
+                  {branches.map((branch) => (
+                    <option key={branch.name} value={branch.name}>{branch.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                onClick={scanSelectedRepository}
+                disabled={!selectedRepository || !selectedBranch || branchState !== "ready"}
+                className="mono inline-flex items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#3d3d3d] disabled:text-[#9b9696]"
+              >
+                <FileSearch className="h-4 w-4" aria-hidden="true" /> Scan branch
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {connectionState === "ready" && !status?.connected && status?.configured && (
+        <p className="mt-4 text-xs leading-5 text-[#9b9696]">
+          GitHub requests repository access so Vibe can read private code and create issues only when you ask it to.
+        </p>
+      )}
+
+      {connectionState === "ready" && !status?.configured && (
+        <p className="mt-4 text-sm leading-6 text-[#ffd166]">
+          GitHub OAuth is not configured. Public URL scanning still works; add the GitHub environment variables to enable private repositories.
+        </p>
+      )}
+
+      <div className="mt-5 grid gap-4 border-t border-[#3d3d3d] pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(180px,0.4fr)_auto] lg:items-end">
+        <label className="block min-w-0">
+          <span className="mono text-[10px] text-[#d9d9d9]">Public repository URL</span>
           <input
             value={repoUrl}
             onChange={(event) => setRepoUrl(event.target.value)}
@@ -780,20 +990,28 @@ function GitHubScanPanel({
             placeholder="https://github.com/owner/repo"
           />
         </label>
-
+        <label className="block min-w-0">
+          <span className="mono text-[10px] text-[#d9d9d9]">Branch (optional)</span>
+          <input
+            value={manualBranch}
+            onChange={(event) => setManualBranch(event.target.value)}
+            className="mt-4 w-full rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#5f5858] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
+            placeholder="default branch"
+          />
+        </label>
         <button
           onClick={submitGitHubScan}
           disabled={repoUrl.trim().length === 0}
           className="mono inline-flex items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#3d3d3d] disabled:text-[#9b9696]"
         >
           <Github className="h-4 w-4" aria-hidden="true" />
-          Scan GitHub
+          Scan public repo
         </button>
       </div>
 
-      {githubError && (
+      {(panelError || githubError || connectionState === "error") && (
         <p className="mt-4 border-t border-[#3d3d3d] pt-4 text-sm leading-6 text-[#ff8f8f]">
-          {githubError}
+          {panelError ?? githubError ?? "Could not read the GitHub connection."}
         </p>
       )}
     </div>
@@ -1446,6 +1664,7 @@ function ReportView({
   onSelect,
   onStatusChange,
   onResetTriage,
+  repository,
 }: {
   report: AuditReport;
   selectedFinding?: AuditFinding;
@@ -1453,6 +1672,7 @@ function ReportView({
   onSelect: (id: string) => void;
   onStatusChange: (findingId: string, status: FindingStatus) => void;
   onResetTriage: () => void;
+  repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
 }) {
   const criticalCount = report.findings.filter((finding) => finding.severity === "critical").length;
 
@@ -1461,7 +1681,7 @@ function ReportView({
       <ScorePanel report={report} criticalCount={criticalCount} />
       <FindingsList findings={report.findings} selectedId={selectedId} onSelect={onSelect} />
       <PromptQueue findings={report.findings} onResetTriage={onResetTriage} />
-      <FindingDetail finding={selectedFinding} onStatusChange={onStatusChange} />
+      <FindingDetail finding={selectedFinding} onStatusChange={onStatusChange} repository={repository} />
     </section>
   );
 }
@@ -1771,11 +1991,53 @@ function PromptQueue({
 function FindingDetail({
   finding,
   onStatusChange,
+  repository,
 }: {
   finding?: AuditFinding;
   onStatusChange: (findingId: string, status: FindingStatus) => void;
+  repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
 }) {
   const [copied, setCopied] = useState(false);
+  const [issueState, setIssueState] = useState<"idle" | "creating" | "created" | "error">("idle");
+  const [issueError, setIssueError] = useState<string | null>(null);
+  const [issueUrl, setIssueUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIssueState("idle");
+    setIssueError(null);
+    setIssueUrl(null);
+  }, [finding?.id]);
+
+  async function createGitHubIssue() {
+    if (!finding || !repository) return;
+    setIssueState("creating");
+    setIssueError(null);
+
+    try {
+      const response = await fetch("/api/github/issues", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository: `${repository.owner}/${repository.repo}`,
+          finding,
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+        retryAt?: string;
+        url?: string;
+      } | null;
+      if (!response.ok || !body?.url) {
+        const retry = body?.retryAt ? ` Retry after ${new Date(body.retryAt).toLocaleString()}.` : "";
+        throw new Error(`${body?.error ?? "GitHub issue creation failed."}${retry}`);
+      }
+      setIssueUrl(body.url);
+      setIssueState("created");
+    } catch (error) {
+      setIssueState("error");
+      setIssueError(error instanceof Error ? error.message : "GitHub issue creation failed.");
+    }
+  }
 
   if (!finding) {
     return <EmptyState compact />;
@@ -1831,6 +2093,45 @@ function FindingDetail({
           <Clipboard className="h-4 w-4" aria-hidden="true" />
           {copied ? "Copied" : "Copy prompt"}
         </button>
+
+        {repository && (
+          <div className="mt-6 border-t border-[#d9d9d9] pt-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="mono text-[10px] text-[#3d3d3d]">GitHub issue</p>
+                <p className="mt-2 text-sm leading-6">
+                  Create this finding in {repository.owner}/{repository.repo} from the scanned {repository.branch} branch.
+                </p>
+              </div>
+              {issueState === "created" && issueUrl ? (
+                <a
+                  href={issueUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mono inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[#111212] px-5 py-3 text-[10px] text-white transition hover:bg-[#3d3d3d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
+                >
+                  View issue <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                </a>
+              ) : (
+                <button
+                  onClick={() => void createGitHubIssue()}
+                  disabled={issueState === "creating"}
+                  className="mono inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[#111212] px-5 py-3 text-[10px] text-white transition hover:bg-[#3d3d3d] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:cursor-wait disabled:bg-[#9b9696]"
+                >
+                  {issueState === "creating" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Github className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {issueState === "creating" ? "Creating issue" : "Create GitHub issue"}
+                </button>
+              )}
+            </div>
+            {issueState === "error" && issueError && (
+              <p className="mt-4 text-sm leading-6 text-[#a42126]">{issueError}</p>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   );

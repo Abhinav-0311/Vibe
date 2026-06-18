@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { readAuditContext } from "@/lib/audit-context";
+import { githubErrorPayload } from "@/lib/github/github-api";
 import { downloadGitHubRepoZip } from "@/lib/github/github-repo";
+import { getGitHubAccessToken } from "@/lib/github/github-session";
 import { createScanResponse } from "@/lib/scan-response";
 import { extractProjectZipBuffer } from "@/lib/upload/zip-project";
 
@@ -12,6 +14,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       repoUrl?: string;
+      branch?: string;
       appType?: string;
       stage?: string;
       hasPayments?: boolean;
@@ -30,12 +33,17 @@ export async function POST(request: Request) {
       hasUserAccounts: String(Boolean(body.hasUserAccounts)),
       storesUserData: String(Boolean(body.storesUserData)),
     });
-    const archive = await downloadGitHubRepoZip(body.repoUrl);
+    const token = await getGitHubAccessToken();
+    const archive = await downloadGitHubRepoZip(body.repoUrl, { token, branch: body.branch });
     uploadedProject = await extractProjectZipBuffer(archive.buffer);
     const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(params), {
       type: "github",
       label: "GitHub repository",
-      detail: body.repoUrl,
+      detail: `${archive.name} / ${archive.branch}`,
+      repository: {
+        ...archive.repository,
+        branch: archive.branch,
+      },
     });
 
     return NextResponse.json({
@@ -43,12 +51,9 @@ export async function POST(request: Request) {
       scannedProject: archive.name,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "GitHub scan failed.",
-      },
-      { status: 400 },
-    );
+    const payload = githubErrorPayload(error);
+    const status = payload.status === 500 && error instanceof Error ? 400 : payload.status;
+    return NextResponse.json(payload.body, { status });
   } finally {
     await uploadedProject?.cleanup();
   }

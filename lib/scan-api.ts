@@ -9,12 +9,38 @@ export type ScanApiResponse = {
     type: "local" | "upload" | "github";
     label: string;
     detail?: string;
+    repository?: {
+      owner: string;
+      repo: string;
+      branch: string;
+    };
   };
   scannedAt: string;
   facts: ScannerFacts;
   checklist: ChecklistResult;
   report: GeneratedReport;
   persistence?: ScanPersistenceResult;
+};
+
+export type GitHubStatusApiResponse = {
+  configured: boolean;
+  connected: boolean;
+};
+
+export type GitHubRepository = {
+  fullName: string;
+  url: string;
+  private: boolean;
+  defaultBranch: string;
+  archived: boolean;
+};
+
+export type GitHubRepositoriesApiResponse = {
+  repositories: GitHubRepository[];
+};
+
+export type GitHubBranchesApiResponse = {
+  branches: Array<{ name: string; protected: boolean }>;
 };
 
 export type SavedScansApiResponse = {

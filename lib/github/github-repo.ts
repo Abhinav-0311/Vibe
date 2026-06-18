@@ -1,3 +1,5 @@
+import { GitHubApiError, githubFetch } from "@/lib/github/github-api";
+
 export type GitHubRepoRef = {
   owner: string;
   repo: string;
@@ -34,40 +36,56 @@ export function parseGitHubRepoUrl(value: string): GitHubRepoRef {
   };
 }
 
-export async function downloadGitHubRepoZip(repoUrl: string): Promise<{ name: string; buffer: Buffer }> {
-  const repo = parseGitHubRepoUrl(repoUrl);
-  const repoApiUrl = `https://api.github.com/repos/${repo.owner}/${repo.repo}`;
-  const metadataResponse = await fetch(repoApiUrl, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      "User-Agent": "Vibe-Launch-Readiness-Auditor",
-    },
-  });
+const maxArchiveBytes = 25 * 1024 * 1024;
 
-  if (!metadataResponse.ok) {
-    throw new Error("Could not read that public GitHub repository.");
-  }
+export async function downloadGitHubRepoZip(
+  repoUrl: string,
+  options: { token?: string | null; branch?: string } = {},
+): Promise<{
+  name: string;
+  buffer: Buffer;
+  branch: string;
+  repository: GitHubRepoRef;
+}> {
+  const repo = parseGitHubRepoUrl(repoUrl);
+  const metadataResponse = await githubFetch(`/repos/${repo.owner}/${repo.repo}`, { token: options.token });
 
   const metadata = (await metadataResponse.json()) as { default_branch?: string; full_name?: string };
-  const branch = metadata.default_branch;
+  const branch = options.branch?.trim() || metadata.default_branch;
 
   if (!branch) {
     throw new Error("Could not detect the repository default branch.");
   }
 
-  const archiveUrl = `https://codeload.github.com/${repo.owner}/${repo.repo}/zip/refs/heads/${encodeURIComponent(branch)}`;
-  const archiveResponse = await fetch(archiveUrl, {
-    headers: {
-      "User-Agent": "Vibe-Launch-Readiness-Auditor",
+  const archiveResponse = await githubFetch(
+    `/repos/${repo.owner}/${repo.repo}/zipball/${encodeURIComponent(branch)}`,
+    {
+      token: options.token,
+      accept: "application/vnd.github+json",
     },
-  });
+  );
+  const contentLength = Number(archiveResponse.headers.get("content-length") ?? 0);
+  if (contentLength > maxArchiveBytes) {
+    throw new GitHubApiError(
+      "This repository archive is larger than Vibe's 25 MB scan limit.",
+      413,
+      "archive_too_large",
+    );
+  }
 
-  if (!archiveResponse.ok) {
-    throw new Error("Could not download the GitHub repository archive.");
+  const buffer = Buffer.from(await archiveResponse.arrayBuffer());
+  if (buffer.byteLength > maxArchiveBytes) {
+    throw new GitHubApiError(
+      "This repository archive is larger than Vibe's 25 MB scan limit.",
+      413,
+      "archive_too_large",
+    );
   }
 
   return {
     name: metadata.full_name ?? `${repo.owner}/${repo.repo}`,
-    buffer: Buffer.from(await archiveResponse.arrayBuffer()),
+    buffer,
+    branch,
+    repository: repo,
   };
 }
