@@ -66,6 +66,8 @@ Runs categorized checks:
 
 ### 3. Architecture Stress Test
 
+Status: complete for the MVP. Results are deterministic and limited to repository evidence.
+
 Turns the original prompt pack into automated audits:
 
 - Schema stress test
@@ -107,6 +109,8 @@ Safety boundary:
 - Uploaded ZIP projects require a fresh upload because Vibe cannot safely infer local changes.
 
 ### 6. AI Workspace Readiness
+
+Status: complete for the MVP setup-pack scope.
 
 Audits whether the builder's AI environment has enough context to operate consistently.
 

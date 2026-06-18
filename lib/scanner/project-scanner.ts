@@ -140,6 +140,13 @@ async function detectFiles(projectRoot: string): Promise<DetectedFile[]> {
     ".cursorrules",
     "lib/analytics/events.ts",
     "lib/observability/plan.ts",
+    "prisma/schema.prisma",
+    "prisma/migrations",
+    "drizzle",
+    "supabase/migrations",
+    ".github/workflows",
+    "Dockerfile",
+    "vercel.json",
   ];
 
   return Promise.all(

@@ -7,6 +7,7 @@ import { enhanceReportWithOpenAI } from "@/lib/report/openai-report-enhancer";
 import type { ScanApiResponse } from "@/lib/scan-api";
 import { scanProject } from "@/lib/scanner/project-scanner";
 import { generateSetupPack } from "@/lib/setup-pack/setup-pack-generator";
+import { runArchitectureStressTest } from "@/lib/architecture-stress/architecture-stress";
 
 export async function createScanResponse(
   projectPath: string,
@@ -32,6 +33,7 @@ export async function createScanResponse(
   const checklist = enhanced.checklist;
   const report = enhanced.report;
   const setupPack = generateSetupPack({ projectName: scannedProject, facts, checklist });
+  const architectureStress = runArchitectureStressTest(facts, checklist);
 
   const response: ScanApiResponse = {
     scannedProject,
@@ -41,6 +43,7 @@ export async function createScanResponse(
     checklist,
     report,
     setupPack,
+    architectureStress,
   };
   const persistence = await saveScanRecord(response);
 

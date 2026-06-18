@@ -20,7 +20,7 @@ export function resolveWorkspaceProjectPath(value: string | null): ProjectPathRe
 
   if (!isInsideWorkspace) {
     return {
-      error: "Project path must stay inside E:\\College\\Project.",
+      error: `Project path must stay inside the configured workspace: ${allowedWorkspaceRoot}.`,
     };
   }
 

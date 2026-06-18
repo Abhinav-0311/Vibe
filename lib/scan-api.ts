@@ -3,6 +3,7 @@ import type { SavedScanDetail, SavedScanRecord, ScanPersistenceResult } from "@/
 import type { GeneratedReport } from "@/lib/report/types";
 import type { ScannerFacts } from "@/lib/scanner/types";
 import type { SetupPack } from "@/lib/setup-pack/types";
+import type { ArchitectureStressResult } from "@/lib/architecture-stress/types";
 
 export type ScanApiResponse = {
   scannedProject: string;
@@ -21,6 +22,7 @@ export type ScanApiResponse = {
   checklist: ChecklistResult;
   report: GeneratedReport;
   setupPack?: SetupPack;
+  architectureStress?: ArchitectureStressResult;
   persistence?: ScanPersistenceResult;
 };
 

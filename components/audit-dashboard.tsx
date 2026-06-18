@@ -56,7 +56,7 @@ const defaultAuditContext: AuditContext = {
 };
 
 const triageStorageKey = "vibe:finding-status-overrides";
-const defaultProjectPath = "E:\\College\\Project\\Vibe";
+const defaultProjectPath = "";
 
 const severityLabel: Record<Severity, string> = {
   critical: "Critical",
@@ -395,7 +395,7 @@ export function AuditDashboard() {
     void refreshWorkspaceProjects();
     void refreshSavedScans();
     void runScan(defaultAuditContext);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate and run the initial scan once.
 
   useEffect(() => {
     window.localStorage.setItem(triageStorageKey, JSON.stringify(statusOverrides));
@@ -432,6 +432,7 @@ export function AuditDashboard() {
         {viewState === "report" && (
           <>
             <ScannerFactsPreview scan={scanData} />
+            <ArchitectureStressPanel scan={scanData} />
             <ScanHistory
               activeScan={scanData}
               history={scanHistory}
@@ -665,11 +666,11 @@ function ContextControls({
             value={projectPath}
             onChange={(event) => onProjectPathChange(event.target.value)}
             className="mt-3 w-full rounded-[18px] border border-[#3d3d3d] bg-black px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#5f5858] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
-            placeholder="E:\College\Project\Vibe"
+            placeholder={workspaceProjects?.workspaceRoot ?? "Use the current server workspace"}
           />
         </label>
         <p className="mt-3 text-xs leading-5 text-[#9b9696]">
-          Paths are limited to `E:\College\Project` so the scanner cannot read arbitrary system folders.
+          Paths are limited to {workspaceProjects?.workspaceRoot ?? "the configured server workspace"} so the scanner cannot read arbitrary system folders.
         </p>
 
         <div className="mt-5 rounded-[22px] bg-black p-4">
@@ -857,7 +858,7 @@ function GitHubScanPanel({
 
   useEffect(() => {
     void loadConnection();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- load the connection once when the panel mounts.
 
   useEffect(() => {
     if (!selectedRepository || !status?.connected) {
@@ -1401,6 +1402,58 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">Run a scan to see detected and missing project signals.</p>
         </div>
       )}
+    </section>
+  );
+}
+
+function ArchitectureStressPanel({ scan }: { scan: ScanApiResponse | null }) {
+  const stress = scan?.architectureStress;
+  if (!stress) return null;
+
+  const statusStyle = {
+    resilient: "border-[#315c45] bg-[#0c2116] text-[#a7f35b]",
+    watch: "border-[#5a4d2b] bg-[#211d10] text-[#ffd166]",
+    "at-risk": "border-[#653238] bg-[#241113] text-[#ff8f8f]",
+  } as const;
+
+  return (
+    <section className="rounded-[30px] bg-[#1d1a1a] p-6 sm:p-8">
+      <div className="grid gap-6 border-b border-[#3d3d3d] pb-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div className="max-w-3xl">
+          <p className="mono text-[11px] text-[#fc74dd]">Architecture stress test</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+            Test what happens after the happy path.
+          </h2>
+          <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">
+            Six deterministic lenses examine data evolution, security, provider dependence, metered cost, failure recovery, and release stability. Every verdict comes from repository evidence, never invented infrastructure assumptions.
+          </p>
+        </div>
+        <div className="flex items-end gap-3 lg:text-right">
+          <span className="text-5xl font-semibold tracking-[-0.05em] text-white">{stress.score}</span>
+          <span className="pb-1 text-sm leading-5 text-[#d9d9d9]">/100<br />{stress.label}</span>
+        </div>
+      </div>
+
+      <div className="divide-y divide-[#3d3d3d]">
+        {stress.assessments.map((assessment, index) => (
+          <article key={assessment.id} className="grid gap-5 py-6 lg:grid-cols-[48px_minmax(180px,0.45fr)_minmax(0,1fr)] lg:items-start">
+            <p className="mono pt-1 text-[10px] text-[#777]">0{index + 1}</p>
+            <div>
+              <span className={`mono inline-flex rounded-full border px-3 py-1 text-[9px] ${statusStyle[assessment.status]}`}>
+                {assessment.status}
+              </span>
+              <h3 className="mt-3 text-lg font-semibold text-white">{assessment.title}</h3>
+            </div>
+            <div>
+              <p className="text-sm leading-6 text-white">{assessment.summary}</p>
+              <p className="mt-3 text-sm leading-6 text-[#9b9696]">{assessment.evidence.join(" ")}</p>
+              <p className="mt-3 text-sm leading-6 text-[#d9d9d9]"><span className="text-[#fc74dd]">Next:</span> {assessment.actions[0]}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <p className="border-t border-[#3d3d3d] pt-5 text-xs leading-5 text-[#777]">{stress.disclaimer}</p>
     </section>
   );
 }

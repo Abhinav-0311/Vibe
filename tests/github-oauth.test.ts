@@ -20,7 +20,10 @@ describe("GitHub token encryption", () => {
   it("rejects a modified encrypted token", () => {
     process.env.GITHUB_TOKEN_ENCRYPTION_KEY = "test-key-with-at-least-thirty-two-characters";
     const encrypted = encryptGitHubToken("github-secret-token");
-    const modified = `${encrypted.slice(0, -1)}${encrypted.endsWith("a") ? "b" : "a"}`;
+    const [iv, tag, ciphertext] = encrypted.split(".");
+    const modifiedCiphertext = Buffer.from(ciphertext, "base64url");
+    modifiedCiphertext[0] ^= 1;
+    const modified = [iv, tag, modifiedCiphertext.toString("base64url")].join(".");
 
     expect(decryptGitHubToken(modified)).toBeNull();
   });

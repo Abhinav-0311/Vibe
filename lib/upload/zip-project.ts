@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 
 const maxUploadBytes = 25 * 1024 * 1024;
+const maxExtractedBytes = 100 * 1024 * 1024;
+const maxArchiveEntries = 20_000;
 
 export type UploadedProject = {
   projectRoot: string;
@@ -47,32 +49,47 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
   const zipPath = path.join(tempRoot, "project.zip");
   const extractRoot = path.join(tempRoot, "project");
   await fs.mkdir(extractRoot, { recursive: true });
-  await fs.writeFile(zipPath, buffer);
+  try {
+    await fs.writeFile(zipPath, buffer);
 
-  const zip = new AdmZip(zipPath);
-
-  for (const entry of zip.getEntries()) {
-    const targetPath = path.resolve(extractRoot, entry.entryName);
-    const relativePath = path.relative(extractRoot, targetPath);
-    const isInsideExtractRoot =
-      relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
-
-    if (!isInsideExtractRoot) {
-      throw new Error("Archive contains unsafe file paths.");
+    const zip = new AdmZip(zipPath);
+    const entries = zip.getEntries();
+    if (entries.length > maxArchiveEntries) {
+      throw new Error(`Archive contains more than ${maxArchiveEntries.toLocaleString()} entries.`);
     }
+
+    let extractedBytes = 0;
+    for (const entry of entries) {
+      extractedBytes += entry.header.size;
+      if (extractedBytes > maxExtractedBytes) {
+        throw new Error("Archive expands beyond Vibe's 100 MB extraction limit.");
+      }
+
+      const targetPath = path.resolve(extractRoot, entry.entryName);
+      const relativePath = path.relative(extractRoot, targetPath);
+      const isInsideExtractRoot =
+        relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+
+      if (!isInsideExtractRoot) {
+        throw new Error("Archive contains unsafe file paths.");
+      }
+    }
+
+    zip.extractAllTo(extractRoot, true);
+    const projectRoot = await findPackageRoot(extractRoot);
+
+    if (!projectRoot) {
+      throw new Error("No package.json was found in the uploaded archive.");
+    }
+
+    return {
+      projectRoot,
+      cleanup: () => fs.rm(tempRoot, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+    throw error;
   }
-
-  zip.extractAllTo(extractRoot, true);
-  const projectRoot = await findPackageRoot(extractRoot);
-
-  if (!projectRoot) {
-    throw new Error("No package.json was found in the uploaded archive.");
-  }
-
-  return {
-    projectRoot,
-    cleanup: () => fs.rm(tempRoot, { recursive: true, force: true }),
-  };
 }
 
 export async function extractUploadedProject(file: File): Promise<UploadedProject> {

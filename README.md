@@ -36,6 +36,9 @@ Vibe scans local folders, uploaded ZIP archives, and GitHub repositories; detect
 - Generates a project-specific AI workspace setup pack without inventing unknown business facts.
 - Exports `AGENTS.md`, product, decision, roadmap, and user-profile memory, a session-start checklist, and an MCP/API wiring checklist as a ZIP.
 - Optionally improves report narrative and implementation prompts through evidence-constrained OpenAI structured output.
+- Runs a deterministic six-lens architecture stress test covering schema evolution, security, portability, cost, recovery, and stability.
+- Exposes dependency-aware service health at `/api/health`.
+- Enforces tests and the production build through GitHub Actions.
 
 ## Why This Exists
 
@@ -132,6 +135,7 @@ The dashboard includes:
 - GitHub issue creation from a selected finding
 - explicit GitHub fix-branch and draft-pull-request handoff
 - before-and-after scan comparison
+- architecture stress-test evidence and next actions
 - AI workspace setup-pack preview and ZIP export
 
 ### Persistence
@@ -257,6 +261,7 @@ The integration requests GitHub's `repo` scope. This permits private-repository 
 npm.cmd run dev
 npm.cmd run build
 npm.cmd run start
+npm.cmd run lint
 npm.cmd run test
 npm.cmd run db:generate
 npm.cmd run db:migrate
@@ -321,19 +326,19 @@ POST /api/setup-pack/export
 
 Validates and exports the generated AI workspace artifacts as a ZIP archive. Artifact paths are restricted to safe Markdown paths and content size is bounded.
 
-## Security Boundary
-
-The local scanner is intentionally constrained. Project paths must stay inside:
-
 ```text
-E:\College\Project
+GET /api/health
 ```
 
-This prevents the scan endpoint from becoming an unrestricted filesystem reader.
+Reports application and PostgreSQL readiness without exposing configuration values. A missing or unreachable database returns HTTP `503`.
+
+## Security Boundary
+
+The local scanner is intentionally constrained to the parent of the running application directory. The UI reads this root from the server instead of hard-coding a machine-specific path. This prevents the scan endpoint from becoming an unrestricted filesystem reader.
 
 ## Project Status
 
-Vibe is currently an MVP/prototype.
+Vibe's single-user MVP is feature complete. Hosted multi-user product work remains post-MVP.
 
 Built:
 
@@ -353,14 +358,23 @@ Built:
 - individual file copy/download and complete ZIP export
 - opt-in AI report narrative and implementation-prompt enhancement
 - deterministic fallback with model latency and token-usage metadata
+- deterministic architecture stress test
+- Fix Assistant plan, branch, draft-PR, and re-scan workflow
+- `/api/health`, GitHub Actions verification, and deployment/rollback runbook
+- portfolio case study and architecture diagram
 
 Planned:
 
 - hosted multi-user mode
-- auth and team workspaces
+- authentication, tenant isolation, and team workspaces
+- billing, quotas, and background scan jobs
+- additional framework support
 
 ## Planning Docs
 
 - [PRODUCT_BLUEPRINT.md](./PRODUCT_BLUEPRINT.md)
 - [MVP_EXECUTION_PLAN.md](./MVP_EXECUTION_PLAN.md)
 - [TECHNICAL_ARCHITECTURE.md](./TECHNICAL_ARCHITECTURE.md)
+- [Deployment and recovery](./docs/DEPLOYMENT.md)
+- [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
+- [MVP QA report](./docs/MVP_QA_REPORT.md)

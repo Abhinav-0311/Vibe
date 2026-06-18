@@ -23,6 +23,8 @@ Exit criteria:
 
 ### Phase 1: App Foundation
 
+Status: complete.
+
 Goal: create the web app shell.
 
 Tasks:
@@ -43,6 +45,8 @@ Verification:
 
 ### Phase 2: Local Scanner Core
 
+Status: complete, including local folders, ZIP archives, and GitHub repositories.
+
 Goal: scan a local or uploaded Next.js project without executing its code.
 
 Tasks:
@@ -62,6 +66,8 @@ Verification:
 - No scanned project code is executed.
 
 ### Phase 3: Checklist Engine
+
+Status: complete.
 
 Goal: convert scanner facts into production-readiness findings.
 
@@ -105,6 +111,8 @@ Status: complete. OpenAI enhancement is opt-in, schema-constrained, evidence-onl
 
 ### Phase 5: Report UI
 
+Status: complete, including architecture stress results and Fix Assistant states.
+
 Goal: make findings easy to understand and act on.
 
 Tasks:
@@ -124,6 +132,8 @@ Verification:
 
 ### Phase 6: Persistence
 
+Status: complete for single-user scan records and browser history.
+
 Goal: save projects, scans, findings, and reports.
 
 Tasks:
@@ -141,6 +151,8 @@ Verification:
 - Data model supports multiple scans per project.
 
 ### Phase 7: GitHub Integration
+
+Status: complete for repository scanning, branch selection, issues, fix branches, and draft pull requests.
 
 Goal: make Vibe work with real repositories.
 
@@ -177,6 +189,26 @@ Verification:
 - No secrets or credentials are requested or stored.
 
 Status: complete. New scans generate seven evidence-backed Markdown artifacts and support individual or ZIP export.
+
+### Phase 9: MVP Release Readiness
+
+Status: complete.
+
+Delivered:
+
+- Deterministic six-lens architecture stress test
+- Dependency-aware health endpoint
+- GitHub Actions test and production-build gate
+- Deployment and rollback runbook
+- Portfolio case study and system diagram
+- ZIP extraction-size limits and failure cleanup
+
+Post-MVP scope:
+
+- Multi-user authentication and tenant isolation
+- Team workspaces and hosted project ownership
+- Billing, quotas, and background scan jobs
+- Additional framework support
 
 ## First Coding Milestone
 
