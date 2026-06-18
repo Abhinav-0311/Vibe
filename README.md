@@ -30,6 +30,8 @@ Vibe scans a local project, detects production-readiness signals, runs context-a
 - Scans public or private GitHub repositories on a selected branch.
 - Turns individual findings into GitHub issues after explicit user approval.
 - Reports GitHub rate limits, permission failures, missing branches, and oversized repositories clearly.
+- Generates a project-specific AI workspace setup pack without inventing unknown business facts.
+- Exports `AGENTS.md`, product, decision, roadmap, and user-profile memory, a session-start checklist, and an MCP/API wiring checklist as a ZIP.
 
 ## Why This Exists
 
@@ -124,6 +126,7 @@ The dashboard includes:
 - PostgreSQL archive
 - GitHub repository and branch picker
 - GitHub issue creation from a selected finding
+- AI workspace setup-pack preview and ZIP export
 
 ### Persistence
 
@@ -287,6 +290,12 @@ POST /api/github/disconnect
 
 Manage the GitHub connection, repository and branch selection, and explicit issue creation.
 
+```text
+POST /api/setup-pack/export
+```
+
+Validates and exports the generated AI workspace artifacts as a ZIP archive. Artifact paths are restricted to safe Markdown paths and content size is bounded.
+
 ## Security Boundary
 
 The local scanner is intentionally constrained. Project paths must stay inside:
@@ -315,6 +324,8 @@ Built:
 - private GitHub repository scanning
 - branch selection and rate-limit-aware errors
 - GitHub issue generation
+- evidence-backed AI workspace setup packs
+- individual file copy/download and complete ZIP export
 
 Planned:
 

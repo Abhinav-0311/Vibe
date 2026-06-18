@@ -6,7 +6,9 @@ import {
   CheckCircle2,
   Clipboard,
   Code2,
+  Download,
   FileSearch,
+  FileText,
   Github,
   History,
   Loader2,
@@ -31,6 +33,7 @@ import type {
   WorkspaceProjectsApiResponse,
 } from "@/lib/scan-api";
 import { addScanToHistory, parseScanHistory, scanHistoryStorageKey, type ScanHistoryItem } from "@/lib/scan-history";
+import type { SetupArtifact, SetupPack } from "@/lib/setup-pack/types";
 
 type ViewState = "report" | "loading" | "empty" | "error";
 type SeverityFilter = "all" | Severity;
@@ -409,6 +412,7 @@ export function AuditDashboard() {
               onRestore={(recordId) => void restoreSavedScan(recordId)}
             />
             {scanData && <ReportNarrative scan={scanData} />}
+            {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}
             <ReportView
               report={reportWithStatuses}
               selectedFinding={selectedFinding}
@@ -1653,6 +1657,165 @@ function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
           <p className="mono text-[10px] text-[#5f5858]">{scan.report.promptQueueSummary}</p>
         </div>
       </div>
+    </section>
+  );
+}
+
+function SetupPackWorkspace({ setupPack }: { setupPack?: SetupPack }) {
+  const [selectedArtifactId, setSelectedArtifactId] = useState(setupPack?.artifacts[0]?.id ?? "");
+  const [copiedArtifactId, setCopiedArtifactId] = useState<string | null>(null);
+  const [exportState, setExportState] = useState<"idle" | "exporting" | "error">("idle");
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedArtifactId(setupPack?.artifacts[0]?.id ?? "");
+    setCopiedArtifactId(null);
+    setExportState("idle");
+    setExportError(null);
+  }, [setupPack]);
+
+  const selectedArtifact = setupPack?.artifacts.find((artifact) => artifact.id === selectedArtifactId);
+
+  function downloadBlob(blob: Blob, fileName: string) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  function downloadArtifact(artifact: SetupArtifact) {
+    downloadBlob(new Blob([artifact.content], { type: "text/markdown;charset=utf-8" }), artifact.path.split("/").pop() ?? "artifact.md");
+  }
+
+  async function copyArtifact(artifact: SetupArtifact) {
+    await navigator.clipboard?.writeText(artifact.content);
+    setCopiedArtifactId(artifact.id);
+    window.setTimeout(() => setCopiedArtifactId(null), 1600);
+  }
+
+  async function exportPack() {
+    if (!setupPack) return;
+    setExportState("exporting");
+    setExportError(null);
+
+    try {
+      const response = await fetch("/api/setup-pack/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setupPack }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "The setup pack could not be exported.");
+      }
+
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const fileName = disposition.match(/filename="([^"]+)"/)?.[1] ?? "ai-workspace-setup-pack.zip";
+      downloadBlob(await response.blob(), fileName);
+      setExportState("idle");
+    } catch (error) {
+      setExportState("error");
+      setExportError(error instanceof Error ? error.message : "The setup pack could not be exported.");
+    }
+  }
+
+  if (!setupPack || setupPack.artifacts.length === 0) {
+    return (
+      <section className="rounded-[30px] border border-[#3d3d3d] p-6 text-center sm:p-8">
+        <FileText className="mx-auto h-7 w-7 text-[#fc74dd]" aria-hidden="true" />
+        <p className="mono mt-5 text-[10px] text-[#fc74dd]">AI workspace setup pack</p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">This saved scan predates setup packs.</h2>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-[#d9d9d9]">
+          Re-run the project scan to generate evidence-backed rules, memory, session, and integration files.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-[30px] bg-[#1d1a1a] p-6 sm:p-8 lg:p-10">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="mono text-[11px] text-[#fc74dd]">AI workspace setup pack</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
+            Give coding agents durable project context.
+          </h2>
+          <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">{setupPack.summary}</p>
+          <p className="mt-2 text-xs leading-5 text-[#9b9696]">
+            Review every TODO before use. Exporting downloads files locally and never modifies the scanned repository.
+          </p>
+        </div>
+        <button
+          onClick={() => void exportPack()}
+          disabled={exportState === "exporting"}
+          className="mono inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-wait disabled:bg-[#3d3d3d] disabled:text-[#9b9696]"
+        >
+          {exportState === "exporting" ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Download className="h-4 w-4" aria-hidden="true" />
+          )}
+          {exportState === "exporting" ? "Preparing ZIP" : "Export setup pack"}
+        </button>
+      </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div aria-label="Setup pack files" className="grid grid-cols-2 content-start gap-2 lg:grid-cols-1">
+          {setupPack.artifacts.map((artifact) => (
+            <button
+              key={artifact.id}
+              aria-pressed={artifact.id === selectedArtifactId}
+              onClick={() => setSelectedArtifactId(artifact.id)}
+              className={`w-full rounded-[18px] px-4 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] ${
+                artifact.id === selectedArtifactId
+                  ? "bg-white text-black"
+                  : "bg-[#111212] text-white hover:bg-[#292525]"
+              }`}
+            >
+              <span className="mono block text-[9px] opacity-70">{artifact.kind}</span>
+              <span className="mt-2 block text-sm font-semibold">{artifact.path}</span>
+              <span className="mt-2 hidden text-xs leading-5 opacity-70 lg:block">{artifact.description}</span>
+            </button>
+          ))}
+        </div>
+
+        {selectedArtifact && (
+          <div className="min-w-0 overflow-hidden rounded-[24px] bg-[#111212]">
+            <div className="flex flex-col gap-4 border-b border-[#3d3d3d] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="mono text-[9px] text-[#9b9696]">Preview</p>
+                <p className="mt-2 text-sm font-semibold text-white">{selectedArtifact.path}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => void copyArtifact(selectedArtifact)}
+                  className="mono inline-flex items-center gap-2 rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
+                >
+                  <Clipboard className="h-4 w-4" aria-hidden="true" />
+                  {copiedArtifactId === selectedArtifact.id ? "Copied" : "Copy"}
+                </button>
+                <button
+                  onClick={() => downloadArtifact(selectedArtifact)}
+                  className="mono inline-flex items-center gap-2 rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" /> Download file
+                </button>
+              </div>
+            </div>
+            <pre className="max-h-[620px] overflow-auto whitespace-pre-wrap break-words p-5 font-mono text-xs leading-6 text-[#d9d9d9] sm:p-6">
+              {selectedArtifact.content}
+            </pre>
+          </div>
+        )}
+      </div>
+
+      {exportState === "error" && exportError && (
+        <p role="alert" className="mt-5 text-sm leading-6 text-[#ff8f8f]">{exportError}</p>
+      )}
     </section>
   );
 }

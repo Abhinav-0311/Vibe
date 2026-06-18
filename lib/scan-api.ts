@@ -2,6 +2,7 @@ import type { ChecklistResult } from "@/lib/checklist/types";
 import type { SavedScanDetail, SavedScanRecord, ScanPersistenceResult } from "@/lib/db/scan-records";
 import type { GeneratedReport } from "@/lib/report/types";
 import type { ScannerFacts } from "@/lib/scanner/types";
+import type { SetupPack } from "@/lib/setup-pack/types";
 
 export type ScanApiResponse = {
   scannedProject: string;
@@ -19,6 +20,7 @@ export type ScanApiResponse = {
   facts: ScannerFacts;
   checklist: ChecklistResult;
   report: GeneratedReport;
+  setupPack?: SetupPack;
   persistence?: ScanPersistenceResult;
 };
 

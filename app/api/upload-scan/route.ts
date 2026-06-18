@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       type: "upload",
       label: "ZIP upload",
       detail: file.name,
-    });
+    }, projectName);
 
     return NextResponse.json({
       ...response,

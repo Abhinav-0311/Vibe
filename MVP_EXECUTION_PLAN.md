@@ -174,6 +174,8 @@ Verification:
 - Generated files are specific to the project type.
 - No secrets or credentials are requested or stored.
 
+Status: complete. New scans generate seven evidence-backed Markdown artifacts and support individual or ZIP export.
+
 ## First Coding Milestone
 
 The first coding milestone should be Phase 1 plus a mocked report screen.

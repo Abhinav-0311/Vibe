@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         ...archive.repository,
         branch: archive.branch,
       },
-    });
+    }, archive.name);
 
     return NextResponse.json({
       ...response,
