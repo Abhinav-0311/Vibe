@@ -36,6 +36,9 @@ const baseFacts: ScannerFacts = {
     hasPaymentRoute: false,
     hasWebhookRoute: false,
     hasHealthRoute: false,
+    hasLocalEnvFile: false,
+    hasEnvGitignoreRule: false,
+    hasRateLimitImplementation: false,
   },
 };
 
@@ -107,6 +110,9 @@ describe("runChecklist", () => {
         hasPaymentRoute: true,
         hasWebhookRoute: true,
         hasHealthRoute: true,
+        hasLocalEnvFile: false,
+        hasEnvGitignoreRule: true,
+        hasRateLimitImplementation: true,
       },
     };
 
@@ -141,5 +147,34 @@ describe("runChecklist", () => {
     const result = runChecklist(baseFacts, apiContext);
 
     expect(result.findings.map((finding) => finding.id)).toContain("missing-health-route");
+  });
+
+  it("flags local environment files that are not ignored", () => {
+    const unsafeFacts: ScannerFacts = {
+      ...baseFacts,
+      signals: {
+        ...baseFacts.signals,
+        hasLocalEnvFile: true,
+      },
+    };
+
+    const result = runChecklist(unsafeFacts, prototypeContext);
+
+    expect(result.findings.map((finding) => finding.id)).toContain("unignored-environment-file");
+  });
+
+  it("requires rate limiting for launch-stage auth routes", () => {
+    const authRouteFacts: ScannerFacts = {
+      ...baseFacts,
+      apiRoutes: [{ route: "/api/auth/login", file: "app/api/auth/login/route.ts", signals: ["auth"] }],
+      signals: {
+        ...baseFacts.signals,
+        hasAuthRoute: true,
+      },
+    };
+
+    const result = runChecklist(authRouteFacts, launchContext);
+
+    expect(result.findings.map((finding) => finding.id)).toContain("missing-rate-limiting");
   });
 });

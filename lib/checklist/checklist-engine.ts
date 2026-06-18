@@ -27,6 +27,28 @@ function finding({
 
 const rules: ChecklistRule[] = [
   {
+    id: "unignored-environment-file",
+    category: "Security",
+    severity: "critical",
+    evaluate: (facts) => {
+      if (!facts.signals.hasLocalEnvFile || facts.signals.hasEnvGitignoreRule) return null;
+
+      return finding({
+        id: "unignored-environment-file",
+        title: "Local environment files are not fully ignored",
+        category: "Security",
+        severity: "critical",
+        evidence:
+          "A local environment file was detected, but .gitignore does not cover every detected environment filename.",
+        impact:
+          "API keys, database passwords, signing secrets, or other credentials could be committed and exposed in repository history.",
+        fix: "Add matching environment-file rules to .gitignore and remove already tracked files from Git history safely.",
+        prompt:
+          "Inspect only environment filenames and .gitignore rules; do not print secret values. Add ignore patterns covering every local environment file while keeping .env.example tracked. Check whether any secret file is already tracked, remove it from the Git index without deleting the local file, and explain that exposed credentials must be rotated.",
+      });
+    },
+  },
+  {
     id: "missing-env-example",
     category: "Deployment",
     severity: "high",
@@ -87,6 +109,32 @@ const rules: ChecklistRule[] = [
         fix: "Add middleware when protected routes, auth redirects, or request-level security controls are introduced.",
         prompt:
           "Review the app routes and identify which routes should be protected. Add a minimal Next.js middleware.ts only if it is needed for auth redirects, route protection, or request-level safeguards. Avoid adding unused middleware.",
+      });
+    },
+  },
+  {
+    id: "missing-rate-limiting",
+    category: "Security",
+    severity: "high",
+    evaluate: (facts, context) => {
+      if (context.stage === "prototype" || facts.signals.hasRateLimitImplementation) return null;
+
+      const protectsAuth = context.hasUserAccounts && facts.signals.hasAuthRoute;
+      const protectsApi = context.appType === "api" && facts.apiRoutes.length > 0;
+      if (!protectsAuth && !protectsApi) return null;
+
+      return finding({
+        id: "missing-rate-limiting",
+        title: "No rate-limiting evidence on sensitive API routes",
+        category: "Security",
+        severity: "high",
+        evidence:
+          "Sensitive API routes were detected, but no known rate-limit package, middleware pattern, or HTTP 429 handling was found.",
+        impact:
+          "Attackers can automate login attempts or overwhelm public endpoints, increasing account takeover and availability risk.",
+        fix: "Apply IP- and account-aware throttling to sensitive endpoints and return a controlled 429 response.",
+        prompt:
+          "Inspect the detected sensitive API routes and add production-appropriate rate limiting. Prefer the project's existing infrastructure, use both IP and account identifiers where available, return HTTP 429 with a safe retry response, avoid limiting trusted webhook delivery, and add tests for repeated requests and reset behavior.",
       });
     },
   },

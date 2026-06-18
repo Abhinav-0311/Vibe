@@ -18,10 +18,12 @@ const authPackages = [
 
 const analyticsPackages = ["posthog-js", "@vercel/analytics", "mixpanel-browser", "analytics"];
 const errorTrackingPackages = ["@sentry/nextjs", "@highlight-run/next", "@bugsnag/js"];
+const rateLimitPackages = ["@upstash/ratelimit", "rate-limiter-flexible", "express-rate-limit"];
 const routeFilePattern = /^route\.(?:ts|js|mjs|cjs)$/i;
 const pagesApiFilePattern = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/i;
 const ignoredRouteDirectories = new Set(["node_modules", ".next", ".git"]);
 const maxRouteFiles = 500;
+const maxSecuritySampleBytes = 256 * 1024;
 
 async function pathExists(targetPath: string) {
   try {
@@ -36,6 +38,24 @@ async function readJsonFile<T>(targetPath: string): Promise<T | null> {
   try {
     const file = await fs.readFile(targetPath, "utf8");
     return JSON.parse(file) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function readTextFile(targetPath: string): Promise<string | null> {
+  try {
+    return await fs.readFile(targetPath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+async function readSecuritySample(targetPath: string): Promise<string | null> {
+  try {
+    const stats = await fs.stat(targetPath);
+    if (!stats.isFile() || stats.size > maxSecuritySampleBytes) return null;
+    return await fs.readFile(targetPath, "utf8");
   } catch {
     return null;
   }
@@ -110,6 +130,11 @@ async function detectFiles(projectRoot: string): Promise<DetectedFile[]> {
     "middleware.ts",
     "middleware.js",
     ".env.example",
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.production",
+    ".gitignore",
     "AGENTS.md",
     ".cursor/rules",
     ".cursorrules",
@@ -220,6 +245,43 @@ async function detectApiRoutes(projectRoot: string): Promise<DetectedApiRoute[]>
   return [...appRoutes, ...pagesRoutes].sort((a, b) => a.route.localeCompare(b.route));
 }
 
+function ignoresEnvironmentFiles(gitignore: string | null, environmentFiles: string[]) {
+  if (!gitignore || environmentFiles.length === 0) return false;
+
+  const patterns = gitignore
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#") && !line.startsWith("!"))
+    .map((line) => line.replace(/^\//, ""));
+
+  return environmentFiles.every((file) =>
+    patterns.some((pattern) => {
+      if (pattern === ".env*") return file.startsWith(".env");
+      if (pattern === ".env.*") return file.startsWith(".env.");
+      if (pattern === ".env*.local") return file.startsWith(".env") && file.endsWith(".local");
+      return pattern === file;
+    }),
+  );
+}
+
+async function detectRateLimitImplementation(
+  projectRoot: string,
+  apiRoutes: DetectedApiRoute[],
+  dependencies: DependencySignal[],
+) {
+  if (hasAnyDependency(dependencies, rateLimitPackages)) return true;
+
+  const sourceFiles = [
+    ...apiRoutes.map((route) => path.join(projectRoot, route.file)),
+    path.join(projectRoot, "middleware.ts"),
+    path.join(projectRoot, "middleware.js"),
+  ];
+  const samples = await Promise.all(sourceFiles.map(readSecuritySample));
+  const rateLimitPattern = /(?:rate[-_ ]?limit|ratelimit|slidingWindow|fixedWindow|status\s*[:(]\s*429|too many requests)/i;
+
+  return samples.some((sample) => sample && rateLimitPattern.test(sample));
+}
+
 export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
   const absoluteDetectedFiles = detectedFiles
@@ -233,6 +295,12 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
 
   const dependencies = flattenDependencies(packageJson);
   const apiRoutes = await detectApiRoutes(projectRoot);
+  const gitignore = await readTextFile(path.join(projectRoot, ".gitignore"));
+  const localEnvFiles = [".env", ".env.local", ".env.development", ".env.production"].filter((file) =>
+    detectedFiles.some((detectedFile) => detectedFile.path === file && detectedFile.exists),
+  );
+  const hasLocalEnvFile = localEnvFiles.length > 0;
+  const hasRateLimitImplementation = await detectRateLimitImplementation(projectRoot, apiRoutes, dependencies);
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
   const hasAppRouter = detectedFiles.some((file) => file.path === "app" && file.exists);
   const hasPagesRouter = detectedFiles.some((file) => file.path === "pages" && file.exists);
@@ -270,6 +338,9 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasPaymentRoute: apiRoutes.some((route) => route.signals.includes("payments")),
       hasWebhookRoute: apiRoutes.some((route) => route.signals.includes("webhook")),
       hasHealthRoute: apiRoutes.some((route) => route.signals.includes("health")),
+      hasLocalEnvFile,
+      hasEnvGitignoreRule: ignoresEnvironmentFiles(gitignore, localEnvFiles),
+      hasRateLimitImplementation,
     },
   };
 }

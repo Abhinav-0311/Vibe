@@ -924,6 +924,11 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           detected: scan.facts.signals.hasMiddleware,
         },
         {
+          label: "Rate limiting",
+          detail: "package, middleware, or HTTP 429 handling",
+          detected: scan.facts.signals.hasRateLimitImplementation,
+        },
+        {
           label: "Auth dependency",
           detail: "Clerk, NextAuth, Supabase, Lucia",
           detected: scan.facts.signals.hasAuthDependency,
@@ -948,6 +953,15 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           detail: "AGENTS.md or cursor rules",
           detected: scan.facts.signals.hasAiRules,
         },
+        ...(scan.facts.signals.hasLocalEnvFile
+          ? [
+              {
+                label: "Local env files ignored",
+                detail: ".gitignore covers detected environment files",
+                detected: scan.facts.signals.hasEnvGitignoreRule,
+              },
+            ]
+          : []),
       ]
     : [];
   const detectedCount = evidence.filter((item) => item.detected).length;

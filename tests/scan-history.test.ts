@@ -36,6 +36,9 @@ function createScan(scannedAt: string, score: number): ScanApiResponse {
         hasPaymentRoute: false,
         hasWebhookRoute: false,
         hasHealthRoute: false,
+        hasLocalEnvFile: false,
+        hasEnvGitignoreRule: false,
+        hasRateLimitImplementation: false,
       },
     },
     checklist: {

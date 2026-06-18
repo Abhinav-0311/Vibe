@@ -38,6 +38,9 @@ const facts: ScannerFacts = {
     hasPaymentRoute: false,
     hasWebhookRoute: false,
     hasHealthRoute: false,
+    hasLocalEnvFile: false,
+    hasEnvGitignoreRule: false,
+    hasRateLimitImplementation: false,
   },
 };
 
@@ -89,6 +92,9 @@ describe("generateReport", () => {
           hasAiRules: true,
           hasPaymentRoute: true,
           hasWebhookRoute: true,
+          hasLocalEnvFile: false,
+          hasEnvGitignoreRule: true,
+          hasRateLimitImplementation: true,
         },
       },
       launchContext,

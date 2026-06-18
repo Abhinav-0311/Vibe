@@ -16,10 +16,14 @@ async function createProject() {
   return projectRoot;
 }
 
-async function createFile(projectRoot: string, relativePath: string) {
+async function createFile(
+  projectRoot: string,
+  relativePath: string,
+  content = "export async function GET() {}\n",
+) {
   const targetPath = path.join(projectRoot, relativePath);
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(targetPath, "export async function GET() {}\n");
+  await fs.writeFile(targetPath, content);
 }
 
 afterEach(async () => {
@@ -44,5 +48,32 @@ describe("scanProject API route discovery", () => {
     expect(facts.signals.hasPaymentRoute).toBe(true);
     expect(facts.signals.hasWebhookRoute).toBe(true);
     expect(facts.signals.hasHealthRoute).toBe(true);
+  });
+
+  it("checks every detected environment filename against gitignore patterns", async () => {
+    const projectRoot = await createProject();
+    await createFile(projectRoot, ".env.production", "SECRET=not-read-by-the-scanner\n");
+    await createFile(projectRoot, ".gitignore", ".env\n");
+
+    const partiallyIgnoredFacts = await scanProject(projectRoot);
+    expect(partiallyIgnoredFacts.signals.hasLocalEnvFile).toBe(true);
+    expect(partiallyIgnoredFacts.signals.hasEnvGitignoreRule).toBe(false);
+
+    await createFile(projectRoot, ".gitignore", ".env*\n");
+    const safelyIgnoredFacts = await scanProject(projectRoot);
+    expect(safelyIgnoredFacts.signals.hasEnvGitignoreRule).toBe(true);
+  });
+
+  it("detects rate-limiting evidence in bounded API route source", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "app/api/auth/login/route.ts",
+      "export async function POST() { return Response.json({}, { status: 429 }); }\n",
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasRateLimitImplementation).toBe(true);
   });
 });

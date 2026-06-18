@@ -47,5 +47,8 @@ export type ScannerFacts = {
     hasPaymentRoute: boolean;
     hasWebhookRoute: boolean;
     hasHealthRoute: boolean;
+    hasLocalEnvFile: boolean;
+    hasEnvGitignoreRule: boolean;
+    hasRateLimitImplementation: boolean;
   };
 };
