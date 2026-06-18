@@ -175,6 +175,11 @@ function classifyRoute(route: string): DetectedApiRoute["signals"] {
   const signals: DetectedApiRoute["signals"] = [];
 
   if (/(?:auth|login|signin|signup|register|password|session)/.test(normalized)) signals.push("auth");
+  if (/(?:login|signin|signup|register|password)/.test(normalized)) signals.push("credential-auth");
+  if (/(?:forgot|recover|reset)[-_\/]?(?:password)?|password[-_\/]?(?:forgot|recover|reset)/.test(normalized)) {
+    signals.push("recovery");
+  }
+  if (/(?:logout|signout|session)/.test(normalized)) signals.push("session");
   if (/(?:payment|checkout|billing|stripe|subscription)/.test(normalized)) signals.push("payments");
   if (/webhooks?/.test(normalized)) signals.push("webhook");
   if (/(?:health|status)/.test(normalized)) signals.push("health");
@@ -327,6 +332,24 @@ async function detectWildcardCors(
     .map(({ relativeFile }) => normalizeRoutePath(relativeFile));
 }
 
+async function detectInsecureSessionCookies(projectRoot: string, apiRoutes: DetectedApiRoute[]) {
+  const authFiles = apiRoutes
+    .filter((route) => route.signals.includes("auth"))
+    .map((route) => route.file);
+  const relativeFiles = Array.from(new Set([...authFiles, "middleware.ts", "middleware.js"]));
+  const samples = await Promise.all(
+    relativeFiles.map(async (relativeFile) => ({
+      relativeFile,
+      sample: await readSecuritySample(path.join(projectRoot, relativeFile)),
+    })),
+  );
+  const insecureCookiePattern = /(?:httpOnly|secure)\s*:\s*false/i;
+
+  return samples
+    .filter(({ sample }) => sample && insecureCookiePattern.test(sample))
+    .map(({ relativeFile }) => normalizeRoutePath(relativeFile));
+}
+
 export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
   const absoluteDetectedFiles = detectedFiles
@@ -348,6 +371,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const hasRateLimitImplementation = await detectRateLimitImplementation(projectRoot, apiRoutes, dependencies);
   const hasWebhookSignatureVerification = await detectWebhookSignatureVerification(projectRoot, apiRoutes);
   const wildcardCorsFiles = await detectWildcardCors(projectRoot, apiRoutes, detectedFiles);
+  const insecureSessionCookieFiles = await detectInsecureSessionCookies(projectRoot, apiRoutes);
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
   const hasAppRouter = detectedFiles.some((file) => file.path === "app" && file.exists);
   const hasPagesRouter = detectedFiles.some((file) => file.path === "pages" && file.exists);
@@ -368,6 +392,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
     apiRoutes,
     securityEvidence: {
       wildcardCorsFiles,
+      insecureSessionCookieFiles,
     },
     signals: {
       hasPackageJson: detectedFiles.some((file) => file.path === "package.json" && file.exists),
@@ -385,6 +410,9 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasErrorTrackingDependency: hasAnyDependency(dependencies, errorTrackingPackages),
       hasAiRules,
       hasAuthRoute: apiRoutes.some((route) => route.signals.includes("auth")),
+      hasCredentialAuthRoute: apiRoutes.some((route) => route.signals.includes("credential-auth")),
+      hasPasswordRecoveryRoute: apiRoutes.some((route) => route.signals.includes("recovery")),
+      hasSessionManagementRoute: apiRoutes.some((route) => route.signals.includes("session")),
       hasPaymentRoute: apiRoutes.some((route) => route.signals.includes("payments")),
       hasWebhookRoute: apiRoutes.some((route) => route.signals.includes("webhook")),
       hasWebhookSignatureVerification,
@@ -393,6 +421,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasEnvGitignoreRule: ignoresEnvironmentFiles(gitignore, localEnvFiles),
       hasRateLimitImplementation,
       hasWildcardCors: wildcardCorsFiles.length > 0,
+      hasInsecureSessionCookie: insecureSessionCookieFiles.length > 0,
     },
   };
 }

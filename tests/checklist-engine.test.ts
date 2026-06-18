@@ -33,6 +33,9 @@ const baseFacts: ScannerFacts = {
     hasErrorTrackingDependency: false,
     hasAiRules: false,
     hasAuthRoute: false,
+    hasCredentialAuthRoute: false,
+    hasPasswordRecoveryRoute: false,
+    hasSessionManagementRoute: false,
     hasPaymentRoute: false,
     hasWebhookRoute: false,
     hasWebhookSignatureVerification: false,
@@ -41,6 +44,7 @@ const baseFacts: ScannerFacts = {
     hasEnvGitignoreRule: false,
     hasRateLimitImplementation: false,
     hasWildcardCors: false,
+    hasInsecureSessionCookie: false,
   },
 };
 
@@ -109,6 +113,9 @@ describe("runChecklist", () => {
         hasErrorTrackingDependency: true,
         hasAiRules: true,
         hasAuthRoute: true,
+        hasCredentialAuthRoute: true,
+        hasPasswordRecoveryRoute: true,
+        hasSessionManagementRoute: true,
         hasPaymentRoute: true,
         hasWebhookRoute: true,
         hasWebhookSignatureVerification: true,
@@ -117,6 +124,7 @@ describe("runChecklist", () => {
         hasEnvGitignoreRule: true,
         hasRateLimitImplementation: true,
         hasWildcardCors: false,
+        hasInsecureSessionCookie: false,
       },
     };
 
@@ -223,5 +231,45 @@ describe("runChecklist", () => {
 
     expect(corsFinding?.severity).toBe("high");
     expect(corsFinding?.evidence).toContain("app/api/data/route.ts");
+  });
+
+  it("requires recovery and logout for local credential auth before launch", () => {
+    const credentialFacts: ScannerFacts = {
+      ...baseFacts,
+      apiRoutes: [{ route: "/api/auth/login", file: "app/api/auth/login/route.ts", signals: ["auth", "credential-auth"] }],
+      signals: {
+        ...baseFacts.signals,
+        hasAuthDependency: true,
+        hasAuthRoute: true,
+        hasCredentialAuthRoute: true,
+        hasRateLimitImplementation: true,
+      },
+    };
+
+    const result = runChecklist(credentialFacts, launchContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).toContain("missing-account-recovery");
+    expect(findingIds).toContain("missing-session-termination");
+  });
+
+  it("flags explicit insecure session cookie settings", () => {
+    const insecureCookieFacts: ScannerFacts = {
+      ...baseFacts,
+      securityEvidence: {
+        wildcardCorsFiles: [],
+        insecureSessionCookieFiles: ["app/api/auth/login/route.ts"],
+      },
+      signals: {
+        ...baseFacts.signals,
+        hasInsecureSessionCookie: true,
+      },
+    };
+
+    const result = runChecklist(insecureCookieFacts, prototypeContext);
+    const cookieFinding = result.findings.find((finding) => finding.id === "insecure-session-cookie");
+
+    expect(cookieFinding?.severity).toBe("high");
+    expect(cookieFinding?.evidence).toContain("app/api/auth/login/route.ts");
   });
 });

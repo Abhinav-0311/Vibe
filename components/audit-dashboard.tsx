@@ -942,6 +942,31 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           detail: "Clerk, NextAuth, Supabase, Lucia",
           detected: scan.facts.signals.hasAuthDependency,
         },
+        ...(scan.facts.signals.hasCredentialAuthRoute &&
+        typeof scan.facts.signals.hasPasswordRecoveryRoute === "boolean"
+          ? [
+              {
+                label: "Account recovery",
+                detail: "Forgot-password or reset route",
+                detected: scan.facts.signals.hasPasswordRecoveryRoute,
+              },
+              {
+                label: "Session termination",
+                detail: "Logout, signout, or session route",
+                detected: scan.facts.signals.hasSessionManagementRoute,
+              },
+            ]
+          : []),
+        ...(scan.facts.signals.hasAuthRoute &&
+        typeof scan.facts.signals.hasInsecureSessionCookie === "boolean"
+          ? [
+              {
+                label: "Session cookie safety",
+                detail: "No explicitly disabled httpOnly or secure option",
+                detected: !scan.facts.signals.hasInsecureSessionCookie,
+              },
+            ]
+          : []),
         {
           label: "Payments dependency",
           detail: "Stripe packages",

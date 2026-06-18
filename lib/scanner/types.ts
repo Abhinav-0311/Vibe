@@ -14,7 +14,9 @@ export type DependencySignal = {
 export type DetectedApiRoute = {
   route: string;
   file: string;
-  signals: Array<"auth" | "payments" | "webhook" | "health">;
+  signals: Array<
+    "auth" | "credential-auth" | "recovery" | "session" | "payments" | "webhook" | "health"
+  >;
 };
 
 export type ScannerFacts = {
@@ -30,6 +32,7 @@ export type ScannerFacts = {
   apiRoutes: DetectedApiRoute[];
   securityEvidence?: {
     wildcardCorsFiles: string[];
+    insecureSessionCookieFiles: string[];
   };
   signals: {
     hasPackageJson: boolean;
@@ -47,6 +50,9 @@ export type ScannerFacts = {
     hasErrorTrackingDependency: boolean;
     hasAiRules: boolean;
     hasAuthRoute: boolean;
+    hasCredentialAuthRoute: boolean;
+    hasPasswordRecoveryRoute: boolean;
+    hasSessionManagementRoute: boolean;
     hasPaymentRoute: boolean;
     hasWebhookRoute: boolean;
     hasWebhookSignatureVerification: boolean;
@@ -55,5 +61,6 @@ export type ScannerFacts = {
     hasEnvGitignoreRule: boolean;
     hasRateLimitImplementation: boolean;
     hasWildcardCors: boolean;
+    hasInsecureSessionCookie: boolean;
   };
 };

@@ -33,6 +33,9 @@ function createScan(scannedAt: string, score = 100): ScanApiResponse {
         hasErrorTrackingDependency: false,
         hasAiRules: true,
         hasAuthRoute: false,
+        hasCredentialAuthRoute: false,
+        hasPasswordRecoveryRoute: false,
+        hasSessionManagementRoute: false,
         hasPaymentRoute: false,
         hasWebhookRoute: false,
         hasWebhookSignatureVerification: false,
@@ -41,6 +44,7 @@ function createScan(scannedAt: string, score = 100): ScanApiResponse {
         hasEnvGitignoreRule: false,
         hasRateLimitImplementation: false,
         hasWildcardCors: false,
+        hasInsecureSessionCookie: false,
       },
     },
     checklist: {

@@ -45,6 +45,9 @@ describe("scanProject API route discovery", () => {
       "/api/stripe/webhook",
     ]);
     expect(facts.signals.hasAuthRoute).toBe(true);
+    expect(facts.signals.hasCredentialAuthRoute).toBe(true);
+    expect(facts.signals.hasPasswordRecoveryRoute).toBe(false);
+    expect(facts.signals.hasSessionManagementRoute).toBe(false);
     expect(facts.signals.hasPaymentRoute).toBe(true);
     expect(facts.signals.hasWebhookRoute).toBe(true);
     expect(facts.signals.hasWebhookSignatureVerification).toBe(false);
@@ -64,6 +67,17 @@ describe("scanProject API route discovery", () => {
 
     expect(facts.signals.hasWebhookRoute).toBe(true);
     expect(facts.signals.hasWebhookSignatureVerification).toBe(true);
+  });
+
+  it("classifies account recovery and session-management routes", async () => {
+    const projectRoot = await createProject();
+    await createFile(projectRoot, "app/api/auth/forgot-password/route.ts");
+    await createFile(projectRoot, "app/api/auth/logout/route.ts");
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasPasswordRecoveryRoute).toBe(true);
+    expect(facts.signals.hasSessionManagementRoute).toBe(true);
   });
 
   it("checks every detected environment filename against gitignore patterns", async () => {
@@ -105,5 +119,21 @@ describe("scanProject API route discovery", () => {
 
     expect(facts.signals.hasWildcardCors).toBe(true);
     expect(facts.securityEvidence?.wildcardCorsFiles).toEqual(["app/api/public/route.ts"]);
+  });
+
+  it("records auth files with explicitly insecure cookie options", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "app/api/auth/login/route.ts",
+      "export async function POST() { cookies().set('session', 'token', { httpOnly: false, secure: false }); }\n",
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasInsecureSessionCookie).toBe(true);
+    expect(facts.securityEvidence?.insecureSessionCookieFiles).toEqual([
+      "app/api/auth/login/route.ts",
+    ]);
   });
 });

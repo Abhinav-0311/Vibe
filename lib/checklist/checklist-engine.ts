@@ -190,6 +190,75 @@ const rules: ChecklistRule[] = [
     },
   },
   {
+    id: "missing-account-recovery",
+    category: "Auth",
+    severity: "high",
+    evaluate: (facts, context) => {
+      if (context.stage === "prototype" || !context.hasUserAccounts) return null;
+      if (!facts.signals.hasCredentialAuthRoute || facts.signals.hasPasswordRecoveryRoute) return null;
+
+      return finding({
+        id: "missing-account-recovery",
+        title: "No account recovery route detected",
+        category: "Auth",
+        severity: "high",
+        evidence:
+          "Local credential-auth routes were detected, but no forgot-password, recovery, or password-reset route was found.",
+        impact:
+          "Users who lose access may be permanently locked out or require unsafe manual account intervention.",
+        fix: "Add a time-limited, single-use account recovery flow with neutral responses and secure token storage.",
+        prompt:
+          "Inspect the local credential-auth implementation and add a secure account recovery flow. Use short-lived single-use tokens, store only token hashes, return neutral responses that do not reveal account existence, invalidate active reset tokens after success, rate limit requests, and add tests for expiry, reuse, and unknown emails.",
+      });
+    },
+  },
+  {
+    id: "missing-session-termination",
+    category: "Auth",
+    severity: "medium",
+    evaluate: (facts, context) => {
+      if (context.stage === "prototype" || !context.hasUserAccounts) return null;
+      if (!facts.signals.hasCredentialAuthRoute || facts.signals.hasSessionManagementRoute) return null;
+
+      return finding({
+        id: "missing-session-termination",
+        title: "No logout or session-management route detected",
+        category: "Auth",
+        severity: "medium",
+        evidence:
+          "Local credential-auth routes were detected, but no logout, signout, or session route was found.",
+        impact: "Users may be unable to reliably terminate an active session on shared or compromised devices.",
+        fix: "Add logout behavior that invalidates the server session and clears the client cookie safely.",
+        prompt:
+          "Inspect the current session model and add a secure logout/session termination flow. Invalidate the server-side session where applicable, clear the cookie with matching path and domain attributes, use POST for state-changing logout actions, and add tests proving the session cannot be reused.",
+      });
+    },
+  },
+  {
+    id: "insecure-session-cookie",
+    category: "Auth",
+    severity: "high",
+    evaluate: (facts) => {
+      if (!facts.signals.hasInsecureSessionCookie) return null;
+
+      const evidenceFiles = facts.securityEvidence?.insecureSessionCookieFiles ?? [];
+      const evidenceSuffix = evidenceFiles.length > 0 ? ` Found in ${evidenceFiles.join(", ")}.` : "";
+
+      return finding({
+        id: "insecure-session-cookie",
+        title: "Unsafe session cookie option detected",
+        category: "Auth",
+        severity: "high",
+        evidence: `An auth route or middleware explicitly disables httpOnly or secure cookie protection.${evidenceSuffix}`,
+        impact:
+          "Client-side scripts or unencrypted transport may expose reusable session credentials to attackers.",
+        fix: "Use httpOnly cookies and require secure transport outside deliberate local-development handling.",
+        prompt:
+          "Inspect the files named in this finding and harden session cookie settings. Use httpOnly, secure in production, an appropriate sameSite policy, a narrow path and domain, and bounded expiry. Preserve local development behavior without shipping insecure production defaults, then add configuration tests.",
+      });
+    },
+  },
+  {
     id: "missing-stripe",
     category: "Payments",
     severity: "medium",
