@@ -22,14 +22,20 @@ export function createScanHash(scan: ScanApiResponse) {
   const fingerprint = {
     scannedProject: scan.scannedProject,
     facts: scan.facts,
-    checklist: scan.checklist,
-    report: {
-      readinessLabel: scan.report.readinessLabel,
-      executiveSummary: scan.report.executiveSummary,
-      interpretation: scan.report.interpretation,
-      topRisks: scan.report.topRisks,
-      nextActions: scan.report.nextActions,
-      promptQueueSummary: scan.report.promptQueueSummary,
+    checklist: {
+      score: scan.checklist.score,
+      context: scan.checklist.context,
+      summary: scan.checklist.summary,
+      findings: scan.checklist.findings.map((finding) => ({
+        id: finding.id,
+        title: finding.title,
+        category: finding.category,
+        severity: finding.severity,
+        status: finding.status,
+        evidence: finding.evidence,
+        impact: finding.impact,
+        fix: finding.fix,
+      })),
     },
   };
 

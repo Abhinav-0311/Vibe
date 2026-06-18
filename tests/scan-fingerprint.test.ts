@@ -94,4 +94,26 @@ describe("createScanHash", () => {
       createScanHash(createScan("2026-06-13T00:00:00.000Z", 80)),
     );
   });
+
+  it("ignores generated report wording and implementation-prompt variation", () => {
+    const first = createScan("2026-06-13T00:00:00.000Z");
+    const second = createScan("2026-06-13T00:00:00.000Z");
+    first.checklist.findings = [
+      {
+        id: "finding",
+        title: "Finding",
+        category: "Security",
+        severity: "high",
+        status: "open",
+        evidence: "Stable evidence",
+        impact: "Stable impact",
+        fix: "Stable fix",
+        prompt: "First generated prompt",
+      },
+    ];
+    second.checklist.findings = [{ ...first.checklist.findings[0], prompt: "Different AI wording" }];
+    second.report.executiveSummary = "Different AI summary wording";
+
+    expect(createScanHash(first)).toBe(createScanHash(second));
+  });
 });

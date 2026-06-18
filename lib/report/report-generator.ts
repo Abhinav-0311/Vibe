@@ -132,5 +132,6 @@ export function generateReport({ facts, checklist, scannedAt }: GenerateReportIn
     topRisks: getTopRisks(checklist),
     nextActions: getNextActions(checklist),
     promptQueueSummary: getPromptQueueSummary(checklist),
+    generation: { mode: "deterministic" },
   };
 }

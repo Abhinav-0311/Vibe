@@ -16,4 +16,14 @@ export type GeneratedReport = {
   topRisks: GeneratedReportRisk[];
   nextActions: string[];
   promptQueueSummary: string;
+  generation?: {
+    mode: "deterministic" | "openai";
+    model?: string;
+    fallbackReason?: "disabled" | "missing_api_key" | "timeout" | "api_error" | "invalid_output";
+    latencyMs?: number;
+    usage?: {
+      inputTokens: number;
+      outputTokens: number;
+    };
+  };
 };

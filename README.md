@@ -32,6 +32,7 @@ Vibe scans a local project, detects production-readiness signals, runs context-a
 - Reports GitHub rate limits, permission failures, missing branches, and oversized repositories clearly.
 - Generates a project-specific AI workspace setup pack without inventing unknown business facts.
 - Exports `AGENTS.md`, product, decision, roadmap, and user-profile memory, a session-start checklist, and an MCP/API wiring checklist as a ZIP.
+- Optionally improves report narrative and implementation prompts through evidence-constrained OpenAI structured output.
 
 ## Why This Exists
 
@@ -155,7 +156,24 @@ SENTRY_DSN=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 GITHUB_TOKEN_ENCRYPTION_KEY=replace-with-at-least-32-random-characters
+OPENAI_REPORT_ENABLED=false
+OPENAI_REPORT_MODEL=gpt-5.4-mini
 ```
+
+## AI Report Enhancement
+
+Every scan first creates a complete deterministic report. OpenAI enhancement is optional and cannot change the score, readiness label, severities, categories, finding IDs, or evidence.
+
+To enable it:
+
+1. Replace `sk-placeholder` with a real server-side `OPENAI_API_KEY` in `.env`.
+2. Set `OPENAI_REPORT_ENABLED=true`.
+3. Keep `OPENAI_REPORT_MODEL` configurable for model availability and cost control.
+4. Restart the development server.
+
+Vibe sends normalized framework metadata, dependency names, route metadata, context, and findings. It does not send repository source code, environment values, package-script bodies, or the local project path. Requests use the Responses API with strict structured output and `store: false`. A timeout, API failure, or invalid response preserves the deterministic report.
+
+Keep AI enhancement disabled on an unauthenticated public deployment. The current MVP flag is intended for trusted local use; hosted usage controls belong with the authentication and workspace phase.
 
 Generate Prisma Client:
 
@@ -326,10 +344,11 @@ Built:
 - GitHub issue generation
 - evidence-backed AI workspace setup packs
 - individual file copy/download and complete ZIP export
+- opt-in AI report narrative and implementation-prompt enhancement
+- deterministic fallback with model latency and token-usage metadata
 
 Planned:
 
-- AI-assisted report wording
 - hosted multi-user mode
 - auth and team workspaces
 

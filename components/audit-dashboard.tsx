@@ -1600,11 +1600,36 @@ function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
     window.setTimeout(() => setCopied(false), 1600);
   }
 
+  const generation = scan.report.generation;
+  const isAiEnhanced = generation?.mode === "openai";
+  const fallbackMessage =
+    generation?.fallbackReason && !["disabled", "missing_api_key"].includes(generation.fallbackReason)
+      ? generation.fallbackReason === "timeout"
+        ? "AI enhancement timed out. The evidence-generated report was preserved."
+        : generation.fallbackReason === "api_error"
+          ? "The AI service was unavailable. The evidence-generated report was preserved."
+          : "The AI response did not pass validation. The evidence-generated report was preserved."
+      : null;
+
   return (
     <section className="rounded-[30px] bg-[#f4f2ee] p-6 text-black sm:p-8 lg:p-10">
       <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
         <div>
-          <p className="mono text-[11px] text-[#5f5858]">Generated report</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="mono text-[11px] text-[#5f5858]">Generated report</p>
+            <span className={`mono rounded-full px-3 py-1 text-[9px] ${isAiEnhanced ? "bg-black text-white" : "bg-white text-[#333030]"}`}>
+              {isAiEnhanced ? `AI enhanced / ${generation?.model}` : "Evidence generated"}
+            </span>
+          </div>
+          {isAiEnhanced && generation && (
+            <p className="mono mt-3 text-[9px] text-[#5f5858]">
+              {generation.latencyMs !== undefined ? `${(generation.latencyMs / 1000).toFixed(1)}s` : "Completed"}
+              {generation.usage
+                ? ` / ${generation.usage.inputTokens} input tokens / ${generation.usage.outputTokens} output tokens`
+                : ""}
+            </p>
+          )}
+          {fallbackMessage && <p className="mt-3 text-xs leading-5 text-[#8a3d2f]">{fallbackMessage}</p>}
           <h2 className="mt-4 max-w-xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
             {scan.report.readinessLabel}
           </h2>

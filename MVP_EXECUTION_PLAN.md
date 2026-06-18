@@ -101,6 +101,8 @@ Verification:
 - Prompts are actionable and stack-aware.
 - Generic findings are rejected or downgraded.
 
+Status: complete. OpenAI enhancement is opt-in, schema-constrained, evidence-only, and falls back to the deterministic report on any failure.
+
 ### Phase 5: Report UI
 
 Goal: make findings easy to understand and act on.
