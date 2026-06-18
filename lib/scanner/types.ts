@@ -11,6 +11,12 @@ export type DependencySignal = {
   kind: "dependency" | "devDependency";
 };
 
+export type DetectedApiRoute = {
+  route: string;
+  file: string;
+  signals: Array<"auth" | "payments" | "webhook" | "health">;
+};
+
 export type ScannerFacts = {
   projectRoot: string;
   packageManager: PackageManager;
@@ -21,6 +27,7 @@ export type ScannerFacts = {
   scripts: Record<string, string>;
   dependencies: DependencySignal[];
   detectedFiles: DetectedFile[];
+  apiRoutes: DetectedApiRoute[];
   signals: {
     hasPackageJson: boolean;
     hasNextConfig: boolean;
@@ -36,5 +43,9 @@ export type ScannerFacts = {
     hasObservabilityPlan: boolean;
     hasErrorTrackingDependency: boolean;
     hasAiRules: boolean;
+    hasAuthRoute: boolean;
+    hasPaymentRoute: boolean;
+    hasWebhookRoute: boolean;
+    hasHealthRoute: boolean;
   };
 };

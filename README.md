@@ -12,6 +12,7 @@ Vibe scans a local project, detects production-readiness signals, runs context-a
 
 - Scans local projects under a controlled workspace path.
 - Detects framework, package manager, dependencies, routes, tests, environment files, middleware, analytics, observability, and AI workspace rules.
+- Inventories Next.js API routes and classifies auth, payment, webhook, and health endpoints without executing project code.
 - Scores the project against launch-readiness rules.
 - Generates a deterministic executive report without relying on AI guesses.
 - Shows an evidence ledger so users can see why the score changed.
@@ -104,6 +105,7 @@ The dashboard includes:
 - readiness score
 - generated report narrative
 - evidence ledger
+- route-level API evidence
 - prioritized findings
 - prompt queue
 - Markdown report export
@@ -268,7 +270,6 @@ Built:
 
 Planned:
 
-- deeper route inspection
 - security-specific checks
 - GitHub issue generation
 - AI-assisted report wording

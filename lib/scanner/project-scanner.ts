@@ -1,6 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { DependencySignal, DetectedFile, PackageManager, ScannerFacts } from "./types";
+import type {
+  DependencySignal,
+  DetectedApiRoute,
+  DetectedFile,
+  PackageManager,
+  ScannerFacts,
+} from "./types";
 
 const authPackages = [
   "@clerk/nextjs",
@@ -12,6 +18,10 @@ const authPackages = [
 
 const analyticsPackages = ["posthog-js", "@vercel/analytics", "mixpanel-browser", "analytics"];
 const errorTrackingPackages = ["@sentry/nextjs", "@highlight-run/next", "@bugsnag/js"];
+const routeFilePattern = /^route\.(?:ts|js|mjs|cjs)$/i;
+const pagesApiFilePattern = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/i;
+const ignoredRouteDirectories = new Set(["node_modules", ".next", ".git"]);
+const maxRouteFiles = 500;
 
 async function pathExists(targetPath: string) {
   try {
@@ -131,6 +141,85 @@ async function detectTests(projectRoot: string) {
   return results.some(Boolean);
 }
 
+function normalizeRoutePath(value: string) {
+  return value.split(path.sep).join("/");
+}
+
+function classifyRoute(route: string): DetectedApiRoute["signals"] {
+  const normalized = route.toLowerCase();
+  const signals: DetectedApiRoute["signals"] = [];
+
+  if (/(?:auth|login|signin|signup|register|password|session)/.test(normalized)) signals.push("auth");
+  if (/(?:payment|checkout|billing|stripe|subscription)/.test(normalized)) signals.push("payments");
+  if (/webhooks?/.test(normalized)) signals.push("webhook");
+  if (/(?:health|status)/.test(normalized)) signals.push("health");
+
+  return signals;
+}
+
+async function collectRouteFiles(root: string, matcher: RegExp) {
+  if (!(await pathExists(root))) return [];
+
+  const files: string[] = [];
+
+  async function visit(directory: string, depth: number) {
+    if (depth > 12 || files.length >= maxRouteFiles) return;
+
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (files.length >= maxRouteFiles) break;
+
+      const entryPath = path.join(directory, entry.name);
+
+      if (entry.isDirectory() && !ignoredRouteDirectories.has(entry.name)) {
+        await visit(entryPath, depth + 1);
+      } else if (entry.isFile() && matcher.test(entry.name)) {
+        files.push(entryPath);
+      }
+    }
+  }
+
+  await visit(root, 0);
+  return files;
+}
+
+function createDetectedRoute(projectRoot: string, file: string, route: string): DetectedApiRoute {
+  return {
+    route,
+    file: normalizeRoutePath(path.relative(projectRoot, file)),
+    signals: classifyRoute(route),
+  };
+}
+
+async function detectApiRoutes(projectRoot: string): Promise<DetectedApiRoute[]> {
+  const appRoot = path.join(projectRoot, "app");
+  const pagesApiRoot = path.join(projectRoot, "pages", "api");
+  const [appRouteFiles, pagesApiFiles] = await Promise.all([
+    collectRouteFiles(appRoot, routeFilePattern),
+    collectRouteFiles(pagesApiRoot, pagesApiFilePattern),
+  ]);
+
+  const appRoutes = appRouteFiles
+    .filter((file) => normalizeRoutePath(path.relative(appRoot, file)).includes("api/"))
+    .map((file) => {
+      const routeDirectory = path.dirname(path.relative(appRoot, file));
+      return createDetectedRoute(projectRoot, file, `/${normalizeRoutePath(routeDirectory)}`);
+    });
+  const pagesRoutes = pagesApiFiles
+    .filter((file) => !file.endsWith(".d.ts"))
+    .map((file) => {
+      const relativeFile = normalizeRoutePath(path.relative(pagesApiRoot, file));
+      const withoutExtension = relativeFile.replace(pagesApiFilePattern, "");
+      const routeSuffix = withoutExtension.endsWith("/index")
+        ? withoutExtension.slice(0, -"/index".length)
+        : withoutExtension;
+      return createDetectedRoute(projectRoot, file, `/api/${routeSuffix}`.replace(/\/$/, ""));
+    });
+
+  return [...appRoutes, ...pagesRoutes].sort((a, b) => a.route.localeCompare(b.route));
+}
+
 export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
   const absoluteDetectedFiles = detectedFiles
@@ -143,6 +232,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   }>(path.join(projectRoot, "package.json"));
 
   const dependencies = flattenDependencies(packageJson);
+  const apiRoutes = await detectApiRoutes(projectRoot);
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
   const hasAppRouter = detectedFiles.some((file) => file.path === "app" && file.exists);
   const hasPagesRouter = detectedFiles.some((file) => file.path === "pages" && file.exists);
@@ -160,6 +250,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
     scripts: packageJson?.scripts ?? {},
     dependencies,
     detectedFiles,
+    apiRoutes,
     signals: {
       hasPackageJson: detectedFiles.some((file) => file.path === "package.json" && file.exists),
       hasNextConfig,
@@ -175,6 +266,10 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasObservabilityPlan: detectedFiles.some((file) => file.path === "lib/observability/plan.ts" && file.exists),
       hasErrorTrackingDependency: hasAnyDependency(dependencies, errorTrackingPackages),
       hasAiRules,
+      hasAuthRoute: apiRoutes.some((route) => route.signals.includes("auth")),
+      hasPaymentRoute: apiRoutes.some((route) => route.signals.includes("payments")),
+      hasWebhookRoute: apiRoutes.some((route) => route.signals.includes("webhook")),
+      hasHealthRoute: apiRoutes.some((route) => route.signals.includes("health")),
     },
   };
 }

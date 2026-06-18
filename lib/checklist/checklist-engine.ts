@@ -136,6 +136,51 @@ const rules: ChecklistRule[] = [
     },
   },
   {
+    id: "missing-payment-webhook",
+    category: "Payments",
+    severity: "high",
+    evaluate: (facts, context) => {
+      if (!context.hasPayments || !facts.signals.hasStripeDependency) return null;
+      if (facts.signals.hasWebhookRoute) return null;
+
+      return finding({
+        id: "missing-payment-webhook",
+        title: "No payment webhook route detected",
+        category: "Payments",
+        severity: "high",
+        evidence:
+          "Stripe is installed and payments are enabled, but no API route containing webhook was detected.",
+        impact:
+          "Checkout may succeed without reliably updating subscriptions, entitlements, failed payments, or cancellations.",
+        fix: "Add a server-side Stripe webhook route with signature verification and idempotent event handling.",
+        prompt:
+          "Inspect the existing payment architecture and add a Stripe webhook route. Verify the raw request body with the Stripe signing secret, handle subscription and payment lifecycle events idempotently, persist entitlement changes, and add tests for invalid signatures and repeated events.",
+      });
+    },
+  },
+  {
+    id: "missing-health-route",
+    category: "Reliability",
+    severity: "medium",
+    evaluate: (facts, context) => {
+      if (context.appType !== "api" || context.stage === "prototype") return null;
+      if (facts.signals.hasHealthRoute) return null;
+
+      return finding({
+        id: "missing-health-route",
+        title: "No API health endpoint detected",
+        category: "Reliability",
+        severity: "medium",
+        evidence: "No API route containing health or status was detected.",
+        impact:
+          "Deployment platforms and operators cannot distinguish a healthy service from one that is running but unable to serve requests.",
+        fix: "Add a minimal health endpoint that reports service readiness without exposing secrets.",
+        prompt:
+          "Add a lightweight health endpoint for this API. Return a stable status response, include only safe dependency readiness checks, avoid exposing configuration or secrets, and add a test for healthy and degraded responses.",
+      });
+    },
+  },
+  {
     id: "missing-analytics",
     category: "Analytics",
     severity: "medium",

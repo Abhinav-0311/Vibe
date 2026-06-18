@@ -882,12 +882,13 @@ function ToggleRow({
 }
 
 function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
+  const apiRoutes = scan?.facts.apiRoutes ?? [];
   const facts = [
     { label: "Framework", value: scan?.facts.framework.name ?? "Scanning..." },
     { label: "Package manager", value: scan?.facts.packageManager ?? "Scanning..." },
     { label: "Project", value: scan?.scannedProject ?? "Scanning..." },
     { label: "Context", value: scan ? scan.checklist.context.stage : "Scanning..." },
-    { label: "Findings", value: scan ? `${scan.checklist.findings.length} open` : "Scanning..." },
+    { label: "API routes", value: scan ? apiRoutes.length.toString() : "Scanning..." },
     { label: "Source", value: scan ? formatScanSource(scan) : "Scanning..." },
   ];
   const evidence = scan
@@ -973,6 +974,40 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           </div>
         ))}
       </div>
+
+      {scan && apiRoutes.length > 0 && (
+        <div className="mt-4 rounded-[24px] border border-[#242424] p-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="mono text-[10px] text-[#fc74dd]">Route inventory</p>
+              <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                Detected API entry points
+              </h3>
+            </div>
+            <p className="text-xs leading-5 text-[#9b9696]">Paths only. Project code is never executed.</p>
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            {apiRoutes.slice(0, 8).map((route) => (
+              <div
+                key={route.file}
+                className="flex min-w-0 items-center justify-between gap-4 rounded-[16px] bg-[#111212] px-4 py-3"
+              >
+                <p className="mono min-w-0 truncate text-[10px] text-white" title={route.route}>
+                  {route.route}
+                </p>
+                <span className="mono shrink-0 text-[9px] text-[#9b9696]">
+                  {route.signals.join(" · ") || "api"}
+                </span>
+              </div>
+            ))}
+          </div>
+          {apiRoutes.length > 8 && (
+            <p className="mono mt-3 text-[9px] text-[#9b9696]">
+              +{apiRoutes.length - 8} more routes detected
+            </p>
+          )}
+        </div>
+      )}
 
       {scan ? (
         <div className="mt-6 rounded-[24px] bg-[#111212] p-5">

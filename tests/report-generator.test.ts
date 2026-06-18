@@ -18,6 +18,7 @@ const facts: ScannerFacts = {
   },
   dependencies: [],
   detectedFiles: [],
+  apiRoutes: [],
   signals: {
     hasPackageJson: true,
     hasNextConfig: true,
@@ -33,6 +34,10 @@ const facts: ScannerFacts = {
     hasObservabilityPlan: false,
     hasErrorTrackingDependency: false,
     hasAiRules: false,
+    hasAuthRoute: false,
+    hasPaymentRoute: false,
+    hasWebhookRoute: false,
+    hasHealthRoute: false,
   },
 };
 
@@ -82,6 +87,8 @@ describe("generateReport", () => {
           hasObservabilityPlan: true,
           hasErrorTrackingDependency: true,
           hasAiRules: true,
+          hasPaymentRoute: true,
+          hasWebhookRoute: true,
         },
       },
       launchContext,

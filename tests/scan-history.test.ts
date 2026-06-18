@@ -16,6 +16,7 @@ function createScan(scannedAt: string, score: number): ScanApiResponse {
       scripts: {},
       dependencies: [],
       detectedFiles: [],
+      apiRoutes: [],
       signals: {
         hasPackageJson: true,
         hasNextConfig: true,
@@ -31,6 +32,10 @@ function createScan(scannedAt: string, score: number): ScanApiResponse {
         hasObservabilityPlan: true,
         hasErrorTrackingDependency: false,
         hasAiRules: true,
+        hasAuthRoute: false,
+        hasPaymentRoute: false,
+        hasWebhookRoute: false,
+        hasHealthRoute: false,
       },
     },
     checklist: {

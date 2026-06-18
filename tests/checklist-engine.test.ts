@@ -16,6 +16,7 @@ const baseFacts: ScannerFacts = {
   },
   dependencies: [],
   detectedFiles: [],
+  apiRoutes: [],
   signals: {
     hasPackageJson: true,
     hasNextConfig: true,
@@ -31,6 +32,10 @@ const baseFacts: ScannerFacts = {
     hasObservabilityPlan: false,
     hasErrorTrackingDependency: false,
     hasAiRules: false,
+    hasAuthRoute: false,
+    hasPaymentRoute: false,
+    hasWebhookRoute: false,
+    hasHealthRoute: false,
   },
 };
 
@@ -98,6 +103,10 @@ describe("runChecklist", () => {
         hasObservabilityPlan: true,
         hasErrorTrackingDependency: true,
         hasAiRules: true,
+        hasAuthRoute: true,
+        hasPaymentRoute: true,
+        hasWebhookRoute: true,
+        hasHealthRoute: true,
       },
     };
 
@@ -105,5 +114,32 @@ describe("runChecklist", () => {
 
     expect(result.score).toBe(100);
     expect(result.findings).toHaveLength(0);
+  });
+
+  it("requires a webhook route when Stripe payments are enabled", () => {
+    const stripeFacts: ScannerFacts = {
+      ...baseFacts,
+      dependencies: [{ name: "stripe", version: "^17.0.0", kind: "dependency" }],
+      signals: {
+        ...baseFacts.signals,
+        hasStripeDependency: true,
+      },
+    };
+
+    const result = runChecklist(stripeFacts, launchContext);
+
+    expect(result.findings.map((finding) => finding.id)).toContain("missing-payment-webhook");
+  });
+
+  it("requires a health route for APIs preparing to launch", () => {
+    const apiContext: AuditContext = {
+      ...launchContext,
+      appType: "api",
+      hasPayments: false,
+      hasUserAccounts: false,
+    };
+    const result = runChecklist(baseFacts, apiContext);
+
+    expect(result.findings.map((finding) => finding.id)).toContain("missing-health-route");
   });
 });
