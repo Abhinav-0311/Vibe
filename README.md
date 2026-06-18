@@ -6,7 +6,7 @@ It helps new coders, indie builders, and vibe coders answer one practical questi
 
 > My app runs locally. Is it ready for real users?
 
-Vibe scans a local project, detects production-readiness signals, runs context-aware checklist rules, generates a readable report, and turns findings into implementation prompts that can be handed to Codex, Cursor, Claude Code, or another coding agent.
+Vibe scans local folders, uploaded ZIP archives, and GitHub repositories; detects production-readiness signals; runs context-aware checklist rules; and turns evidence-backed findings into a verified implementation workflow.
 
 ## What It Does
 
@@ -29,6 +29,9 @@ Vibe scans a local project, detects production-readiness signals, runs context-a
 - Restores saved database scans into the full report UI.
 - Scans public or private GitHub repositories on a selected branch.
 - Turns individual findings into GitHub issues after explicit user approval.
+- Generates a deterministic Markdown implementation plan from triaged findings.
+- Creates a dedicated GitHub fix branch and draft pull request only after explicit user actions.
+- Compares re-scans to show resolved, remaining, and newly introduced findings.
 - Reports GitHub rate limits, permission failures, missing branches, and oversized repositories clearly.
 - Generates a project-specific AI workspace setup pack without inventing unknown business facts.
 - Exports `AGENTS.md`, product, decision, roadmap, and user-profile memory, a session-start checklist, and an MCP/API wiring checklist as a ZIP.
@@ -121,12 +124,14 @@ The dashboard includes:
 - route-level API evidence
 - secret-file hygiene and rate-limit checks
 - prioritized findings
-- prompt queue
+- Fix Assistant with prompt queue and Markdown implementation plan
 - Markdown report export
 - local scan history
 - PostgreSQL archive
 - GitHub repository and branch picker
 - GitHub issue creation from a selected finding
+- explicit GitHub fix-branch and draft-pull-request handoff
+- before-and-after scan comparison
 - AI workspace setup-pack preview and ZIP export
 
 ### Persistence
@@ -302,7 +307,9 @@ Scans a public or connected private GitHub repository. Accepts `repoUrl`, option
 GET /api/github/status
 GET /api/github/repos
 GET /api/github/branches
+POST /api/github/branches
 POST /api/github/issues
+POST /api/github/pull-requests
 POST /api/github/disconnect
 ```
 

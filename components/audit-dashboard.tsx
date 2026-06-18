@@ -10,6 +10,8 @@ import {
   FileSearch,
   FileText,
   Github,
+  GitBranch,
+  GitPullRequest,
   History,
   Loader2,
   RefreshCw,
@@ -22,6 +24,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { AuditContext } from "@/lib/checklist/types";
 import { auditReport, emptyReport, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
+import { generateFixPlan } from "@/lib/fix-assistant/fix-plan";
+import { compareScans } from "@/lib/fix-assistant/scan-comparison";
+import type { ScanComparison } from "@/lib/fix-assistant/types";
 import type {
   SavedScanDetailApiResponse,
   SavedScansApiResponse,
@@ -120,6 +125,7 @@ export function AuditDashboard() {
   const [workspaceProjects, setWorkspaceProjects] = useState<WorkspaceProjectsApiResponse | null>(null);
   const [projectDiscoveryState, setProjectDiscoveryState] = useState<ProjectDiscoveryState>("loading");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, FindingStatus>>({});
+  const [scanComparison, setScanComparison] = useState<ScanComparison | null>(null);
 
   const report = useMemo(() => createReportFromScan(scanData), [scanData]);
   const reportWithStatuses = useMemo(
@@ -140,6 +146,7 @@ export function AuditDashboard() {
   );
 
   function applyCompletedScan(scan: ScanApiResponse) {
+    setScanComparison(compareScans(scanData, scan));
     setScanData(scan);
     setSelectedId(scan.checklist.findings[0]?.id);
     saveScanToHistory(scan);
@@ -161,6 +168,7 @@ export function AuditDashboard() {
   }
 
   function selectHistoryItem(item: ScanHistoryItem) {
+    setScanComparison(null);
     setScanData(item.scan);
     setAuditContext(item.scan.checklist.context);
     setProjectPath(item.scan.facts.projectRoot);
@@ -228,6 +236,7 @@ export function AuditDashboard() {
       }
 
       setScanData(data.record.scan);
+      setScanComparison(null);
       setAuditContext(data.record.scan.checklist.context);
       setProjectPath(data.record.scan.facts.projectRoot);
       setSelectedId(data.record.scan.checklist.findings[0]?.id);
@@ -344,6 +353,32 @@ export function AuditDashboard() {
     }
   }
 
+  function rerunActiveScan() {
+    if (!scanData) return;
+    const repository = scanData.scanSource?.repository;
+    if (repository) {
+      void runGitHubScan(
+        `https://github.com/${repository.owner}/${repository.repo}`,
+        repository.branch,
+        scanData.checklist.context,
+      );
+      return;
+    }
+
+    if (scanData.scanSource?.type === "upload") return;
+    void runScan(scanData.checklist.context, scanData.facts.projectRoot);
+  }
+
+  function scanGitHubFixBranch(branch: string) {
+    const repository = scanData?.scanSource?.repository;
+    if (!scanData || !repository) return;
+    void runGitHubScan(
+      `https://github.com/${repository.owner}/${repository.repo}`,
+      branch,
+      scanData.checklist.context,
+    );
+  }
+
   useEffect(() => {
     const savedStatuses = window.localStorage.getItem(triageStorageKey);
     const savedHistory = window.localStorage.getItem(scanHistoryStorageKey);
@@ -421,6 +456,10 @@ export function AuditDashboard() {
               onStatusChange={updateFindingStatus}
               onResetTriage={resetTriage}
               repository={scanData?.scanSource?.repository}
+              scan={scanData}
+              comparison={scanComparison}
+              onRescan={rerunActiveScan}
+              onScanGitHubBranch={scanGitHubFixBranch}
             />
           </>
         )}
@@ -1853,6 +1892,10 @@ function ReportView({
   onStatusChange,
   onResetTriage,
   repository,
+  scan,
+  comparison,
+  onRescan,
+  onScanGitHubBranch,
 }: {
   report: AuditReport;
   selectedFinding?: AuditFinding;
@@ -1861,6 +1904,10 @@ function ReportView({
   onStatusChange: (findingId: string, status: FindingStatus) => void;
   onResetTriage: () => void;
   repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
+  scan: ScanApiResponse | null;
+  comparison: ScanComparison | null;
+  onRescan: () => void;
+  onScanGitHubBranch: (branch: string) => void;
 }) {
   const criticalCount = report.findings.filter((finding) => finding.severity === "critical").length;
 
@@ -1868,7 +1915,16 @@ function ReportView({
     <section className="grid gap-6">
       <ScorePanel report={report} criticalCount={criticalCount} />
       <FindingsList findings={report.findings} selectedId={selectedId} onSelect={onSelect} />
-      <PromptQueue findings={report.findings} onResetTriage={onResetTriage} />
+      <FixAssistant
+        projectName={report.projectName}
+        findings={report.findings}
+        scan={scan}
+        repository={repository}
+        comparison={comparison}
+        onResetTriage={onResetTriage}
+        onRescan={onRescan}
+        onScanGitHubBranch={onScanGitHubBranch}
+      />
       <FindingDetail finding={selectedFinding} onStatusChange={onStatusChange} repository={repository} />
     </section>
   );
@@ -2096,19 +2152,64 @@ ${finding.prompt}`,
     .join("\n\n---\n\n");
 }
 
-function PromptQueue({
+function downloadMarkdown(content: string, fileName: string) {
+  const url = URL.createObjectURL(new Blob([content], { type: "text/markdown;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function FixAssistant({
+  projectName,
   findings,
+  scan,
+  repository,
+  comparison,
   onResetTriage,
+  onRescan,
+  onScanGitHubBranch,
 }: {
+  projectName: string;
   findings: AuditFinding[];
+  scan: ScanApiResponse | null;
+  repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
+  comparison: ScanComparison | null;
   onResetTriage: () => void;
+  onRescan: () => void;
+  onScanGitHubBranch: (branch: string) => void;
 }) {
+  const plan = useMemo(
+    () => generateFixPlan({ projectName, findings, facts: scan?.facts }),
+    [findings, projectName, scan?.facts],
+  );
   const [copied, setCopied] = useState(false);
+  const [branchName, setBranchName] = useState(plan.branchName);
+  const [branchState, setBranchState] = useState<"idle" | "creating" | "created" | "error">("idle");
+  const [branchError, setBranchError] = useState<string | null>(null);
+  const [branchUrl, setBranchUrl] = useState<string | null>(null);
+  const [pullRequestState, setPullRequestState] = useState<"idle" | "creating" | "created" | "error">("idle");
+  const [pullRequestError, setPullRequestError] = useState<string | null>(null);
+  const [pullRequestUrl, setPullRequestUrl] = useState<string | null>(null);
   const queuedFindings = findings.filter((finding) => finding.status !== "ignored");
   const plannedCount = findings.filter((finding) => finding.status === "planned").length;
   const openCount = findings.filter((finding) => finding.status === "open").length;
   const ignoredCount = findings.filter((finding) => finding.status === "ignored").length;
   const promptBundle = buildPromptBundle(queuedFindings);
+  const sourceType = scan?.scanSource?.type ?? "local";
+
+  useEffect(() => {
+    setBranchName(plan.branchName);
+    setBranchState("idle");
+    setBranchError(null);
+    setBranchUrl(null);
+    setPullRequestState("idle");
+    setPullRequestError(null);
+    setPullRequestUrl(null);
+  }, [plan.branchName, repository?.branch, repository?.owner, repository?.repo]);
 
   async function copyPromptBundle() {
     await navigator.clipboard?.writeText(promptBundle);
@@ -2116,63 +2217,270 @@ function PromptQueue({
     window.setTimeout(() => setCopied(false), 1600);
   }
 
+  async function createFixBranch() {
+    if (!repository || !branchName.trim()) return;
+    setBranchState("creating");
+    setBranchError(null);
+
+    try {
+      const response = await fetch("/api/github/branches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository: `${repository.owner}/${repository.repo}`,
+          baseBranch: repository.branch,
+          branchName: branchName.trim(),
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string; url?: string } | null;
+      if (!response.ok || !body?.url) throw new Error(body?.error ?? "GitHub branch creation failed.");
+      setBranchUrl(body.url);
+      setBranchState("created");
+    } catch (error) {
+      setBranchState("error");
+      setBranchError(error instanceof Error ? error.message : "GitHub branch creation failed.");
+    }
+  }
+
+  async function createDraftPullRequest() {
+    if (!repository || branchState !== "created") return;
+    setPullRequestState("creating");
+    setPullRequestError(null);
+
+    try {
+      const response = await fetch("/api/github/pull-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository: `${repository.owner}/${repository.repo}`,
+          baseBranch: repository.branch,
+          headBranch: branchName.trim(),
+          title: plan.pullRequestTitle,
+          body: plan.pullRequestBody,
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string; url?: string } | null;
+      if (!response.ok || !body?.url) throw new Error(body?.error ?? "Draft pull request creation failed.");
+      setPullRequestUrl(body.url);
+      setPullRequestState("created");
+    } catch (error) {
+      setPullRequestState("error");
+      setPullRequestError(error instanceof Error ? error.message : "Draft pull request creation failed.");
+    }
+  }
+
   return (
     <section className="rounded-[30px] bg-[#1d1a1a] p-6 sm:p-8">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
-          <p className="mono text-[11px] text-[#fc74dd]">Prompt queue</p>
+          <p className="mono text-[11px] text-[#fc74dd]">Fix assistant</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
-            Turn triaged findings into an implementation queue.
+            Turn findings into a verified implementation handoff.
           </h2>
           <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">
-            Open and planned findings are bundled into a copyable prompt pack. Ignored findings stay in the report but are excluded from the queue.
+            Export the evidence-backed work plan, implement it in your coding agent, then re-scan the same project to measure what changed. Vibe never edits repository code or claims a fix without new scan evidence.
           </p>
         </div>
-        <button
-          onClick={copyPromptBundle}
-          disabled={queuedFindings.length === 0}
-          className="mono inline-flex items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-[#111212] transition hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#3d3d3d] disabled:text-[#d9d9d9]"
-        >
-          <Clipboard className="h-4 w-4" aria-hidden="true" />
-          {copied ? "Copied queue" : "Copy queue"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={copyPromptBundle}
+            disabled={queuedFindings.length === 0}
+            className="mono inline-flex items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-[#111212] transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#3d3d3d] disabled:text-[#d9d9d9]"
+          >
+            <Clipboard className="h-4 w-4" aria-hidden="true" />
+            {copied ? "Copied queue" : "Copy queue"}
+          </button>
+          <button
+            onClick={() => downloadMarkdown(plan.markdown, `${projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "vibe"}-implementation-plan.md`)}
+            disabled={plan.items.length === 0}
+            className="mono inline-flex items-center justify-center gap-2 rounded-full border border-[#525050] px-5 py-3 text-[10px] text-white transition hover:border-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" /> Download plan
+          </button>
+        </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-4">
+      <div className="mt-7 grid gap-4 md:grid-cols-4">
         <Metric label="Queued prompts" value={queuedFindings.length.toString()} />
         <Metric label="Open" value={openCount.toString()} />
         <Metric label="Planned" value={plannedCount.toString()} />
         <Metric label="Ignored" value={ignoredCount.toString()} />
       </div>
 
+      <div className="mt-7 border-t border-[#3d3d3d] pt-7">
+        {queuedFindings.length === 0 ? (
+          <div className="py-8 text-center">
+            <p className="mono text-[10px] text-[#fc74dd]">Queue empty</p>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#d9d9d9]">
+              Mark at least one finding as open or planned to generate an implementation handoff.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+            <div>
+              <p className="mono text-[10px] text-[#d9d9d9]">First task</p>
+              <p className="mt-3 text-lg font-semibold tracking-[-0.02em] text-white">{queuedFindings[0].title}</p>
+              <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">{queuedFindings[0].prompt}</p>
+            </div>
+            <div className="border-t border-[#3d3d3d] pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+              <p className="mono text-[10px] text-[#d9d9d9]">Delivery sequence</p>
+              <ol className="mt-4 grid gap-3 text-sm leading-6 text-[#d9d9d9]">
+                <li><span className="text-white">01.</span> Export the plan and implement findings in severity order.</li>
+                <li><span className="text-white">02.</span> Run the project tests and production build listed in the plan.</li>
+                <li><span className="text-white">03.</span> Re-scan the fixed source and review resolved, remaining, and introduced findings.</li>
+              </ol>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {repository && queuedFindings.length > 0 && (
+        <div className="mt-7 border-t border-[#3d3d3d] pt-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <p className="mono text-[10px] text-[#fc74dd]">GitHub handoff</p>
+              <h3 className="mt-2 text-xl font-semibold text-white">Prepare a dedicated fix branch.</h3>
+              <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
+                The branch starts from <span className="text-white">{repository.branch}</span>. Vibe creates no commits; push your implementation before opening the draft pull request.
+              </p>
+            </div>
+            <div className="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
+              <label className="sr-only" htmlFor="fix-branch-name">Fix branch name</label>
+              <input
+                id="fix-branch-name"
+                value={branchName}
+                onChange={(event) => {
+                  setBranchName(event.target.value);
+                  setBranchState("idle");
+                  setBranchError(null);
+                  setBranchUrl(null);
+                  setPullRequestState("idle");
+                  setPullRequestUrl(null);
+                }}
+                disabled={branchState === "creating"}
+                className="mono min-w-0 flex-1 rounded-full border border-[#525050] bg-[#111212] px-4 py-3 text-[10px] text-white outline-none transition placeholder:text-[#777] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30 disabled:opacity-60"
+              />
+              <button
+                onClick={() => void createFixBranch()}
+                disabled={!branchName.trim() || branchState === "creating" || branchState === "created"}
+                className="mono inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#525050] px-5 py-3 text-[10px] text-white transition hover:border-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {branchState === "creating" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <GitBranch className="h-4 w-4" aria-hidden="true" />}
+                {branchState === "creating" ? "Creating" : branchState === "created" ? "Branch ready" : "Create branch"}
+              </button>
+            </div>
+          </div>
+
+          {branchState === "error" && <p role="alert" className="mt-4 text-sm leading-6 text-[#ff8f8f]">{branchError}</p>}
+          {branchState === "created" && (
+            <div className="mt-5 flex flex-col gap-4 border-t border-[#3d3d3d] pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <a href={branchUrl ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-white underline decoration-[#525050] underline-offset-4 hover:decoration-white">
+                Open fix branch <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => onScanGitHubBranch(branchName.trim())}
+                  className="mono inline-flex items-center gap-2 rounded-full border border-[#525050] px-4 py-2 text-[10px] text-white transition hover:border-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" /> Scan fix branch
+                </button>
+                {pullRequestState === "created" ? (
+                  <a href={pullRequestUrl ?? "#"} target="_blank" rel="noreferrer" className="mono inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[10px] text-black transition hover:bg-[#e8e8e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]">
+                    Open draft PR <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => void createDraftPullRequest()}
+                    disabled={pullRequestState === "creating"}
+                    className="mono inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[10px] text-black transition hover:bg-[#e8e8e8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {pullRequestState === "creating" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <GitPullRequest className="h-4 w-4" aria-hidden="true" />}
+                    {pullRequestState === "creating" ? "Creating" : "Create draft PR"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {pullRequestState === "error" && (
+            <p role="alert" className="mt-4 text-sm leading-6 text-[#ff8f8f]">
+              {pullRequestError} GitHub requires the fix branch to contain commits that differ from the base branch.
+            </p>
+          )}
+        </div>
+      )}
+
+      {!repository && (
+        <div className="mt-7 flex flex-col gap-4 border-t border-[#3d3d3d] pt-7 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="mono text-[10px] text-[#fc74dd]">Verification</p>
+            <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
+              {sourceType === "upload"
+                ? "Upload a fresh ZIP after implementing the plan to compare new evidence with this scan."
+                : "Re-scan the same local project after implementing and verifying the plan."}
+            </p>
+          </div>
+          <button
+            onClick={onRescan}
+            disabled={sourceType === "upload"}
+            className="mono inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#525050] px-5 py-3 text-[10px] text-white transition hover:border-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" /> Re-scan project
+          </button>
+        </div>
+      )}
+
+      {comparison && (
+        <div className="mt-7 border-t border-[#3d3d3d] pt-7" aria-live="polite">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="mono text-[10px] text-[#fc74dd]">Re-scan comparison</p>
+              <h3 className="mt-2 text-xl font-semibold text-white">Evidence changed by {comparison.scoreDelta >= 0 ? "+" : ""}{comparison.scoreDelta} points.</h3>
+            </div>
+            <p className="mono text-[10px] text-[#d9d9d9]">{comparison.baselineScore}/100 to {comparison.currentScore}/100</p>
+          </div>
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            <Metric label="Resolved" value={comparison.resolved.length.toString()} />
+            <Metric label="Remaining" value={comparison.remaining.length.toString()} />
+            <Metric label="Introduced" value={comparison.introduced.length.toString()} />
+          </div>
+          {(comparison.resolved.length > 0 || comparison.introduced.length > 0) && (
+            <div className="mt-5 grid gap-5 border-t border-[#3d3d3d] pt-5 md:grid-cols-2">
+              <ComparisonList label="Resolved findings" items={comparison.resolved} empty="No findings resolved yet." />
+              <ComparisonList label="New findings" items={comparison.introduced} empty="No new findings introduced." />
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mt-5 flex justify-end">
-        <button
-          onClick={onResetTriage}
-          className="mono rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white"
-        >
+        <button onClick={onResetTriage} className="mono rounded-full px-3 py-2 text-[10px] text-[#9b9696] transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]">
           Reset triage
         </button>
       </div>
-
-      {queuedFindings.length === 0 ? (
-        <div className="mt-6 rounded-[24px] border border-[#3d3d3d] p-6 text-center">
-          <p className="mono text-[10px] text-[#fc74dd]">Queue empty</p>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#d9d9d9]">
-            Mark at least one finding as open or planned to generate a copyable implementation queue.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 rounded-[24px] bg-[#111212] p-5">
-          <p className="mono text-[10px] text-[#d9d9d9]">Next prompt</p>
-          <p className="mt-3 text-base font-semibold tracking-[-0.02em] text-white">
-            {queuedFindings[0].title}
-          </p>
-          <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#d9d9d9]">
-            {queuedFindings[0].prompt}
-          </p>
-        </div>
-      )}
     </section>
+  );
+}
+
+function ComparisonList({
+  label,
+  items,
+  empty,
+}: {
+  label: string;
+  items: Array<{ id: string; title: string }>;
+  empty: string;
+}) {
+  return (
+    <div>
+      <p className="mono text-[10px] text-[#d9d9d9]">{label}</p>
+      {items.length === 0 ? (
+        <p className="mt-3 text-sm leading-6 text-[#9b9696]">{empty}</p>
+      ) : (
+        <ul className="mt-3 grid gap-2 text-sm leading-6 text-white">
+          {items.slice(0, 4).map((item) => <li key={item.id}>{item.title}</li>)}
+        </ul>
+      )}
+    </div>
   );
 }
 

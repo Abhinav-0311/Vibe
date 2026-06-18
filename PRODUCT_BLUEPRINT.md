@@ -89,17 +89,22 @@ Generates:
 
 ### 5. Fix Assistant
 
-MVP behavior:
+Status: complete for the current single-user product scope.
+
+Current behavior:
 
 - Copy-paste prompts for Cursor, Codex, Replit, or Copilot
-- Markdown implementation checklists
+- Deterministic Markdown implementation plans ordered by finding severity
+- GitHub issue creation after explicit user approval
+- Dedicated GitHub fix-branch creation after explicit user approval
+- Draft pull-request creation after users push implementation commits
+- Re-scan comparison across the same project and audit context
 
-Later behavior:
+Safety boundary:
 
-- GitHub issue creation
-- Fix branch generation
-- Pull request generation
-- Re-scan after fixes
+- Vibe does not edit repository code, create implementation commits, or claim a finding is fixed.
+- A finding is considered resolved only when a comparable re-scan no longer detects it.
+- Uploaded ZIP projects require a fresh upload because Vibe cannot safely infer local changes.
 
 ### 6. AI Workspace Readiness
 
