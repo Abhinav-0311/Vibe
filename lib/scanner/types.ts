@@ -46,6 +46,7 @@ export type ScannerFacts = {
     hasAuthRoute: boolean;
     hasPaymentRoute: boolean;
     hasWebhookRoute: boolean;
+    hasWebhookSignatureVerification: boolean;
     hasHealthRoute: boolean;
     hasLocalEnvFile: boolean;
     hasEnvGitignoreRule: boolean;

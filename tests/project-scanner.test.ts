@@ -47,7 +47,22 @@ describe("scanProject API route discovery", () => {
     expect(facts.signals.hasAuthRoute).toBe(true);
     expect(facts.signals.hasPaymentRoute).toBe(true);
     expect(facts.signals.hasWebhookRoute).toBe(true);
+    expect(facts.signals.hasWebhookSignatureVerification).toBe(false);
     expect(facts.signals.hasHealthRoute).toBe(true);
+  });
+
+  it("detects Stripe signature verification inside a webhook route", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "app/api/stripe/webhook/route.ts",
+      "export async function POST(request) { return stripe.webhooks.constructEvent(await request.text(), request.headers.get('stripe-signature'), process.env.STRIPE_WEBHOOK_SECRET); }\n",
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasWebhookRoute).toBe(true);
+    expect(facts.signals.hasWebhookSignatureVerification).toBe(true);
   });
 
   it("checks every detected environment filename against gitignore patterns", async () => {

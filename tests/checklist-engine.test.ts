@@ -35,6 +35,7 @@ const baseFacts: ScannerFacts = {
     hasAuthRoute: false,
     hasPaymentRoute: false,
     hasWebhookRoute: false,
+    hasWebhookSignatureVerification: false,
     hasHealthRoute: false,
     hasLocalEnvFile: false,
     hasEnvGitignoreRule: false,
@@ -109,6 +110,7 @@ describe("runChecklist", () => {
         hasAuthRoute: true,
         hasPaymentRoute: true,
         hasWebhookRoute: true,
+        hasWebhookSignatureVerification: true,
         hasHealthRoute: true,
         hasLocalEnvFile: false,
         hasEnvGitignoreRule: true,
@@ -135,6 +137,32 @@ describe("runChecklist", () => {
     const result = runChecklist(stripeFacts, launchContext);
 
     expect(result.findings.map((finding) => finding.id)).toContain("missing-payment-webhook");
+  });
+
+  it("rejects a Stripe webhook route without signature verification", () => {
+    const unverifiedWebhookFacts: ScannerFacts = {
+      ...baseFacts,
+      dependencies: [{ name: "stripe", version: "^17.0.0", kind: "dependency" }],
+      apiRoutes: [
+        {
+          route: "/api/stripe/webhook",
+          file: "app/api/stripe/webhook/route.ts",
+          signals: ["payments", "webhook"],
+        },
+      ],
+      signals: {
+        ...baseFacts.signals,
+        hasStripeDependency: true,
+        hasPaymentRoute: true,
+        hasWebhookRoute: true,
+      },
+    };
+
+    const result = runChecklist(unverifiedWebhookFacts, launchContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).toContain("unverified-payment-webhook");
+    expect(findingIds).not.toContain("missing-payment-webhook");
   });
 
   it("requires a health route for APIs preparing to launch", () => {

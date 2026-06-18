@@ -207,6 +207,29 @@ const rules: ChecklistRule[] = [
     },
   },
   {
+    id: "unverified-payment-webhook",
+    category: "Payments",
+    severity: "critical",
+    evaluate: (facts, context) => {
+      if (!context.hasPayments || !facts.signals.hasStripeDependency) return null;
+      if (!facts.signals.hasWebhookRoute || facts.signals.hasWebhookSignatureVerification) return null;
+
+      return finding({
+        id: "unverified-payment-webhook",
+        title: "Stripe webhook signature verification is missing",
+        category: "Payments",
+        severity: "critical",
+        evidence:
+          "A webhook API route and Stripe dependency were detected, but no Stripe webhooks.constructEvent verification call was found in the webhook route.",
+        impact:
+          "A forged request could grant access, cancel accounts, or corrupt subscription and payment state.",
+        fix: "Verify the raw webhook body and Stripe-Signature header before processing any event.",
+        prompt:
+          "Inspect the detected Stripe webhook route and add signature verification using stripe.webhooks.constructEvent or constructEventAsync. Preserve the raw request body, read the Stripe-Signature header, reject missing or invalid signatures before processing events, keep error responses safe, and add tests for valid and forged requests.",
+      });
+    },
+  },
+  {
     id: "missing-health-route",
     category: "Reliability",
     severity: "medium",

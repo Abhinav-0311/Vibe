@@ -282,6 +282,18 @@ async function detectRateLimitImplementation(
   return samples.some((sample) => sample && rateLimitPattern.test(sample));
 }
 
+async function detectWebhookSignatureVerification(projectRoot: string, apiRoutes: DetectedApiRoute[]) {
+  const webhookRoutes = apiRoutes.filter((route) => route.signals.includes("webhook"));
+  if (webhookRoutes.length === 0) return false;
+
+  const samples = await Promise.all(
+    webhookRoutes.map((route) => readSecuritySample(path.join(projectRoot, route.file))),
+  );
+  const stripeVerificationPattern = /\.webhooks\.constructEvent(?:Async)?\s*\(/;
+
+  return samples.some((sample) => sample && stripeVerificationPattern.test(sample));
+}
+
 export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
   const absoluteDetectedFiles = detectedFiles
@@ -301,6 +313,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   );
   const hasLocalEnvFile = localEnvFiles.length > 0;
   const hasRateLimitImplementation = await detectRateLimitImplementation(projectRoot, apiRoutes, dependencies);
+  const hasWebhookSignatureVerification = await detectWebhookSignatureVerification(projectRoot, apiRoutes);
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
   const hasAppRouter = detectedFiles.some((file) => file.path === "app" && file.exists);
   const hasPagesRouter = detectedFiles.some((file) => file.path === "pages" && file.exists);
@@ -337,6 +350,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasAuthRoute: apiRoutes.some((route) => route.signals.includes("auth")),
       hasPaymentRoute: apiRoutes.some((route) => route.signals.includes("payments")),
       hasWebhookRoute: apiRoutes.some((route) => route.signals.includes("webhook")),
+      hasWebhookSignatureVerification,
       hasHealthRoute: apiRoutes.some((route) => route.signals.includes("health")),
       hasLocalEnvFile,
       hasEnvGitignoreRule: ignoresEnvironmentFiles(gitignore, localEnvFiles),

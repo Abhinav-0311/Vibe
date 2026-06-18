@@ -15,6 +15,7 @@ Vibe scans a local project, detects production-readiness signals, runs context-a
 - Inventories Next.js API routes and classifies auth, payment, webhook, and health endpoints without executing project code.
 - Checks environment-file Git ignore coverage without reading or exposing secret values.
 - Detects in-repo rate-limiting evidence for sensitive API surfaces.
+- Verifies that detected Stripe webhook routes contain signature-validation evidence.
 - Scores the project against launch-readiness rules.
 - Generates a deterministic executive report without relying on AI guesses.
 - Shows an evidence ledger so users can see why the score changed.

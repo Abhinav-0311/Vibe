@@ -938,6 +938,16 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           detail: "Stripe packages",
           detected: scan.facts.signals.hasStripeDependency,
         },
+        ...(scan.facts.signals.hasWebhookRoute &&
+        typeof scan.facts.signals.hasWebhookSignatureVerification === "boolean"
+          ? [
+              {
+                label: "Webhook verification",
+                detail: "Stripe constructEvent in webhook route",
+                detected: scan.facts.signals.hasWebhookSignatureVerification,
+              },
+            ]
+          : []),
         {
           label: "Analytics plan",
           detail: "lib/analytics/events.ts or package",
