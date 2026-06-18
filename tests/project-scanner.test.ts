@@ -136,4 +136,33 @@ describe("scanProject API route discovery", () => {
       "app/api/auth/login/route.ts",
     ]);
   });
+
+  it("detects unsafe production scripts and disabled Next.js build checks", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "package.json",
+      JSON.stringify({
+        scripts: { build: "next build", start: "next dev" },
+        dependencies: { next: "15.0.0" },
+      }),
+    );
+    await createFile(projectRoot, "package-lock.json", "{}\n");
+    await createFile(
+      projectRoot,
+      "next.config.ts",
+      "export default { typescript: { ignoreBuildErrors: true }, eslint: { ignoreDuringBuilds: true } };\n",
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasLockfile).toBe(true);
+    expect(facts.signals.hasBuildScript).toBe(true);
+    expect(facts.signals.hasStartScript).toBe(true);
+    expect(facts.signals.hasDevelopmentStartScript).toBe(true);
+    expect(facts.signals.ignoresTypeScriptBuildErrors).toBe(true);
+    expect(facts.signals.ignoresEslintBuildErrors).toBe(true);
+    expect(facts.deploymentEvidence?.ignoredTypeScriptBuildFiles).toEqual(["next.config.ts"]);
+    expect(facts.deploymentEvidence?.ignoredEslintBuildFiles).toEqual(["next.config.ts"]);
+  });
 });

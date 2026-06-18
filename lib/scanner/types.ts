@@ -34,6 +34,11 @@ export type ScannerFacts = {
     wildcardCorsFiles: string[];
     insecureSessionCookieFiles: string[];
   };
+  deploymentEvidence?: {
+    ignoredTypeScriptBuildFiles: string[];
+    ignoredEslintBuildFiles: string[];
+    startCommand?: string;
+  };
   signals: {
     hasPackageJson: boolean;
     hasNextConfig: boolean;
@@ -62,5 +67,11 @@ export type ScannerFacts = {
     hasRateLimitImplementation: boolean;
     hasWildcardCors: boolean;
     hasInsecureSessionCookie: boolean;
+    hasLockfile: boolean;
+    hasBuildScript: boolean;
+    hasStartScript: boolean;
+    hasDevelopmentStartScript: boolean;
+    ignoresTypeScriptBuildErrors: boolean;
+    ignoresEslintBuildErrors: boolean;
   };
 };

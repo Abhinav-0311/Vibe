@@ -45,6 +45,12 @@ const baseFacts: ScannerFacts = {
     hasRateLimitImplementation: false,
     hasWildcardCors: false,
     hasInsecureSessionCookie: false,
+    hasLockfile: true,
+    hasBuildScript: true,
+    hasStartScript: false,
+    hasDevelopmentStartScript: false,
+    ignoresTypeScriptBuildErrors: false,
+    ignoresEslintBuildErrors: false,
   },
 };
 
@@ -84,11 +90,11 @@ describe("runChecklist", () => {
     const findingIds = result.findings.map((finding) => finding.id);
 
     expect(result.context.stage).toBe("launch-prep");
-    expect(result.score).toBe(13);
+    expect(result.score).toBe(20);
     expect(result.summary.critical).toBe(1);
     expect(findingIds).toContain("missing-auth");
     expect(findingIds).toContain("missing-stripe");
-    expect(findingIds).toContain("missing-middleware");
+    expect(findingIds).not.toContain("missing-middleware");
   });
 
   it("does not report missing systems when scanner facts show those systems exist", () => {
@@ -125,6 +131,12 @@ describe("runChecklist", () => {
         hasRateLimitImplementation: true,
         hasWildcardCors: false,
         hasInsecureSessionCookie: false,
+        hasLockfile: true,
+        hasBuildScript: true,
+        hasStartScript: true,
+        hasDevelopmentStartScript: false,
+        ignoresTypeScriptBuildErrors: false,
+        ignoresEslintBuildErrors: false,
       },
     };
 
@@ -214,6 +226,41 @@ describe("runChecklist", () => {
     const result = runChecklist(authRouteFacts, launchContext);
 
     expect(result.findings.map((finding) => finding.id)).toContain("missing-rate-limiting");
+    expect(result.findings.map((finding) => finding.id)).toContain("missing-middleware");
+  });
+
+  it("does not require deployment artifacts during prototype work", () => {
+    const prototypeDeploymentFacts: ScannerFacts = {
+      ...baseFacts,
+      signals: {
+        ...baseFacts.signals,
+        hasLockfile: false,
+        hasBuildScript: false,
+      },
+    };
+
+    const result = runChecklist(prototypeDeploymentFacts, prototypeContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).not.toContain("missing-lockfile");
+    expect(findingIds).not.toContain("missing-build-script");
+  });
+
+  it("does not require local recovery routes for hosted auth without credential routes", () => {
+    const hostedAuthFacts: ScannerFacts = {
+      ...baseFacts,
+      dependencies: [{ name: "@clerk/nextjs", version: "^6.0.0", kind: "dependency" }],
+      signals: {
+        ...baseFacts.signals,
+        hasAuthDependency: true,
+      },
+    };
+
+    const result = runChecklist(hostedAuthFacts, launchContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).not.toContain("missing-account-recovery");
+    expect(findingIds).not.toContain("missing-session-termination");
   });
 
   it("raises wildcard CORS severity for apps handling user data", () => {
@@ -271,5 +318,49 @@ describe("runChecklist", () => {
 
     expect(cookieFinding?.severity).toBe("high");
     expect(cookieFinding?.evidence).toContain("app/api/auth/login/route.ts");
+  });
+
+  it("requires a lockfile and build script before launch", () => {
+    const incompleteDeploymentFacts: ScannerFacts = {
+      ...baseFacts,
+      signals: {
+        ...baseFacts.signals,
+        hasLockfile: false,
+        hasBuildScript: false,
+      },
+    };
+
+    const result = runChecklist(incompleteDeploymentFacts, launchContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).toContain("missing-lockfile");
+    expect(findingIds).toContain("missing-build-script");
+  });
+
+  it("rejects development start commands and disabled build validation", () => {
+    const unsafeDeploymentFacts: ScannerFacts = {
+      ...baseFacts,
+      deploymentEvidence: {
+        ignoredTypeScriptBuildFiles: ["next.config.ts"],
+        ignoredEslintBuildFiles: ["next.config.ts"],
+        startCommand: "next dev",
+      },
+      signals: {
+        ...baseFacts.signals,
+        hasStartScript: true,
+        hasDevelopmentStartScript: true,
+        ignoresTypeScriptBuildErrors: true,
+        ignoresEslintBuildErrors: true,
+      },
+    };
+
+    const result = runChecklist(unsafeDeploymentFacts, launchContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).toContain("development-start-script");
+    expect(findingIds).toContain("disabled-build-validation");
+    expect(result.findings.find((finding) => finding.id === "disabled-build-validation")?.evidence).toContain(
+      "next.config.ts",
+    );
   });
 });

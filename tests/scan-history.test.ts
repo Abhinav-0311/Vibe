@@ -45,6 +45,12 @@ function createScan(scannedAt: string, score: number): ScanApiResponse {
         hasRateLimitImplementation: false,
         hasWildcardCors: false,
         hasInsecureSessionCookie: false,
+        hasLockfile: true,
+        hasBuildScript: true,
+        hasStartScript: false,
+        hasDevelopmentStartScript: false,
+        ignoresTypeScriptBuildErrors: false,
+        ignoresEslintBuildErrors: false,
       },
     },
     checklist: {

@@ -70,6 +70,104 @@ const rules: ChecklistRule[] = [
     },
   },
   {
+    id: "missing-lockfile",
+    category: "Deployment",
+    severity: "medium",
+    evaluate: (facts, context) => {
+      if (context.stage === "prototype" || facts.signals.hasLockfile) return null;
+
+      return finding({
+        id: "missing-lockfile",
+        title: "No dependency lockfile detected",
+        category: "Deployment",
+        severity: "medium",
+        evidence: "No npm, pnpm, Yarn, or Bun lockfile was detected in the project root.",
+        impact:
+          "Local, CI, and production installs may resolve different dependency versions and produce inconsistent behavior.",
+        fix: "Generate and commit the lockfile for the package manager used by the project.",
+        prompt:
+          "Identify the package manager used by this project, generate its lockfile without switching package managers, verify a clean install and build, and commit the lockfile. Do not manually edit generated lockfile contents.",
+      });
+    },
+  },
+  {
+    id: "missing-build-script",
+    category: "Deployment",
+    severity: "high",
+    evaluate: (facts, context) => {
+      if (context.stage === "prototype" || facts.signals.hasBuildScript) return null;
+
+      return finding({
+        id: "missing-build-script",
+        title: "No production build script detected",
+        category: "Deployment",
+        severity: "high",
+        evidence: "package.json does not define a non-empty build script.",
+        impact: "CI and hosting platforms cannot consistently produce a production artifact before release.",
+        fix: "Add the framework's production build command and verify it in a clean environment.",
+        prompt:
+          "Inspect the detected framework and add the correct production build script to package.json. Preserve existing scripts, run the build in a clean environment, fix genuine compilation errors rather than bypassing them, and document any required build-time environment variables.",
+      });
+    },
+  },
+  {
+    id: "development-start-script",
+    category: "Deployment",
+    severity: "high",
+    evaluate: (facts, context) => {
+      if (context.stage === "prototype" || !facts.signals.hasDevelopmentStartScript) return null;
+
+      const command = facts.deploymentEvidence?.startCommand;
+      const commandEvidence = command ? ` The current command is ${JSON.stringify(command)}.` : "";
+
+      return finding({
+        id: "development-start-script",
+        title: "Start script launches a development server",
+        category: "Deployment",
+        severity: "high",
+        evidence: `The package.json start script contains a development or watch command.${commandEvidence}`,
+        impact:
+          "Development servers are not optimized or hardened for production traffic and may expose debugging behavior.",
+        fix: "Use the framework's production server command after a successful production build.",
+        prompt:
+          "Replace the development start command with the framework's production start command while preserving the separate dev script. Verify the sequence using a clean production build followed by start, and do not disable build validation to make it pass.",
+      });
+    },
+  },
+  {
+    id: "disabled-build-validation",
+    category: "Deployment",
+    severity: "high",
+    evaluate: (facts, context) => {
+      const ignoresTypes = facts.signals.ignoresTypeScriptBuildErrors;
+      const ignoresLint = facts.signals.ignoresEslintBuildErrors;
+      if (!ignoresTypes && !ignoresLint) return null;
+
+      const severity: Severity = context.stage === "prototype" ? "medium" : "high";
+      const files = [
+        ...(facts.deploymentEvidence?.ignoredTypeScriptBuildFiles ?? []),
+        ...(facts.deploymentEvidence?.ignoredEslintBuildFiles ?? []),
+      ];
+      const checks = [ignoresTypes ? "TypeScript errors" : null, ignoresLint ? "ESLint errors" : null]
+        .filter(Boolean)
+        .join(" and ");
+      const fileEvidence = files.length > 0 ? ` Found in ${Array.from(new Set(files)).join(", ")}.` : "";
+
+      return finding({
+        id: "disabled-build-validation",
+        title: "Production build validation is disabled",
+        category: "Deployment",
+        severity,
+        evidence: `Next.js is configured to ignore ${checks} during production builds.${fileEvidence}`,
+        impact:
+          "Broken types or lint-detected defects can reach deployment even though the production build appears successful.",
+        fix: "Remove build bypasses and resolve the underlying type or lint failures.",
+        prompt:
+          "Inspect the Next.js configuration files named in this finding. Remove ignoreBuildErrors and ignoreDuringBuilds bypasses, run type checking, linting, tests, and the production build, then fix the underlying issues without weakening compiler or lint rules globally.",
+      });
+    },
+  },
+  {
     id: "missing-tests",
     category: "Testing",
     severity: "high",
@@ -97,6 +195,10 @@ const rules: ChecklistRule[] = [
     evaluate: (facts, context) => {
       if (context.stage === "prototype") return null;
       if (facts.signals.hasMiddleware) return null;
+
+      const protectsAuth = context.hasUserAccounts && facts.signals.hasAuthRoute;
+      const protectsApi = context.appType === "api" && facts.apiRoutes.length > 0;
+      if (!protectsAuth && !protectsApi) return null;
 
       return finding({
         id: "missing-middleware",

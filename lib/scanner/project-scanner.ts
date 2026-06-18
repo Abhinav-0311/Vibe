@@ -350,6 +350,29 @@ async function detectInsecureSessionCookies(projectRoot: string, apiRoutes: Dete
     .map(({ relativeFile }) => normalizeRoutePath(relativeFile));
 }
 
+async function detectIgnoredBuildChecks(projectRoot: string, detectedFiles: DetectedFile[]) {
+  const configFiles = detectedFiles.filter(
+    (file) => file.exists && file.path.startsWith("next.config"),
+  );
+  const samples = await Promise.all(
+    configFiles.map(async (file) => ({
+      relativeFile: file.path,
+      sample: await readSecuritySample(path.join(projectRoot, file.path)),
+    })),
+  );
+  const ignoredTypeScriptBuildFiles = samples
+    .filter(({ sample }) => sample && /ignoreBuildErrors\s*:\s*true/i.test(sample))
+    .map(({ relativeFile }) => relativeFile);
+  const ignoredEslintBuildFiles = samples
+    .filter(({ sample }) => sample && /ignoreDuringBuilds\s*:\s*true/i.test(sample))
+    .map(({ relativeFile }) => relativeFile);
+
+  return {
+    ignoredTypeScriptBuildFiles,
+    ignoredEslintBuildFiles,
+  };
+}
+
 export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
   const absoluteDetectedFiles = detectedFiles
@@ -362,6 +385,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   }>(path.join(projectRoot, "package.json"));
 
   const dependencies = flattenDependencies(packageJson);
+  const scripts = packageJson?.scripts ?? {};
   const apiRoutes = await detectApiRoutes(projectRoot);
   const gitignore = await readTextFile(path.join(projectRoot, ".gitignore"));
   const localEnvFiles = [".env", ".env.local", ".env.development", ".env.production"].filter((file) =>
@@ -372,6 +396,11 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const hasWebhookSignatureVerification = await detectWebhookSignatureVerification(projectRoot, apiRoutes);
   const wildcardCorsFiles = await detectWildcardCors(projectRoot, apiRoutes, detectedFiles);
   const insecureSessionCookieFiles = await detectInsecureSessionCookies(projectRoot, apiRoutes);
+  const ignoredBuildChecks = await detectIgnoredBuildChecks(projectRoot, detectedFiles);
+  const startCommand = scripts.start?.trim();
+  const hasDevelopmentStartScript = Boolean(
+    startCommand && /(?:\bnext\s+dev\b|\bvite\s+dev\b|\bnodemon\b|\btsx\s+watch\b)/i.test(startCommand),
+  );
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
   const hasAppRouter = detectedFiles.some((file) => file.path === "app" && file.exists);
   const hasPagesRouter = detectedFiles.some((file) => file.path === "pages" && file.exists);
@@ -386,13 +415,17 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
     projectRoot,
     packageManager: detectPackageManager(projectRoot, absoluteDetectedFiles),
     framework: detectFramework(dependencies, hasNextConfig),
-    scripts: packageJson?.scripts ?? {},
+    scripts,
     dependencies,
     detectedFiles,
     apiRoutes,
     securityEvidence: {
       wildcardCorsFiles,
       insecureSessionCookieFiles,
+    },
+    deploymentEvidence: {
+      ...ignoredBuildChecks,
+      ...(startCommand ? { startCommand } : {}),
     },
     signals: {
       hasPackageJson: detectedFiles.some((file) => file.path === "package.json" && file.exists),
@@ -422,6 +455,16 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasRateLimitImplementation,
       hasWildcardCors: wildcardCorsFiles.length > 0,
       hasInsecureSessionCookie: insecureSessionCookieFiles.length > 0,
+      hasLockfile: detectedFiles.some(
+        (file) =>
+          file.exists &&
+          ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"].includes(file.path),
+      ),
+      hasBuildScript: Boolean(scripts.build?.trim()),
+      hasStartScript: Boolean(startCommand),
+      hasDevelopmentStartScript,
+      ignoresTypeScriptBuildErrors: ignoredBuildChecks.ignoredTypeScriptBuildFiles.length > 0,
+      ignoresEslintBuildErrors: ignoredBuildChecks.ignoredEslintBuildFiles.length > 0,
     },
   };
 }

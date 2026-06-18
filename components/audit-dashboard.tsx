@@ -898,6 +898,36 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           detail: "package.json",
           detected: scan.facts.signals.hasPackageJson,
         },
+        ...(typeof scan.facts.signals.hasLockfile === "boolean"
+          ? [
+              {
+                label: "Release inputs",
+                detail: "Dependency lockfile and production build script",
+                detected: scan.facts.signals.hasLockfile && scan.facts.signals.hasBuildScript,
+              },
+            ]
+          : []),
+        ...(typeof scan.facts.signals.ignoresTypeScriptBuildErrors === "boolean"
+          ? [
+              {
+                label: "Build validation",
+                detail: "TypeScript and ESLint checks remain enabled",
+                detected:
+                  !scan.facts.signals.ignoresTypeScriptBuildErrors &&
+                  !scan.facts.signals.ignoresEslintBuildErrors,
+              },
+            ]
+          : []),
+        ...(scan.facts.signals.hasStartScript &&
+        typeof scan.facts.signals.hasDevelopmentStartScript === "boolean"
+          ? [
+              {
+                label: "Production start",
+                detail: "Start script does not launch a dev server",
+                detected: !scan.facts.signals.hasDevelopmentStartScript,
+              },
+            ]
+          : []),
         {
           label: "Next.js config",
           detail: "next.config.*",
