@@ -28,6 +28,9 @@ export type ScannerFacts = {
   dependencies: DependencySignal[];
   detectedFiles: DetectedFile[];
   apiRoutes: DetectedApiRoute[];
+  securityEvidence?: {
+    wildcardCorsFiles: string[];
+  };
   signals: {
     hasPackageJson: boolean;
     hasNextConfig: boolean;
@@ -51,5 +54,6 @@ export type ScannerFacts = {
     hasLocalEnvFile: boolean;
     hasEnvGitignoreRule: boolean;
     hasRateLimitImplementation: boolean;
+    hasWildcardCors: boolean;
   };
 };

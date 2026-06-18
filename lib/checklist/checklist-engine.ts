@@ -139,6 +139,34 @@ const rules: ChecklistRule[] = [
     },
   },
   {
+    id: "wildcard-cors",
+    category: "Security",
+    severity: "high",
+    evaluate: (facts, context) => {
+      if (!facts.signals.hasWildcardCors) return null;
+
+      const severity: Severity =
+        context.stage === "prototype" && !context.hasUserAccounts && !context.storesUserData
+          ? "medium"
+          : "high";
+      const evidenceFiles = facts.securityEvidence?.wildcardCorsFiles ?? [];
+      const evidenceSuffix = evidenceFiles.length > 0 ? ` Found in ${evidenceFiles.join(", ")}.` : "";
+
+      return finding({
+        id: "wildcard-cors",
+        title: "Wildcard CORS policy detected",
+        category: "Security",
+        severity,
+        evidence: `A CORS configuration allows every origin with Access-Control-Allow-Origin: * or origin: *.${evidenceSuffix}`,
+        impact:
+          "Untrusted websites may be able to call public API endpoints from a user's browser, expanding abuse and data-exposure risk.",
+        fix: "Replace wildcard origins with a small environment-specific allowlist and reject unknown origins.",
+        prompt:
+          "Inspect the files named in the CORS finding. Replace wildcard origin access with an explicit allowlist loaded from safe configuration, handle requests with no Origin header deliberately, add Vary: Origin when reflecting approved origins, and add tests for approved and rejected origins. Do not combine wildcard origins with credentials.",
+      });
+    },
+  },
+  {
     id: "missing-auth",
     category: "Auth",
     severity: "critical",

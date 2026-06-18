@@ -16,6 +16,7 @@ Vibe scans a local project, detects production-readiness signals, runs context-a
 - Checks environment-file Git ignore coverage without reading or exposing secret values.
 - Detects in-repo rate-limiting evidence for sensitive API surfaces.
 - Verifies that detected Stripe webhook routes contain signature-validation evidence.
+- Detects wildcard CORS policies in API routes, middleware, and Next.js configuration.
 - Scores the project against launch-readiness rules.
 - Generates a deterministic executive report without relying on AI guesses.
 - Shows an evidence ledger so users can see why the score changed.

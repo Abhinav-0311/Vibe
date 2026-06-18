@@ -928,6 +928,15 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           detail: "package, middleware, or HTTP 429 handling",
           detected: scan.facts.signals.hasRateLimitImplementation,
         },
+        ...(typeof scan.facts.signals.hasWildcardCors === "boolean"
+          ? [
+              {
+                label: "Restricted CORS",
+                detail: "No wildcard origin configuration detected",
+                detected: !scan.facts.signals.hasWildcardCors,
+              },
+            ]
+          : []),
         {
           label: "Auth dependency",
           detail: "Clerk, NextAuth, Supabase, Lucia",

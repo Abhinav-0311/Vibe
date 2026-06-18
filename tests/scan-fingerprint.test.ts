@@ -40,6 +40,7 @@ function createScan(scannedAt: string, score = 100): ScanApiResponse {
         hasLocalEnvFile: false,
         hasEnvGitignoreRule: false,
         hasRateLimitImplementation: false,
+        hasWildcardCors: false,
       },
     },
     checklist: {

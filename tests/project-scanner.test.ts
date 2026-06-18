@@ -49,6 +49,7 @@ describe("scanProject API route discovery", () => {
     expect(facts.signals.hasWebhookRoute).toBe(true);
     expect(facts.signals.hasWebhookSignatureVerification).toBe(false);
     expect(facts.signals.hasHealthRoute).toBe(true);
+    expect(facts.signals.hasWildcardCors).toBe(false);
   });
 
   it("detects Stripe signature verification inside a webhook route", async () => {
@@ -90,5 +91,19 @@ describe("scanProject API route discovery", () => {
     const facts = await scanProject(projectRoot);
 
     expect(facts.signals.hasRateLimitImplementation).toBe(true);
+  });
+
+  it("records the API route containing a wildcard CORS policy", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "app/api/public/route.ts",
+      'export function GET() { return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*" } }); }\n',
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasWildcardCors).toBe(true);
+    expect(facts.securityEvidence?.wildcardCorsFiles).toEqual(["app/api/public/route.ts"]);
   });
 });

@@ -42,6 +42,7 @@ const facts: ScannerFacts = {
     hasLocalEnvFile: false,
     hasEnvGitignoreRule: false,
     hasRateLimitImplementation: false,
+    hasWildcardCors: false,
   },
 };
 
@@ -97,6 +98,7 @@ describe("generateReport", () => {
           hasLocalEnvFile: false,
           hasEnvGitignoreRule: true,
           hasRateLimitImplementation: true,
+          hasWildcardCors: false,
         },
       },
       launchContext,

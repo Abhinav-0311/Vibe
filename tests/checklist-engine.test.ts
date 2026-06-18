@@ -40,6 +40,7 @@ const baseFacts: ScannerFacts = {
     hasLocalEnvFile: false,
     hasEnvGitignoreRule: false,
     hasRateLimitImplementation: false,
+    hasWildcardCors: false,
   },
 };
 
@@ -115,6 +116,7 @@ describe("runChecklist", () => {
         hasLocalEnvFile: false,
         hasEnvGitignoreRule: true,
         hasRateLimitImplementation: true,
+        hasWildcardCors: false,
       },
     };
 
@@ -204,5 +206,22 @@ describe("runChecklist", () => {
     const result = runChecklist(authRouteFacts, launchContext);
 
     expect(result.findings.map((finding) => finding.id)).toContain("missing-rate-limiting");
+  });
+
+  it("raises wildcard CORS severity for apps handling user data", () => {
+    const corsFacts: ScannerFacts = {
+      ...baseFacts,
+      securityEvidence: { wildcardCorsFiles: ["app/api/data/route.ts"] },
+      signals: {
+        ...baseFacts.signals,
+        hasWildcardCors: true,
+      },
+    };
+
+    const result = runChecklist(corsFacts, launchContext);
+    const corsFinding = result.findings.find((finding) => finding.id === "wildcard-cors");
+
+    expect(corsFinding?.severity).toBe("high");
+    expect(corsFinding?.evidence).toContain("app/api/data/route.ts");
   });
 });

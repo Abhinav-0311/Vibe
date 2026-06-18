@@ -294,6 +294,39 @@ async function detectWebhookSignatureVerification(projectRoot: string, apiRoutes
   return samples.some((sample) => sample && stripeVerificationPattern.test(sample));
 }
 
+async function detectWildcardCors(
+  projectRoot: string,
+  apiRoutes: DetectedApiRoute[],
+  detectedFiles: DetectedFile[],
+) {
+  const configFiles = detectedFiles
+    .filter((file) => file.exists && file.path.startsWith("next.config"))
+    .map((file) => file.path);
+  const relativeFiles = Array.from(
+    new Set([
+      ...apiRoutes.map((route) => route.file),
+      ...configFiles,
+      "middleware.ts",
+      "middleware.js",
+    ]),
+  );
+  const samples = await Promise.all(
+    relativeFiles.map(async (relativeFile) => ({
+      relativeFile,
+      sample: await readSecuritySample(path.join(projectRoot, relativeFile)),
+    })),
+  );
+  const wildcardHeaderPattern = /Access-Control-Allow-Origin[\s\S]{0,160}(?:value\s*:\s*)?["'`]\*["'`]/i;
+  const wildcardOriginOptionPattern = /\borigin\s*:\s*["'`]\*["'`]/i;
+
+  return samples
+    .filter(
+      ({ sample }) =>
+        sample && (wildcardHeaderPattern.test(sample) || wildcardOriginOptionPattern.test(sample)),
+    )
+    .map(({ relativeFile }) => normalizeRoutePath(relativeFile));
+}
+
 export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
   const absoluteDetectedFiles = detectedFiles
@@ -314,6 +347,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const hasLocalEnvFile = localEnvFiles.length > 0;
   const hasRateLimitImplementation = await detectRateLimitImplementation(projectRoot, apiRoutes, dependencies);
   const hasWebhookSignatureVerification = await detectWebhookSignatureVerification(projectRoot, apiRoutes);
+  const wildcardCorsFiles = await detectWildcardCors(projectRoot, apiRoutes, detectedFiles);
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
   const hasAppRouter = detectedFiles.some((file) => file.path === "app" && file.exists);
   const hasPagesRouter = detectedFiles.some((file) => file.path === "pages" && file.exists);
@@ -332,6 +366,9 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
     dependencies,
     detectedFiles,
     apiRoutes,
+    securityEvidence: {
+      wildcardCorsFiles,
+    },
     signals: {
       hasPackageJson: detectedFiles.some((file) => file.path === "package.json" && file.exists),
       hasNextConfig,
@@ -355,6 +392,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasLocalEnvFile,
       hasEnvGitignoreRule: ignoresEnvironmentFiles(gitignore, localEnvFiles),
       hasRateLimitImplementation,
+      hasWildcardCors: wildcardCorsFiles.length > 0,
     },
   };
 }
