@@ -242,6 +242,12 @@ Docker Compose is also included for machines that prefer containerized Postgres:
 docker compose up -d
 ```
 
+The Docker database uses host port `5433` to avoid conflicts with an existing native PostgreSQL installation or another project using `5432`:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vibe?schema=public
+```
+
 ## GitHub Setup
 
 Public repository URLs work without authentication. To scan private repositories, choose branches, and create issues, create a GitHub OAuth App:
