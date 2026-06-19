@@ -174,6 +174,9 @@ const rules: ChecklistRule[] = [
     evaluate: (facts) => {
       if (facts.signals.hasTests) return null;
 
+      const frameworkName =
+        facts.framework.name === "Unknown" ? "detected JavaScript or TypeScript" : facts.framework.name;
+
       return finding({
         id: "missing-tests",
         title: "No test setup detected",
@@ -182,9 +185,9 @@ const rules: ChecklistRule[] = [
         evidence: "No tests, __tests__ folder, Vitest config, Jest config, or Playwright config was detected.",
         impact:
           "Core behavior can regress silently as the app changes, especially around auth, payments, and scanner logic.",
-        fix: "Add a minimal test setup and start with scanner/checklist unit tests.",
+        fix: "Add a minimal test setup and start with tests for the project's core domain logic.",
         prompt:
-          "Add a minimal test setup for this Next.js TypeScript project. Prioritize unit tests for scanner and checklist logic before UI tests. Keep the setup lightweight and document the test command in package.json.",
+          `Add a minimal test setup appropriate for this ${frameworkName} project. Prioritize unit tests for core domain logic before UI tests. Keep the setup lightweight and document the test command in package.json.`,
       });
     },
   },

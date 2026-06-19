@@ -89,13 +89,29 @@ describe("scan history", () => {
     expect(parseScanHistory("{}")).toEqual([]);
   });
 
-  it("adds the newest scan first and removes duplicate ids", () => {
+  it("adds the newest scan first and removes equivalent snapshots", () => {
     const scan = createScan("2026-06-13T00:00:00.000Z", 100);
     const firstHistory = addScanToHistory([], scan);
-    const secondHistory = addScanToHistory(firstHistory, scan);
+    const newerEquivalentScan = createScan("2026-06-13T00:05:00.000Z", 100);
+    const secondHistory = addScanToHistory(firstHistory, newerEquivalentScan);
 
     expect(firstHistory[0]).toEqual(createScanHistoryItem(scan));
     expect(secondHistory).toHaveLength(1);
+    expect(secondHistory[0].scan.scannedAt).toBe("2026-06-13T00:05:00.000Z");
+  });
+
+  it("compacts equivalent snapshots already saved in local storage", () => {
+    const olderScan = createScan("2026-06-13T00:00:00.000Z", 100);
+    const newerScan = createScan("2026-06-13T00:05:00.000Z", 100);
+    const storedHistory = [
+      { ...createScanHistoryItem(newerScan), id: "legacy-newer-id" },
+      { ...createScanHistoryItem(olderScan), id: "legacy-older-id" },
+    ];
+
+    const history = parseScanHistory(JSON.stringify(storedHistory));
+
+    expect(history).toHaveLength(1);
+    expect(history[0].scan.scannedAt).toBe("2026-06-13T00:05:00.000Z");
   });
 
   it("keeps only the six newest scans", () => {

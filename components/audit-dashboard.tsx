@@ -639,7 +639,7 @@ function ContextControls({
           />
         </label>
         <p className="mt-3 text-xs leading-5 text-[#9b9696]">
-          Paths are limited to {workspaceProjects?.workspaceRoot ?? "the configured server workspace"} so the scanner cannot read arbitrary system folders.
+          Select a Node.js project containing package.json inside {workspaceProjects?.workspaceRoot ?? "the configured server workspace"}. Other stacks are not supported yet.
         </p>
 
         <div className="mt-5 rounded-[22px] bg-black p-4">
@@ -898,7 +898,7 @@ function GitHubScanPanel({
         <div className="max-w-2xl">
           <p className="mono text-[10px] text-[#fc74dd]">GitHub repository</p>
           <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
-            Connect GitHub for private repositories and branch selection, or scan a public URL without connecting.
+            Scan a Node.js repository containing package.json. Connect GitHub for private repositories and branch selection, or use a public URL.
           </p>
         </div>
         {connectionState === "loading" ? (
@@ -1048,7 +1048,7 @@ function ProjectUploadPanel({
         <div className="max-w-2xl">
           <p className="mono text-[10px] text-[#fc74dd]">Upload project</p>
           <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
-            Upload a ZIP archive when the project is not inside the local workspace picker.
+            Upload a Node.js project ZIP containing package.json when it is not inside the local workspace picker.
           </p>
           <p className="mt-2 text-xs leading-5 text-[#9b9696]">
             The archive is extracted to a temporary folder, scanned without executing code, then removed.

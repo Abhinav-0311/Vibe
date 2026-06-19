@@ -30,6 +30,12 @@ export function resolveWorkspaceProjectPath(value: string | null): ProjectPathRe
     };
   }
 
+  if (!existsSync(path.join(resolvedPath, "package.json"))) {
+    return {
+      error: "Select a Node.js project folder containing package.json. Other stacks are not supported yet.",
+    };
+  }
+
   return {
     projectPath: resolvedPath,
   };
