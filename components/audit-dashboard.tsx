@@ -424,8 +424,6 @@ export function AuditDashboard() {
           onUploadScan={(file, context) => void runUploadScan(file, context)}
           onGitHubScan={(repoUrl, branch, context) => void runGitHubScan(repoUrl, branch, context)}
         />
-        <StateSwitch active={viewState} onChange={setViewState} />
-
         {viewState === "loading" && <LoadingState />}
         {viewState === "empty" && <EmptyState />}
         {viewState === "error" && <ErrorState message={scanError} onRetry={runScan} />}
@@ -573,35 +571,6 @@ function IntroCard({
         </div>
       </div>
     </article>
-  );
-}
-
-function StateSwitch({
-  active,
-  onChange,
-}: {
-  active: ViewState;
-  onChange: (state: ViewState) => void;
-}) {
-  const states: ViewState[] = ["report", "loading", "empty", "error"];
-
-  return (
-    <div className="flex flex-wrap gap-2" aria-label="Preview UI states">
-      {states.map((state) => (
-        <button
-          key={state}
-          onClick={() => onChange(state)}
-          aria-pressed={active === state}
-          className={`mono rounded-full border px-4 py-2 text-[10px] transition ${
-            active === state
-              ? "border-[#fc74dd] bg-[#fc74dd] text-[#111212]"
-              : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white hover:text-white"
-          }`}
-        >
-          {state}
-        </button>
-      ))}
-    </div>
   );
 }
 
