@@ -22,13 +22,10 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to list saved scan records", error);
 
-    return NextResponse.json(
-      {
-        databaseConfigured: true,
-        records: [],
-        error: "database_error",
-      },
-      { status: 503 },
-    );
+    return NextResponse.json({
+      databaseConfigured: true,
+      records: [],
+      error: "database_error",
+    });
   }
 }

@@ -1577,7 +1577,7 @@ function DatabaseArchive({
   onRestore: (recordId: string) => void;
 }) {
   const isLoading = state === "loading";
-  const isError = state === "error";
+  const isError = state === "error" || savedScans?.error === "database_error";
   const isConfigured = savedScans?.databaseConfigured ?? false;
   const records = savedScans?.records ?? [];
 
@@ -1618,7 +1618,10 @@ function DatabaseArchive({
           <div className="rounded-[24px] border border-[#3d3d3d] p-6">
             <p className="mono text-[10px] text-[#ff5a5f]">Archive unavailable</p>
             <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">
-              The saved-scans endpoint returned an error. Local scan history is still available.
+              PostgreSQL is configured, but Vibe could not read saved scans. Local scan history and new scans still work.
+            </p>
+            <p className="mono mt-4 inline-flex rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white">
+              docker compose up -d
             </p>
           </div>
         )}
