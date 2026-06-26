@@ -7,7 +7,9 @@ export type FixPlanItem = {
   category: string;
   severity: Severity;
   evidence: string;
+  severityReason?: string;
   fix: string;
+  verification?: string[];
   prompt: string;
 };
 

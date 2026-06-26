@@ -7,8 +7,10 @@ export type AuditFinding = {
   severity: Severity;
   status: "open" | "planned" | "ignored";
   evidence: string;
+  severityReason?: string;
   impact: string;
   fix: string;
+  verification?: string[];
   prompt: string;
 };
 

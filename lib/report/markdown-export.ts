@@ -65,8 +65,13 @@ function formatFindings(checklist: ChecklistResult) {
 - Category: ${finding.category}
 - Status: ${finding.status}
 - Evidence: ${finding.evidence}
+- Why this rank: ${finding.severityReason ?? "Severity is based on the selected audit context and detected project evidence."}
 - Impact: ${finding.impact}
 - Fix: ${finding.fix}
+
+### Verification
+
+${(finding.verification ?? ["Re-run Vibe and confirm the finding is resolved."]).map((item) => `- ${item}`).join("\n")}
 
 ### Implementation prompt
 

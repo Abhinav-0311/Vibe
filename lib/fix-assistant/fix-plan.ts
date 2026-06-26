@@ -39,7 +39,9 @@ function orderedItems(findings: AuditFinding[]): FixPlanItem[] {
       category: finding.category,
       severity: finding.severity,
       evidence: finding.evidence,
+      severityReason: finding.severityReason,
       fix: finding.fix,
+      verification: finding.verification,
       prompt: finding.prompt,
     }));
 }
@@ -52,9 +54,14 @@ function formatWorkItems(items: FixPlanItem[]) {
       (item) => `## ${item.order}. ${item.title}
 
 - [ ] Confirm the evidence is still present: ${item.evidence}
+- [ ] Confirm the rank is still appropriate: ${item.severityReason ?? "Review severity against the current launch context."}
 - [ ] Implement: ${item.fix}
 - [ ] Add or update tests for the changed behavior.
 - [ ] Keep unrelated behavior unchanged.
+
+### Verification
+
+${(item.verification ?? ["Re-run Vibe and confirm the finding is resolved."]).map((step) => `- [ ] ${step}`).join("\n")}
 
 ### Coding-agent prompt
 

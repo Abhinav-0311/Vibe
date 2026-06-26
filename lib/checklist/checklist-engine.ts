@@ -8,8 +8,10 @@ function finding({
   category,
   severity,
   evidence,
+  severityReason,
   impact,
   fix,
+  verification,
   prompt,
 }: Omit<AuditFinding, "status">): AuditFinding {
   return {
@@ -19,9 +21,113 @@ function finding({
     severity,
     status: "open",
     evidence,
+    severityReason,
     impact,
     fix,
+    verification,
     prompt,
+  };
+}
+
+function yesNo(value: boolean) {
+  return value ? "yes" : "no";
+}
+
+function formatAuditScope(context: AuditContext) {
+  return [
+    `stage=${context.stage}`,
+    `appType=${context.appType}`,
+    `users=${yesNo(context.hasUserAccounts)}`,
+    `payments=${yesNo(context.hasPayments)}`,
+    `storesUserData=${yesNo(context.storesUserData)}`,
+  ].join(", ");
+}
+
+function formatProjectSignals(facts: ScannerFacts) {
+  const routes = facts.apiRoutes.length > 0 ? `${facts.apiRoutes.length} API route(s)` : "no API routes";
+  const dependencyCount = `${facts.dependencies.length} package signal(s)`;
+  return `${facts.framework.name} (${facts.framework.confidence} confidence), ${facts.packageManager}, ${routes}, ${dependencyCount}.`;
+}
+
+function severityReasonFor(finding: AuditFinding, context: AuditContext) {
+  const severityLabel = finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1);
+  const contextPrefix = `${severityLabel} because this ${context.stage} ${context.appType}`;
+
+  if (finding.severity === "critical") {
+    return `${contextPrefix} has a gap that can directly expose users, credentials, payments, or account access before normal product usage reveals it.`;
+  }
+
+  if (finding.severity === "high") {
+    return `${contextPrefix} is missing a launch-readiness control that commonly causes security, reliability, deployment, or trust failures under real users.`;
+  }
+
+  if (finding.severity === "medium") {
+    return `${contextPrefix} has an operational gap that may not block a prototype, but should be resolved before the product becomes harder to change.`;
+  }
+
+  return `${contextPrefix} has a lower-risk improvement that still improves maintainability and launch confidence.`;
+}
+
+function verificationFor(finding: AuditFinding, facts: ScannerFacts) {
+  const commands: string[] = [];
+  const packageRunner = facts.packageManager === "unknown" ? "npm" : facts.packageManager;
+
+  if (facts.scripts.test) commands.push(`${packageRunner} run test`);
+  if (facts.scripts.lint) commands.push(`${packageRunner} run lint`);
+  if (facts.scripts.build) commands.push(`${packageRunner} run build`);
+
+  const scanEvidence = `Re-run Vibe and confirm "${finding.title}" is no longer reported for the same audit context.`;
+
+  if (commands.length === 0) {
+    return [
+      "Run the closest available project verification command after adding one if the project has no test script yet.",
+      scanEvidence,
+    ];
+  }
+
+  return [...commands.map((command) => `Run \`${command}\`.`), scanEvidence];
+}
+
+function formatImplementationPrompt(finding: AuditFinding, facts: ScannerFacts, context: AuditContext) {
+  const verification = (finding.verification ?? verificationFor(finding, facts))
+    .map((item) => `- ${item}`)
+    .join("\n");
+
+  return `You are fixing a Vibe launch-readiness finding.
+
+Project context: ${formatAuditScope(context)}
+Detected stack signals: ${formatProjectSignals(facts)}
+
+Finding: ${finding.title}
+Severity: ${finding.severity}
+Evidence: ${finding.evidence}
+Why it matters: ${finding.impact}
+
+Task: ${finding.fix}
+
+Implementation guidance:
+${finding.prompt}
+
+Constraints:
+- Keep the change scoped to this finding unless a shared prerequisite is necessary.
+- Preserve existing product behavior and project style.
+- Do not weaken type checking, linting, authentication, payment verification, secret handling, or tests to make the fix pass.
+- Do not print or commit secret values.
+
+Acceptance criteria:
+${verification}
+- Summarize the files changed and any remaining risk.`;
+}
+
+function enrichFinding(finding: AuditFinding, facts: ScannerFacts, context: AuditContext): AuditFinding {
+  const severityReason = finding.severityReason ?? severityReasonFor(finding, context);
+  const verification = finding.verification ?? verificationFor(finding, facts);
+
+  return {
+    ...finding,
+    severityReason,
+    verification,
+    prompt: formatImplementationPrompt({ ...finding, severityReason, verification }, facts, context),
   };
 }
 
@@ -556,7 +662,7 @@ export function runChecklist(facts: ScannerFacts, context: AuditContext = defaul
   const findings = rules.flatMap((rule) => {
     const result = rule.evaluate(facts, context);
     return result ? [result] : [];
-  });
+  }).map((item) => enrichFinding(item, facts, context));
 
   const totalPenalty = findings.reduce((sum, item) => sum + severityPenalty(item.severity, context), 0);
   const score = Math.max(0, 100 - totalPenalty);

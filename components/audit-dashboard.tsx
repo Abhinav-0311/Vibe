@@ -2386,7 +2386,7 @@ function FixAssistant({
             <div>
               <p className="mono text-[10px] text-[#d9d9d9]">First task</p>
               <p className="mt-3 text-lg font-semibold tracking-[-0.02em] text-white">{queuedFindings[0].title}</p>
-              <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">{queuedFindings[0].prompt}</p>
+              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-[#d9d9d9]">{queuedFindings[0].prompt}</p>
             </div>
             <div className="border-t border-[#3d3d3d] pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
               <p className="mono text-[10px] text-[#d9d9d9]">Delivery sequence</p>
@@ -2641,9 +2641,33 @@ function FindingDetail({
         <DetailBlock title="Suggested fix" body={finding.fix} />
       </div>
 
+      {(finding.severityReason || finding.verification?.length) && (
+        <div className="mt-8 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          {finding.severityReason && (
+            <div className="rounded-[24px] bg-[#f3f3ef] p-5">
+              <p className="mono text-[10px] text-[#3d3d3d]">Why this rank</p>
+              <p className="mt-3 text-sm leading-6">{finding.severityReason}</p>
+            </div>
+          )}
+          {finding.verification?.length ? (
+            <div className="rounded-[24px] bg-[#f3f3ef] p-5">
+              <p className="mono text-[10px] text-[#3d3d3d]">Verification</p>
+              <ul className="mt-3 grid gap-2 text-sm leading-6">
+                {finding.verification.map((item) => (
+                  <li key={item} className="flex gap-3">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#fc74dd]" aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       <div className="mt-8 rounded-[24px] bg-[#f3f3ef] p-5">
         <p className="mono mb-4 text-[10px] text-[#3d3d3d]">Copy prompt</p>
-        <p className="text-sm leading-6">{finding.prompt}</p>
+        <p className="whitespace-pre-line text-sm leading-6">{finding.prompt}</p>
         <button
           onClick={async () => {
             await navigator.clipboard?.writeText(finding.prompt);
