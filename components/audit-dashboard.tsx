@@ -51,10 +51,10 @@ type ProjectSourceMode = "local" | "github" | "upload";
 
 const defaultAuditContext: AuditContext = {
   appType: "saas",
-  stage: "prototype",
+  stage: "launch-prep",
   hasPayments: false,
-  hasUserAccounts: false,
-  storesUserData: false,
+  hasUserAccounts: true,
+  storesUserData: true,
 };
 
 const triageStorageKey = "vibe:finding-status-overrides";
@@ -430,8 +430,21 @@ export function AuditDashboard() {
         {viewState === "error" && <ErrorState message={scanError} onRetry={runScan} />}
         {viewState === "report" && (
           <>
-            <ScannerFactsPreview scan={scanData} />
-            <ArchitectureStressPanel scan={scanData} />
+            <ReportView
+              report={reportWithStatuses}
+              selectedFinding={selectedFinding}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onStatusChange={updateFindingStatus}
+              onResetTriage={resetTriage}
+              repository={scanData?.scanSource?.repository}
+              scan={scanData}
+              comparison={scanComparison}
+              onRescan={rerunActiveScan}
+              onScanGitHubBranch={scanGitHubFixBranch}
+            />
+            {scanData && <ReportNarrative scan={scanData} />}
+            {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}
             <ScanHistory
               activeScan={scanData}
               history={scanHistory}
@@ -446,21 +459,8 @@ export function AuditDashboard() {
               restoreError={restoreError}
               onRestore={(recordId) => void restoreSavedScan(recordId)}
             />
-            {scanData && <ReportNarrative scan={scanData} />}
-            {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}
-            <ReportView
-              report={reportWithStatuses}
-              selectedFinding={selectedFinding}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onStatusChange={updateFindingStatus}
-              onResetTriage={resetTriage}
-              repository={scanData?.scanSource?.repository}
-              scan={scanData}
-              comparison={scanComparison}
-              onRescan={rerunActiveScan}
-              onScanGitHubBranch={scanGitHubFixBranch}
-            />
+            <ScannerFactsPreview scan={scanData} />
+            <ArchitectureStressPanel scan={scanData} />
           </>
         )}
       </div>
@@ -488,90 +488,46 @@ function TopBar({ onNewScan }: { onNewScan: () => void }) {
 
 function Hero() {
   return (
-    <section className="py-10 sm:py-14">
-      <div className="mx-auto max-w-5xl text-center">
+    <section className="py-9 sm:py-12">
+      <div className="mx-auto max-w-4xl text-center">
         <p className="mono mb-5 text-[11px] text-[#fc74dd]">Vibe audit console</p>
-        <h1 className="text-[64px] font-semibold leading-[0.9] tracking-[-0.05em] text-white sm:text-[100px] lg:text-[140px]">
+        <h1 className="text-[64px] font-semibold leading-[0.9] tracking-[-0.05em] text-white sm:text-[96px] lg:text-[128px]">
           Vibe
         </h1>
-        <p className="mx-auto mt-6 max-w-3xl text-[28px] font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-[42px]">
-          A launch-readiness auditor for AI-built apps.
+        <p className="mx-auto mt-6 max-w-3xl text-[26px] font-semibold leading-[1.08] tracking-[-0.04em] text-white sm:text-[40px]">
+          Find the obvious things your AI-built app still missed.
         </p>
-        <p className="mx-auto mt-6 max-w-3xl text-base leading-7 text-[#d9d9d9] sm:text-[19px] sm:leading-8">
-          Vibe helps new coders, indie builders, and vibe coders understand whether a project is actually ready for real users. It turns codebase signals into production risks, clear evidence, and exact prompts you can hand to Codex, Cursor, or Claude Code.
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#d9d9d9] sm:text-lg sm:leading-8">
+          Scan a Node.js project, see the launch gaps, and copy focused fix prompts for Codex, Cursor, or Claude Code.
         </p>
       </div>
 
-      <div className="mt-14 grid gap-4 lg:grid-cols-3">
-        <IntroCard
-          label="What we do"
-          title="Find the missing launch systems."
-          body="We inspect the project shape, framework signals, auth flows, payment setup, tests, deployment files, analytics, error tracking, and AI workspace context. The goal is to reveal what is missing before customers, attackers, or payment failures reveal it for you."
-          points={[
-            "Detects production gaps like missing password recovery, rate limiting, payment safety, policy pages, and observability.",
-            "Checks AI workspace context such as rules files, memory notes, boundaries, and setup instructions.",
-            "Turns scattered codebase signals into one readable readiness report.",
-          ]}
-        />
-        <IntroCard
-          label="How it works"
-          title="Scanner facts become prioritized findings."
-          body="The scanner collects evidence first. The checklist engine converts that evidence into severity-ranked findings. Then the report explains why each issue matters and gives a focused implementation prompt for your coding agent."
-          points={[
-            "Step one: scan the repo without executing unsafe project code.",
-            "Step two: compare detected signals against launch-readiness rules.",
-            "Step three: generate evidence-backed findings with exact prompts for Codex, Cursor, or Claude Code.",
-          ]}
-        />
-        <IntroCard
-          label="Why it matters"
-          title="Working locally is not production-ready."
-          body="AI tools make it easy to build screens quickly, but production requires boring systems: rate limits, password recovery, webhook safety, observability, legal pages, feedback loops, and durable project rules for your AI workspace."
-          points={[
-            "A product can look complete while still failing under real users, payments, abuse, or deployment pressure.",
-            "New builders often do not know what to ask their AI agent next, so Vibe gives them the next production prompt.",
-            "The final goal is not just a score. It is a practical path from prototype to safer launch.",
-          ]}
-        />
+      <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-3">
+        <SignalPill icon={Code2} label="For vibe coders" value="Plain-English risks" />
+        <SignalPill icon={AlertTriangle} label="For builders" value="Missed launch basics" />
+        <SignalPill icon={Clipboard} label="For agents" value="Copyable fix prompts" />
       </div>
     </section>
   );
 }
 
-function IntroCard({
+function SignalPill({
+  icon: Icon,
   label,
-  title,
-  body,
-  points,
+  value,
 }: {
+  icon: typeof Code2;
   label: string;
-  title: string;
-  body: string;
-  points: string[];
+  value: string;
 }) {
   return (
-    <article className="flex min-h-[420px] flex-col rounded-[30px] bg-[#1d1a1a] p-6 sm:p-8">
-      <div>
-        <p className="mono text-[10px] text-[#fc74dd]">{label}</p>
-        <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-[-0.04em] text-white">
-          {title}
-        </h2>
+    <div className="flex items-center gap-3 rounded-full border border-[#242020] bg-[#111212] px-4 py-3">
+      <Icon className="h-4 w-4 shrink-0 text-[#fc74dd]" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="mono truncate text-[9px] text-[#8f8888]">{label}</p>
+        <p className="truncate text-sm font-medium text-white">{value}</p>
       </div>
-      <div className="mt-7 flex flex-1 flex-col">
-        <p className="text-sm leading-6 text-[#d9d9d9]">{body}</p>
-        <div className="mt-7 space-y-3">
-          {points.map((point) => (
-            <div
-              key={point}
-              className="flex gap-4 border-t border-[#3d3d3d] pt-3 text-sm leading-6 text-white"
-            >
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#fc74dd]" />
-              <p>{point}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </article>
+    </div>
   );
 }
 
@@ -618,15 +574,20 @@ function ContextControls({
         <div className="max-w-2xl">
           <p className="mono text-[11px] text-[#fc74dd]">Audit context</p>
           <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
-            Choose a project. Define what ready means.
+            Scan a project.
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-[#b8b3b3]">
-            Vibe scans Node.js projects without executing their code, then scores the evidence against your intended launch stage.
+            Vibe reads repository structure, never executes project code, and turns missed launch basics into fix prompts.
           </p>
         </div>
-        <span className="mono w-fit rounded-full border border-[#4a4444] px-3 py-2 text-[9px] text-[#b8b3b3]">
-          Node.js projects
-        </span>
+        <div className="flex flex-wrap gap-2">
+          <span className="mono w-fit rounded-full border border-[#4a4444] px-3 py-2 text-[9px] text-[#b8b3b3]">
+            Node.js projects
+          </span>
+          <span className="mono w-fit rounded-full border border-[#4a4444] px-3 py-2 text-[9px] text-[#b8b3b3]">
+            No code execution
+          </span>
+        </div>
       </div>
 
       <div className="mt-7 grid grid-cols-3 gap-2 border-b border-[#3d3838] pb-5 sm:flex sm:w-fit">
@@ -729,38 +690,52 @@ function ContextControls({
       {sourceMode === "github" && <GitHubScanPanel context={context} githubError={githubError} isScanning={isScanning} onGitHubScan={onGitHubScan} />}
       {sourceMode === "upload" && <ProjectUploadPanel context={context} uploadError={uploadError} isScanning={isScanning} onUploadScan={onUploadScan} />}
 
-      <div className="mt-8 grid gap-6 border-t border-[#3d3838] pt-7 lg:grid-cols-2">
-        <SegmentedControl
-          label="Project stage"
-          options={stages}
-          value={context.stage}
-          onChange={(stage) => update({ stage })}
-        />
-        <SegmentedControl
-          label="App type"
-          options={appTypes}
-          value={context.appType}
-          onChange={(appType) => update({ appType })}
-        />
-      </div>
+      <details className="group mt-7 border-t border-[#3d3838] pt-6">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]">
+          <div>
+            <p className="mono text-[10px] text-[#fc74dd]">Readiness profile</p>
+            <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
+              {context.stage} / {context.appType} / users {context.hasUserAccounts ? "yes" : "no"} / payments {context.hasPayments ? "yes" : "no"}
+            </p>
+          </div>
+          <span className="mono rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white transition group-open:bg-white group-open:text-black">
+            Edit
+          </span>
+        </summary>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <ToggleRow
-          label="Users log in"
-          checked={context.hasUserAccounts}
-          onChange={(hasUserAccounts) => update({ hasUserAccounts })}
-        />
-        <ToggleRow
-          label="Users pay"
-          checked={context.hasPayments}
-          onChange={(hasPayments) => update({ hasPayments })}
-        />
-        <ToggleRow
-          label="Stores user data"
-          checked={context.storesUserData}
-          onChange={(storesUserData) => update({ storesUserData })}
-        />
-      </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <SegmentedControl
+            label="Project stage"
+            options={stages}
+            value={context.stage}
+            onChange={(stage) => update({ stage })}
+          />
+          <SegmentedControl
+            label="App type"
+            options={appTypes}
+            value={context.appType}
+            onChange={(appType) => update({ appType })}
+          />
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <ToggleRow
+            label="Users log in"
+            checked={context.hasUserAccounts}
+            onChange={(hasUserAccounts) => update({ hasUserAccounts })}
+          />
+          <ToggleRow
+            label="Users pay"
+            checked={context.hasPayments}
+            onChange={(hasPayments) => update({ hasPayments })}
+          />
+          <ToggleRow
+            label="Stores user data"
+            checked={context.storesUserData}
+            onChange={(storesUserData) => update({ storesUserData })}
+          />
+        </div>
+      </details>
     </section>
   );
 }
@@ -1319,12 +1294,12 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
     <section className="rounded-[30px] border border-[#1d1a1a] p-5 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl">
-          <p className="mono text-[11px] text-[#fc74dd]">Scanner layer</p>
+          <p className="mono text-[11px] text-[#fc74dd]">Technical evidence</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
-            Scanner facts now become checklist findings.
+            What Vibe saw in the repository.
           </h2>
           <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">
-            The `/api/scan` endpoint now returns raw project facts and rule-based findings. This is the bridge between file detection and the future AI report layer.
+            These facts explain why the findings appeared. They are useful for debugging the scan, but the fix list above is the main workflow.
           </p>
         </div>
         <Code2 className="h-7 w-7 text-[#fc74dd]" aria-hidden="true" />
