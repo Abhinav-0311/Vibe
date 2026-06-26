@@ -29,6 +29,8 @@ describe("ZIP project extraction", () => {
     const zip = new AdmZip();
     zip.addFile("README.md", Buffer.from("No project here"));
 
-    await expect(extractProjectZipBuffer(zip.toBuffer())).rejects.toThrow("No package.json");
+    await expect(extractProjectZipBuffer(zip.toBuffer())).rejects.toThrow(
+      "This repository does not contain package.json. Vibe currently supports Node.js projects only.",
+    );
   });
 });

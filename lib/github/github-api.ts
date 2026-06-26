@@ -77,19 +77,29 @@ export async function githubFetch(
     accept?: string;
   } = {},
 ) {
-  const response = await fetch(`https://api.github.com${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      Accept: options.accept ?? "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "Vibe-Launch-Readiness-Auditor",
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(options.body ? { body: JSON.stringify(options.body) } : {}),
-    redirect: "follow",
-    cache: "no-store",
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`https://api.github.com${path}`, {
+      method: options.method ?? "GET",
+      headers: {
+        Accept: options.accept ?? "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "Vibe-Launch-Readiness-Auditor",
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+      redirect: "follow",
+      cache: "no-store",
+    });
+  } catch {
+    throw new GitHubApiError(
+      "Vibe could not reach GitHub. Check the internet connection and try again.",
+      502,
+      "github_error",
+    );
+  }
 
   if (!response.ok) await throwGitHubError(response);
   return response;

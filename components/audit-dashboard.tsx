@@ -9,6 +9,7 @@ import {
   Download,
   FileSearch,
   FileText,
+  FolderOpen,
   Github,
   GitBranch,
   GitPullRequest,
@@ -46,6 +47,7 @@ type CategoryFilter = "all" | string;
 type FindingStatus = AuditFinding["status"];
 type SavedScansState = "loading" | "ready" | "error";
 type ProjectDiscoveryState = "loading" | "ready" | "error";
+type ProjectSourceMode = "local" | "github" | "upload";
 
 const defaultAuditContext: AuditContext = {
   appType: "saas",
@@ -307,8 +309,7 @@ export function AuditDashboard() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload scan failed";
       setUploadError(message);
-      setScanError(message);
-      setViewState("error");
+      setViewState(scanData ? "report" : "empty");
     }
   }
 
@@ -348,8 +349,7 @@ export function AuditDashboard() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "GitHub scan failed";
       setGithubError(message);
-      setScanError(message);
-      setViewState("error");
+      setViewState(scanData ? "report" : "empty");
     }
   }
 
@@ -421,6 +421,7 @@ export function AuditDashboard() {
           onRunScan={(context) => void runScan(context, projectPath)}
           uploadError={uploadError}
           githubError={githubError}
+          isScanning={viewState === "loading"}
           onUploadScan={(file, context) => void runUploadScan(file, context)}
           onGitHubScan={(repoUrl, branch, context) => void runGitHubScan(repoUrl, branch, context)}
         />
@@ -585,6 +586,7 @@ function ContextControls({
   onRunScan,
   uploadError,
   githubError,
+  isScanning,
   onUploadScan,
   onGitHubScan,
 }: {
@@ -598,9 +600,11 @@ function ContextControls({
   onRunScan: (context: AuditContext) => void;
   uploadError: string | null;
   githubError: string | null;
+  isScanning: boolean;
   onUploadScan: (file: File, context: AuditContext) => void;
   onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
 }) {
+  const [sourceMode, setSourceMode] = useState<ProjectSourceMode>("local");
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
   const appTypes: AuditContext["appType"][] = ["saas", "internal-tool", "content-site", "api"];
 
@@ -609,26 +613,51 @@ function ContextControls({
   }
 
   return (
-    <section className="rounded-[30px] bg-[#1d1a1a] p-5 sm:p-6">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+    <section className="rounded-[24px] bg-[#1d1a1a] p-5 sm:p-7">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
           <p className="mono text-[11px] text-[#fc74dd]">Audit context</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
-            Tell Vibe what this project is trying to become.
+          <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
+            Choose a project. Define what ready means.
           </h2>
-          <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">
-            The same missing system can be harmless in a prototype and critical before launch. These controls change how the checklist scores the scan.
+          <p className="mt-3 max-w-xl text-sm leading-6 text-[#b8b3b3]">
+            Vibe scans Node.js projects without executing their code, then scores the evidence against your intended launch stage.
           </p>
         </div>
-        <button
-          onClick={() => onRunScan(context)}
-          className="mono rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-[#111212] transition hover:brightness-95"
-        >
-          Run with context
-        </button>
+        <span className="mono w-fit rounded-full border border-[#4a4444] px-3 py-2 text-[9px] text-[#b8b3b3]">
+          Node.js projects
+        </span>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-7 grid grid-cols-3 gap-2 border-b border-[#3d3838] pb-5 sm:flex sm:w-fit">
+        {([
+          { value: "local", label: "Local", icon: FolderOpen },
+          { value: "github", label: "GitHub", icon: Github },
+          { value: "upload", label: "ZIP", icon: Upload },
+        ] as const).map((source) => {
+          const Icon = source.icon;
+          const selected = sourceMode === source.value;
+
+          return (
+            <button
+              key={source.value}
+              type="button"
+              onClick={() => setSourceMode(source.value)}
+              aria-pressed={selected}
+              className={`mono inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-4 text-[10px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] ${
+                selected
+                  ? "border-[#fc74dd] bg-[#fc74dd] text-black"
+                  : "border-[#4a4444] text-[#d9d9d9] hover:border-[#8f8888] hover:text-white"
+              }`}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+              {source.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {sourceMode === "local" && <div className="mt-6">
         <label className="block">
           <span className="mono text-[10px] text-[#d9d9d9]">Project path</span>
           <input
@@ -642,7 +671,7 @@ function ContextControls({
           Select a Node.js project containing package.json inside {workspaceProjects?.workspaceRoot ?? "the configured server workspace"}. Other stacks are not supported yet.
         </p>
 
-        <div className="mt-5 rounded-[22px] bg-black p-4">
+        <div className="mt-5 border-t border-[#3d3838] pt-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="mono text-[10px] text-[#d9d9d9]">Workspace projects</p>
@@ -686,12 +715,21 @@ function ContextControls({
             </div>
           )}
         </div>
-      </div>
+        <button
+          type="button"
+          onClick={() => onRunScan(context)}
+          disabled={isScanning}
+          className="mono mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 text-[10px] text-black transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-wait disabled:bg-[#4a4444] disabled:text-[#9b9696]"
+        >
+          {isScanning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileSearch className="h-4 w-4" aria-hidden="true" />}
+          {isScanning ? "Scanning project" : "Scan local project"}
+        </button>
+      </div>}
 
-      <GitHubScanPanel context={context} githubError={githubError} onGitHubScan={onGitHubScan} />
-      <ProjectUploadPanel context={context} uploadError={uploadError} onUploadScan={onUploadScan} />
+      {sourceMode === "github" && <GitHubScanPanel context={context} githubError={githubError} isScanning={isScanning} onGitHubScan={onGitHubScan} />}
+      {sourceMode === "upload" && <ProjectUploadPanel context={context} uploadError={uploadError} isScanning={isScanning} onUploadScan={onUploadScan} />}
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+      <div className="mt-8 grid gap-6 border-t border-[#3d3838] pt-7 lg:grid-cols-2">
         <SegmentedControl
           label="Project stage"
           options={stages}
@@ -764,10 +802,12 @@ function SegmentedControl<T extends string>({
 function GitHubScanPanel({
   context,
   githubError,
+  isScanning,
   onGitHubScan,
 }: {
   context: AuditContext;
   githubError: string | null;
+  isScanning: boolean;
   onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
 }) {
   const [repoUrl, setRepoUrl] = useState("");
@@ -893,7 +933,7 @@ function GitHubScanPanel({
   }
 
   return (
-    <div className="mt-5 rounded-[22px] border border-[#3d3d3d] bg-black p-4">
+    <div className="mt-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-2xl">
           <p className="mono text-[10px] text-[#fc74dd]">GitHub repository</p>
@@ -966,10 +1006,11 @@ function GitHubScanPanel({
               </label>
               <button
                 onClick={scanSelectedRepository}
-                disabled={!selectedRepository || !selectedBranch || branchState !== "ready"}
+                disabled={isScanning || !selectedRepository || !selectedBranch || branchState !== "ready"}
                 className="mono inline-flex items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:bg-[#3d3d3d] disabled:text-[#9b9696]"
               >
-                <FileSearch className="h-4 w-4" aria-hidden="true" /> Scan branch
+                {isScanning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <FileSearch className="h-4 w-4" aria-hidden="true" />}
+                {isScanning ? "Scanning" : "Scan branch"}
               </button>
             </div>
           )}
@@ -1014,11 +1055,11 @@ function GitHubScanPanel({
         </label>
         <button
           onClick={submitGitHubScan}
-          disabled={repoUrl.trim().length === 0}
+          disabled={isScanning || repoUrl.trim().length === 0}
           className="mono inline-flex items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 disabled:cursor-not-allowed disabled:bg-[#3d3d3d] disabled:text-[#9b9696]"
         >
-          <Github className="h-4 w-4" aria-hidden="true" />
-          Scan public repo
+          {isScanning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Github className="h-4 w-4" aria-hidden="true" />}
+          {isScanning ? "Scanning repository" : "Scan public repo"}
         </button>
       </div>
 
@@ -1034,16 +1075,18 @@ function GitHubScanPanel({
 function ProjectUploadPanel({
   context,
   uploadError,
+  isScanning,
   onUploadScan,
 }: {
   context: AuditContext;
   uploadError: string | null;
+  isScanning: boolean;
   onUploadScan: (file: File, context: AuditContext) => void;
 }) {
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
 
   return (
-    <div className="mt-5 rounded-[22px] border border-[#3d3d3d] bg-black p-4">
+    <div className="mt-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-2xl">
           <p className="mono text-[10px] text-[#fc74dd]">Upload project</p>
@@ -1055,12 +1098,13 @@ function ProjectUploadPanel({
           </p>
         </div>
 
-        <label className="mono inline-flex cursor-pointer items-center justify-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95">
-          <Upload className="h-4 w-4" aria-hidden="true" />
-          Upload ZIP
+        <label className={`mono inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[10px] transition ${isScanning ? "cursor-wait bg-[#4a4444] text-[#9b9696]" : "cursor-pointer bg-[#fc74dd] text-black hover:brightness-95"}`}>
+          {isScanning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+          {isScanning ? "Scanning archive" : "Choose ZIP"}
           <input
             type="file"
             accept=".zip,application/zip,application/x-zip-compressed"
+            disabled={isScanning}
             className="sr-only"
             onChange={(event) => {
               const file = event.target.files?.[0];

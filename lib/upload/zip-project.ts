@@ -79,7 +79,9 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
     const projectRoot = await findPackageRoot(extractRoot);
 
     if (!projectRoot) {
-      throw new Error("No package.json was found in the uploaded archive.");
+      throw new Error(
+        "This repository does not contain package.json. Vibe currently supports Node.js projects only.",
+      );
     }
 
     return {

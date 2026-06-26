@@ -38,6 +38,16 @@ describe("parseGitHubRepoUrl", () => {
 });
 
 describe("downloadGitHubRepoZip", () => {
+  it("returns an actionable error when GitHub cannot be reached", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+
+    await expect(downloadGitHubRepoZip("https://github.com/owner/project")).rejects.toMatchObject({
+      message: "Vibe could not reach GitHub. Check the internet connection and try again.",
+      code: "github_error",
+      status: 502,
+    });
+  });
+
   it("downloads the requested branch through the authenticated GitHub API", async () => {
     const fetchMock = vi
       .fn()
