@@ -22,6 +22,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { AuditContext } from "@/lib/checklist/types";
 import { auditReport, emptyReport, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
@@ -430,41 +431,109 @@ export function AuditDashboard() {
         {viewState === "error" && <ErrorState message={scanError} onRetry={runScan} />}
         {viewState === "report" && (
           <>
-            <ReportView
-              report={reportWithStatuses}
-              selectedFinding={selectedFinding}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onStatusChange={updateFindingStatus}
-              onResetTriage={resetTriage}
-              repository={scanData?.scanSource?.repository}
-              scan={scanData}
-              comparison={scanComparison}
-              onRescan={rerunActiveScan}
-              onScanGitHubBranch={scanGitHubFixBranch}
-            />
-            {scanData && <ReportNarrative scan={scanData} />}
-            {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}
-            <ScanHistory
-              activeScan={scanData}
-              history={scanHistory}
-              onSelect={selectHistoryItem}
-              onClear={clearScanHistory}
-            />
-            <DatabaseArchive
-              savedScans={savedScans}
-              state={savedScansState}
-              onRefresh={() => void refreshSavedScans()}
-              restoringRecordId={restoringRecordId}
-              restoreError={restoreError}
-              onRestore={(recordId) => void restoreSavedScan(recordId)}
-            />
-            <ScannerFactsPreview scan={scanData} />
-            <ArchitectureStressPanel scan={scanData} />
+            <ResultSection
+              eyebrow="Fix this first"
+              title="Start with the highest-risk misses."
+              description="This is the main product surface: score, prioritized findings, evidence, and the next prompt to give your coding agent."
+            >
+              <ReportView
+                report={reportWithStatuses}
+                selectedFinding={selectedFinding}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onStatusChange={updateFindingStatus}
+                repository={scanData?.scanSource?.repository}
+              />
+            </ResultSection>
+
+            <ResultSection
+              eyebrow="Implementation handoff"
+              title="Turn the scan into work."
+              description="Use this section after you understand the first findings. It exports the report, setup pack, and implementation queue."
+            >
+              {scanData && <ReportNarrative scan={scanData} />}
+              {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}
+              <FixAssistant
+                projectName={reportWithStatuses.projectName}
+                findings={reportWithStatuses.findings}
+                scan={scanData}
+                repository={scanData?.scanSource?.repository}
+                comparison={scanComparison}
+                onResetTriage={resetTriage}
+                onRescan={rerunActiveScan}
+                onScanGitHubBranch={scanGitHubFixBranch}
+              />
+            </ResultSection>
+
+            <EvidenceDisclosure>
+              <ScanHistory
+                activeScan={scanData}
+                history={scanHistory}
+                onSelect={selectHistoryItem}
+                onClear={clearScanHistory}
+              />
+              <DatabaseArchive
+                savedScans={savedScans}
+                state={savedScansState}
+                onRefresh={() => void refreshSavedScans()}
+                restoringRecordId={restoringRecordId}
+                restoreError={restoreError}
+                onRestore={(recordId) => void restoreSavedScan(recordId)}
+              />
+              <ScannerFactsPreview scan={scanData} />
+              <ArchitectureStressPanel scan={scanData} />
+            </EvidenceDisclosure>
           </>
         )}
       </div>
     </main>
+  );
+}
+
+function ResultSection({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid gap-5">
+      <div className="flex flex-col gap-3 border-t border-[#1d1a1a] pt-7 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="mono text-[11px] text-[#fc74dd]">{eyebrow}</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">{title}</h2>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-[#b8b3b3]">{description}</p>
+      </div>
+      <div className="grid gap-6">{children}</div>
+    </section>
+  );
+}
+
+function EvidenceDisclosure({ children }: { children: ReactNode }) {
+  return (
+    <details className="group rounded-[30px] border border-[#1d1a1a] p-5 sm:p-6">
+      <summary className="flex cursor-pointer list-none flex-col gap-4 rounded-[24px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-3xl">
+          <p className="mono text-[11px] text-[#fc74dd]">More evidence</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+            Inspect the scan details.
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[#b8b3b3]">
+            Open this when you want history, database records, route evidence, or architecture stress details.
+          </p>
+        </div>
+        <span className="mono w-fit rounded-full border border-[#3d3d3d] px-5 py-3 text-[10px] text-white transition group-open:bg-white group-open:text-black">
+          View evidence
+        </span>
+      </summary>
+      <div className="mt-6 grid gap-6">{children}</div>
+    </details>
   );
 }
 
@@ -1934,24 +2003,14 @@ function ReportView({
   selectedId,
   onSelect,
   onStatusChange,
-  onResetTriage,
   repository,
-  scan,
-  comparison,
-  onRescan,
-  onScanGitHubBranch,
 }: {
   report: AuditReport;
   selectedFinding?: AuditFinding;
   selectedId?: string;
   onSelect: (id: string) => void;
   onStatusChange: (findingId: string, status: FindingStatus) => void;
-  onResetTriage: () => void;
   repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
-  scan: ScanApiResponse | null;
-  comparison: ScanComparison | null;
-  onRescan: () => void;
-  onScanGitHubBranch: (branch: string) => void;
 }) {
   const criticalCount = report.findings.filter((finding) => finding.severity === "critical").length;
 
@@ -1959,16 +2018,6 @@ function ReportView({
     <section className="grid gap-6">
       <ScorePanel report={report} criticalCount={criticalCount} />
       <FindingsList findings={report.findings} selectedId={selectedId} onSelect={onSelect} />
-      <FixAssistant
-        projectName={report.projectName}
-        findings={report.findings}
-        scan={scan}
-        repository={repository}
-        comparison={comparison}
-        onResetTriage={onResetTriage}
-        onRescan={onRescan}
-        onScanGitHubBranch={onScanGitHubBranch}
-      />
       <FindingDetail finding={selectedFinding} onStatusChange={onStatusChange} repository={repository} />
     </section>
   );
