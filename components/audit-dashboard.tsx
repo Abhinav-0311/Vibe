@@ -29,6 +29,7 @@ import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import { generateFixPlan } from "@/lib/fix-assistant/fix-plan";
 import { compareScans } from "@/lib/fix-assistant/scan-comparison";
 import type { ScanComparison } from "@/lib/fix-assistant/types";
+import { buildScoreBreakdown } from "@/lib/score-breakdown";
 import type {
   SavedScanDetailApiResponse,
   SavedScansApiResponse,
@@ -2053,6 +2054,8 @@ function ReportView({
 }
 
 function ScorePanel({ report, criticalCount }: { report: AuditReport; criticalCount: number }) {
+  const scoreBreakdown = buildScoreBreakdown(report.findings);
+
   return (
     <aside className="rounded-[30px] bg-[#1d1a1a] p-6 sm:p-8">
       <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
@@ -2068,6 +2071,8 @@ function ScorePanel({ report, criticalCount }: { report: AuditReport; criticalCo
         <ScoreRow label="AI workspace" score={report.aiWorkspaceScore} />
       </div>
 
+      <ScoreBreakdown items={scoreBreakdown} />
+
       <div className="my-8 h-[2px] w-full heartbeat" />
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -2079,6 +2084,49 @@ function ScorePanel({ report, criticalCount }: { report: AuditReport; criticalCo
 
       <p className="mt-8 max-w-4xl text-base leading-7 text-[#d9d9d9]">{report.summary}</p>
     </aside>
+  );
+}
+
+function ScoreBreakdown({ items }: { items: ReturnType<typeof buildScoreBreakdown> }) {
+  return (
+    <section className="mt-5 rounded-[24px] border border-[#3d3d3d] bg-black/25 p-5" aria-labelledby="score-breakdown-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mono text-[10px] text-[#fc74dd]">Score breakdown</p>
+          <h3 id="score-breakdown-title" className="mt-2 text-lg font-semibold tracking-[-0.03em] text-white">
+            Where readiness is weak.
+          </h3>
+        </div>
+        <p className="max-w-lg text-sm leading-6 text-[#b8b3b3]">
+          UI/UX is scored here, then explained through the matching findings below.
+        </p>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {items.map((item) => (
+          <div key={item.category} className="rounded-[18px] bg-[#111212] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <p className="mono text-[9px] text-[#d9d9d9]">{item.category}</p>
+              <p className="mono text-[9px] text-white">{item.findingCount}</p>
+            </div>
+            <div className="mt-4 h-1.5 rounded-full bg-black">
+              <div
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={item.score}
+                aria-label={`${item.category}: ${item.score} out of 100`}
+                className="h-full rounded-full bg-[#fc74dd]"
+                style={{ width: `${item.score}%` }}
+              />
+            </div>
+            <p className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-white">
+              {item.score}<span className="text-xs text-[#9b9696]">/100</span>
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
