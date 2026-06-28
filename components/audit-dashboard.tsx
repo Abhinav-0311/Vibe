@@ -76,6 +76,13 @@ const severityClass: Record<Severity, string> = {
   low: "text-[#a7f35b]",
 };
 
+const scoreStatusLabel: Record<ReturnType<typeof buildScoreBreakdown>[number]["status"], string> = {
+  clear: "Clear",
+  watch: "Watch",
+  weak: "Weak",
+  blocked: "Blocked",
+};
+
 function scoreLabel(score: number) {
   if (score >= 80) return "Launchable";
   if (score >= 60) return "Needs work";
@@ -2107,7 +2114,7 @@ function ScoreBreakdown({ items }: { items: ReturnType<typeof buildScoreBreakdow
           <div key={item.category} className="rounded-[18px] bg-[#111212] p-4">
             <div className="flex items-start justify-between gap-3">
               <p className="mono text-[9px] text-[#d9d9d9]">{item.category}</p>
-              <p className="mono text-[9px] text-white">{item.findingCount}</p>
+              <p className="mono text-[9px] text-white">{scoreStatusLabel[item.status]}</p>
             </div>
             <div className="mt-4 h-1.5 rounded-full bg-black">
               <div
@@ -2123,6 +2130,12 @@ function ScoreBreakdown({ items }: { items: ReturnType<typeof buildScoreBreakdow
             <p className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-white">
               {item.score}<span className="text-xs text-[#9b9696]">/100</span>
             </p>
+            <div className="mt-4 border-t border-[#2b2929] pt-3">
+              <p className="mono text-[9px] text-[#777]">{item.findingCount} finding{item.findingCount === 1 ? "" : "s"}</p>
+              <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-[#d9d9d9]">
+                {item.topFinding ? item.topFinding.title : "No current finding in this area."}
+              </p>
+            </div>
           </div>
         ))}
       </div>
