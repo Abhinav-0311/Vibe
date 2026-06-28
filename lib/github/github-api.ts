@@ -5,6 +5,7 @@ export type GitHubErrorCode =
   | "rate_limited"
   | "issues_disabled"
   | "archive_too_large"
+  | "invalid_branch"
   | "validation_failed"
   | "github_error";
 

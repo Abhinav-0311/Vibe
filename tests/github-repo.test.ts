@@ -74,6 +74,42 @@ describe("downloadGitHubRepoZip", () => {
     );
   });
 
+  it("rejects invalid requested branch names before downloading the archive", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(downloadGitHubRepoZip("https://github.com/owner/project", { branch: "feature bad" })).rejects.toMatchObject({
+      code: "invalid_branch",
+      status: 400,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects invalid default branch metadata before downloading the archive", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "feature..bad", full_name: "owner/project" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(downloadGitHubRepoZip("https://github.com/owner/project")).rejects.toMatchObject({
+      code: "invalid_branch",
+      status: 400,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects archives larger than 25 MB before buffering them", async () => {
     const fetchMock = vi
       .fn()

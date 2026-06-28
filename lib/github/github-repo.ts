@@ -1,4 +1,5 @@
 import { GitHubApiError, githubFetch } from "@/lib/github/github-api";
+import { isValidGitHubBranch } from "@/lib/github/github-refs";
 
 export type GitHubRepoRef = {
   owner: string;
@@ -55,6 +56,14 @@ export async function downloadGitHubRepoZip(
 
   if (!branch) {
     throw new Error("Could not detect the repository default branch.");
+  }
+
+  if (!isValidGitHubBranch(branch)) {
+    throw new GitHubApiError(
+      "Enter a valid GitHub branch name.",
+      400,
+      "invalid_branch",
+    );
   }
 
   const archiveResponse = await githubFetch(
