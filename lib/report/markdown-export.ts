@@ -69,6 +69,12 @@ function formatFindings(checklist: ChecklistResult) {
 - Impact: ${finding.impact}
 - Fix: ${finding.fix}
 
+### Learn the mistake
+
+- What it means: ${finding.learning?.explanation ?? "This finding points to a readiness gap detected from repository evidence."}
+- Why builders miss it: ${finding.learning?.commonMistake ?? "Builders often focus on the happy-path demo and miss production support systems."}
+- Good fix: ${finding.learning?.goodFix ?? "Fix the specific evidence, verify the behavior, and re-run Vibe."}
+
 ### Verification
 
 ${(finding.verification ?? ["Re-run Vibe and confirm the finding is resolved."]).map((item) => `- ${item}`).join("\n")}

@@ -387,5 +387,10 @@ describe("runChecklist", () => {
     expect(findingIds).toContain("placeholder-ui-copy");
     expect(findingIds).toContain("images-missing-alt");
     expect(findingIds).toContain("unlabeled-form-controls");
+    expect(result.findings.find((finding) => finding.id === "unlabeled-form-controls")?.learning).toMatchObject({
+      explanation: expect.stringContaining("form label"),
+      commonMistake: expect.stringContaining("placeholder"),
+      goodFix: expect.stringContaining("visible label"),
+    });
   });
 });

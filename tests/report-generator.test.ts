@@ -156,6 +156,7 @@ describe("generateReport", () => {
     expect(markdown).toContain("- Stage: launch-prep");
     expect(markdown).toContain("## Top Risks");
     expect(markdown).toContain("## Finding 1:");
+    expect(markdown).toContain("### Learn the mistake");
     expect(markdown).toContain("### Implementation prompt");
   });
 });

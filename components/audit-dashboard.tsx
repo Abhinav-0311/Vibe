@@ -2697,6 +2697,17 @@ function FindingDetail({
         <DetailBlock title="Suggested fix" body={finding.fix} />
       </div>
 
+      {finding.learning && (
+        <div className="mt-8 rounded-[24px] bg-[#f3f3ef] p-5">
+          <p className="mono text-[10px] text-[#3d3d3d]">Learn the mistake</p>
+          <div className="mt-4 grid gap-5 lg:grid-cols-3">
+            <DetailBlock compact title="What it means" body={finding.learning.explanation} />
+            <DetailBlock compact title="Why builders miss it" body={finding.learning.commonMistake} />
+            <DetailBlock compact title="Good fix" body={finding.learning.goodFix} />
+          </div>
+        </div>
+      )}
+
       {(finding.severityReason || finding.verification?.length) && (
         <div className="mt-8 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
           {finding.severityReason && (
@@ -2779,9 +2790,9 @@ function FindingDetail({
   );
 }
 
-function DetailBlock({ title, body }: { title: string; body: string }) {
+function DetailBlock({ title, body, compact = false }: { title: string; body: string; compact?: boolean }) {
   return (
-    <div className="border-t border-[#d9d9d9] py-5">
+    <div className={`border-t border-[#d9d9d9] ${compact ? "py-4" : "py-5"}`}>
       <p className="mono text-[10px] text-[#3d3d3d]">{title}</p>
       <p className="mt-3 text-sm leading-6">{body}</p>
     </div>

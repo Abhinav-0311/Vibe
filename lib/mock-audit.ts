@@ -8,6 +8,11 @@ export type AuditFinding = {
   status: "open" | "planned" | "ignored";
   evidence: string;
   severityReason?: string;
+  learning?: {
+    explanation: string;
+    commonMistake: string;
+    goodFix: string;
+  };
   impact: string;
   fix: string;
   verification?: string[];

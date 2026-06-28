@@ -40,6 +40,7 @@ function orderedItems(findings: AuditFinding[]): FixPlanItem[] {
       severity: finding.severity,
       evidence: finding.evidence,
       severityReason: finding.severityReason,
+      learning: finding.learning,
       fix: finding.fix,
       verification: finding.verification,
       prompt: finding.prompt,
@@ -58,6 +59,12 @@ function formatWorkItems(items: FixPlanItem[]) {
 - [ ] Implement: ${item.fix}
 - [ ] Add or update tests for the changed behavior.
 - [ ] Keep unrelated behavior unchanged.
+
+### Learning note
+
+- What it means: ${item.learning?.explanation ?? "This finding points to a readiness gap detected from repository evidence."}
+- Why builders miss it: ${item.learning?.commonMistake ?? "Builders often focus on the happy-path demo and miss production support systems."}
+- Good fix: ${item.learning?.goodFix ?? "Fix the specific evidence, verify the behavior, and re-run Vibe."}
 
 ### Verification
 

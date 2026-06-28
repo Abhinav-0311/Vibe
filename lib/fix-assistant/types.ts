@@ -8,6 +8,11 @@ export type FixPlanItem = {
   severity: Severity;
   evidence: string;
   severityReason?: string;
+  learning?: {
+    explanation: string;
+    commonMistake: string;
+    goodFix: string;
+  };
   fix: string;
   verification?: string[];
   prompt: string;

@@ -92,6 +92,9 @@ function formatImplementationPrompt(finding: AuditFinding, facts: ScannerFacts, 
   const verification = (finding.verification ?? verificationFor(finding, facts))
     .map((item) => `- ${item}`)
     .join("\n");
+  const learning = finding.learning
+    ? `\nLearning note: ${finding.learning.explanation}\nCommon mistake: ${finding.learning.commonMistake}\nGood fix: ${finding.learning.goodFix}\n`
+    : "";
 
   return `You are fixing a Vibe launch-readiness finding.
 
@@ -102,6 +105,7 @@ Finding: ${finding.title}
 Severity: ${finding.severity}
 Evidence: ${finding.evidence}
 Why it matters: ${finding.impact}
+${learning}
 
 Task: ${finding.fix}
 
@@ -119,15 +123,164 @@ ${verification}
 - Summarize the files changed and any remaining risk.`;
 }
 
+function learningFor(finding: AuditFinding): NonNullable<AuditFinding["learning"]> {
+  const byId: Record<string, NonNullable<AuditFinding["learning"]>> = {
+    "missing-rate-limiting": {
+      explanation:
+        "Rate limiting is a traffic safety control. It slows repeated requests so login, signup, and public APIs are harder to brute-force or overwhelm.",
+      commonMistake:
+        "Builders often protect the happy path but forget that attackers and bots use the same endpoint thousands of times.",
+      goodFix:
+        "Limit by IP and by account identifier where possible, return a clear 429 response, and test repeated requests.",
+    },
+    "unverified-payment-webhook": {
+      explanation:
+        "Webhook signature verification proves the payment event actually came from Stripe before your app changes subscription state.",
+      commonMistake:
+        "A route named webhook feels official, but without signature verification anyone can forge a request to that route.",
+      goodFix:
+        "Verify the raw body and Stripe-Signature header before processing events, then handle repeated events idempotently.",
+    },
+    "missing-auth": {
+      explanation:
+        "Authentication is the system that proves who a user is before you show private data or paid functionality.",
+      commonMistake:
+        "A prototype may have screens that look logged-in while still lacking real sessions, protected routes, logout, and recovery.",
+      goodFix:
+        "Use a real auth provider or well-tested auth layer, protect routes server-side, document env vars, and verify login/logout flows.",
+    },
+    "missing-env-example": {
+      explanation:
+        ".env.example is a safe map of required configuration. It tells another developer or deploy platform what variables must exist without leaking real secrets.",
+      commonMistake:
+        "Teams keep secrets locally and forget to document them, so deployment fails or someone copies real keys into chat or Git.",
+      goodFix:
+        "List every required variable with placeholder values, keep real .env files ignored, and rotate secrets if they were exposed.",
+    },
+    "unignored-environment-file": {
+      explanation:
+        "Environment files often contain API keys, database URLs, and signing secrets. If Git tracks them, the exposure can live forever in history.",
+      commonMistake:
+        "New builders add .env for local work but forget to ignore every environment filename they created.",
+      goodFix:
+        "Ignore all local env files, keep .env.example tracked, remove any tracked secret file from Git, and rotate exposed credentials.",
+    },
+    "missing-tests": {
+      explanation:
+        "Tests are a repeatable safety check. They prove important behavior still works after AI-assisted changes.",
+      commonMistake:
+        "The app is clicked manually once, then future changes silently break scanner logic, auth, payments, or edge cases.",
+      goodFix:
+        "Start with small unit tests around core logic and add a documented test command before broad UI automation.",
+    },
+    "missing-ui-loading-state": {
+      explanation:
+        "A loading state tells users the app is still working while data, uploads, auth, or scans take time.",
+      commonMistake:
+        "AI-built apps often work locally on fast paths but feel frozen on slower networks or larger projects.",
+      goodFix:
+        "Show route-level or action-level loading feedback, disable duplicate submissions, and keep the message short.",
+    },
+    "missing-ui-error-state": {
+      explanation:
+        "An error state explains what failed and gives the user a way to recover instead of leaving them stuck.",
+      commonMistake:
+        "Builders log errors to the console but forget the user cannot see the console or know what to retry.",
+      goodFix:
+        "Show clear error copy, include retry or next-step actions, and use accessible alert semantics for important failures.",
+    },
+    "placeholder-ui-copy": {
+      explanation:
+        "Placeholder copy makes a real feature feel unfinished because users cannot tell whether the workflow is ready.",
+      commonMistake:
+        "Temporary text added during vibe coding stays in the product because the screen looks visually complete.",
+      goodFix:
+        "Replace filler with specific product language that tells the user what happened, what to do, or what the feature means.",
+    },
+    "images-missing-alt": {
+      explanation:
+        "Alternative text lets screen reader users understand meaningful images and lets decorative images stay silent.",
+      commonMistake:
+        "Images are treated as visual decoration even when they carry product meaning, screenshots, logos, or state.",
+      goodFix:
+        "Write concise alt text for meaningful images and mark purely decorative images with empty alt text or aria-hidden.",
+    },
+    "unlabeled-form-controls": {
+      explanation:
+        "A form label gives a control its meaning for users, keyboards, autofill, and assistive technology.",
+      commonMistake:
+        "A placeholder looks like a label, but it disappears during typing and is often not enough for accessibility.",
+      goodFix:
+        "Connect each input, select, or textarea to a visible label or a deliberate accessible name.",
+    },
+    "missing-error-tracking": {
+      explanation:
+        "Error tracking tells you what failed for real users after launch, including failures you cannot reproduce locally.",
+      commonMistake:
+        "Builders assume users will report bugs, but most users just leave when a scan, payment, or auth flow fails.",
+      goodFix:
+        "Capture server and client errors, tag important flows, and document required monitoring environment variables.",
+    },
+  };
+
+  if (byId[finding.id]) return byId[finding.id];
+
+  const byCategory: Record<string, NonNullable<AuditFinding["learning"]>> = {
+    "UI/UX": {
+      explanation: "UI/UX readiness means the product helps users understand state, recover from problems, and complete the main workflow.",
+      commonMistake: "The screen looks finished in a screenshot, but missing states or unclear controls make it fail in real use.",
+      goodFix: "Make the primary action clear, cover loading/empty/error states, and verify keyboard and mobile behavior.",
+    },
+    Security: {
+      explanation: "Security readiness reduces the ways a public app can be abused once real users and bots can reach it.",
+      commonMistake: "Local demos focus on normal users, while production has repeated attempts, malformed requests, and untrusted traffic.",
+      goodFix: "Add narrow controls, test abuse paths, and avoid weakening auth, secrets, or validation to make the app feel simpler.",
+    },
+    Auth: {
+      explanation: "Auth readiness controls identity, sessions, route protection, and account recovery.",
+      commonMistake: "Login screens are built before the app has a durable session and recovery model.",
+      goodFix: "Use a reliable auth layer, protect server routes, and verify signup, login, logout, and recovery paths.",
+    },
+    Payments: {
+      explanation: "Payment readiness protects money movement, subscription state, and entitlement changes.",
+      commonMistake: "Checkout is tested, but webhook verification, retries, and failed payment states are skipped.",
+      goodFix: "Verify provider events, store entitlement changes idempotently, and test invalid or repeated events.",
+    },
+    Reliability: {
+      explanation: "Reliability readiness helps you detect, diagnose, and recover from failures after launch.",
+      commonMistake: "If it works once locally, it is treated as stable even though production failures are silent.",
+      goodFix: "Add health checks, monitoring, clear error handling, and a rollback or recovery path.",
+    },
+    Deployment: {
+      explanation: "Deployment readiness makes local behavior repeatable in CI and production.",
+      commonMistake: "The app runs on one machine but lacks the scripts, lockfiles, or config needed for repeatable release.",
+      goodFix: "Document environment variables, commit lockfiles, keep build checks enabled, and verify a production build.",
+    },
+    "AI Workspace": {
+      explanation: "AI workspace readiness gives coding agents durable project context across sessions.",
+      commonMistake: "The agent is expected to remember product rules, brand voice, and boundaries from chat history alone.",
+      goodFix: "Store product purpose, constraints, stack, safety rules, and mentoring expectations in a project rules file.",
+    },
+  };
+
+  return byCategory[finding.category] ?? {
+    explanation: "This finding points to a readiness gap detected from repository evidence.",
+    commonMistake: "Builders often optimize for a working demo and miss the supporting system needed for real users.",
+    goodFix: "Fix the specific evidence, verify the behavior, and re-run Vibe to confirm the gap is gone.",
+  };
+}
+
 function enrichFinding(finding: AuditFinding, facts: ScannerFacts, context: AuditContext): AuditFinding {
   const severityReason = finding.severityReason ?? severityReasonFor(finding, context);
   const verification = finding.verification ?? verificationFor(finding, facts);
+  const learning = finding.learning ?? learningFor(finding);
 
   return {
     ...finding,
     severityReason,
     verification,
-    prompt: formatImplementationPrompt({ ...finding, severityReason, verification }, facts, context),
+    learning,
+    prompt: formatImplementationPrompt({ ...finding, severityReason, verification, learning }, facts, context),
   };
 }
 
