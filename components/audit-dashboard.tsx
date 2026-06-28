@@ -709,50 +709,60 @@ function ContextControls({
           Select a Node.js project containing package.json inside {workspaceProjects?.workspaceRoot ?? "the configured server workspace"}. Other stacks are not supported yet.
         </p>
 
-        <div className="mt-5 border-t border-[#3d3838] pt-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <details className="group mt-5 border-t border-[#3d3838] pt-5">
+          <summary className="flex cursor-pointer list-none flex-col gap-3 rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="mono text-[10px] text-[#d9d9d9]">Workspace projects</p>
+              <p className="mono text-[10px] text-[#d9d9d9]">Detected projects</p>
               <p className="mt-2 text-xs leading-5 text-[#9b9696]">
-                Select a detected project or keep typing a path manually.
+                {workspaceProjects && workspaceProjects.projects.length > 0
+                  ? `${workspaceProjects.projects.length} project${workspaceProjects.projects.length === 1 ? "" : "s"} found in the workspace.`
+                  : "Open this if you want Vibe to pick from discovered package.json projects."}
               </p>
             </div>
-            <button
-              onClick={onRefreshProjects}
-              disabled={projectDiscoveryState === "loading"}
-              className="mono inline-flex items-center justify-center rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white disabled:cursor-wait disabled:opacity-50"
-            >
-              {projectDiscoveryState === "loading" ? "Scanning" : "Refresh"}
-            </button>
-          </div>
+            <span className="mono w-fit rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white transition group-open:bg-white group-open:text-black">
+              Choose
+            </span>
+          </summary>
 
-          {projectDiscoveryState === "error" && (
-            <p className="mt-4 text-sm leading-6 text-[#ff8f8f]">Could not discover workspace projects.</p>
-          )}
-
-          {projectDiscoveryState === "ready" && (workspaceProjects?.projects.length ?? 0) === 0 && (
-            <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">No package.json projects found under the workspace root.</p>
-          )}
-
-          {workspaceProjects && workspaceProjects.projects.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {workspaceProjects.projects.map((project) => (
-                <button
-                  key={project.path}
-                  onClick={() => onProjectPathChange(project.path)}
-                  aria-pressed={projectPath === project.path}
-                  className={`mono rounded-full border px-4 py-2 text-[10px] transition ${
-                    projectPath === project.path
-                      ? "border-[#fc74dd] bg-[#fc74dd] text-black"
-                      : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white hover:text-white"
-                  }`}
-                >
-                  {project.name}
-                </button>
-              ))}
+          <div className="mt-5">
+            <div className="mb-4 flex justify-end">
+              <button
+                onClick={onRefreshProjects}
+                disabled={projectDiscoveryState === "loading"}
+                className="mono inline-flex items-center justify-center rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white disabled:cursor-wait disabled:opacity-50"
+              >
+                {projectDiscoveryState === "loading" ? "Scanning" : "Refresh"}
+              </button>
             </div>
-          )}
-        </div>
+
+            {projectDiscoveryState === "error" && (
+              <p className="text-sm leading-6 text-[#ff8f8f]">Could not discover workspace projects.</p>
+            )}
+
+            {projectDiscoveryState === "ready" && (workspaceProjects?.projects.length ?? 0) === 0 && (
+              <p className="text-sm leading-6 text-[#d9d9d9]">No package.json projects found under the workspace root.</p>
+            )}
+
+            {workspaceProjects && workspaceProjects.projects.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {workspaceProjects.projects.map((project) => (
+                  <button
+                    key={project.path}
+                    onClick={() => onProjectPathChange(project.path)}
+                    aria-pressed={projectPath === project.path}
+                    className={`mono rounded-full border px-4 py-2 text-[10px] transition ${
+                      projectPath === project.path
+                        ? "border-[#fc74dd] bg-[#fc74dd] text-black"
+                        : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white hover:text-white"
+                    }`}
+                  >
+                    {project.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
         <button
           type="button"
           onClick={() => onRunScan(context)}
