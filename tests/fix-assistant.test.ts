@@ -113,6 +113,9 @@ describe("fix plan", () => {
 
     expect(plan.markdown).toContain(auditReport.findings[0].evidence);
     expect(plan.markdown).toContain(auditReport.findings[0].prompt);
+    expect(plan.roadmap).toHaveLength(3);
+    expect(plan.roadmap[0].findingIds).toEqual([auditReport.findings[0].id]);
+    expect(plan.markdown).toContain("## Readiness Roadmap");
     expect(plan.markdown).toContain("### Learning note");
     expect(plan.markdown).toContain("`npm run test`");
     expect(plan.markdown).toContain("`npm run build`");

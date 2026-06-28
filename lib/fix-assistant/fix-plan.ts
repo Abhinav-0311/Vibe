@@ -1,6 +1,6 @@
 import type { AuditFinding, Severity } from "@/lib/mock-audit";
 import type { ScannerFacts } from "@/lib/scanner/types";
-import type { FixPlan, FixPlanItem } from "@/lib/fix-assistant/types";
+import type { FixPlan, FixPlanItem, FixRoadmapStep } from "@/lib/fix-assistant/types";
 
 const severityRank: Record<Severity, number> = {
   critical: 0,
@@ -77,6 +77,71 @@ ${item.prompt}`,
     .join("\n\n");
 }
 
+function formatStepFocus(item: FixPlanItem) {
+  return item.learning?.goodFix ?? item.fix;
+}
+
+function buildRoadmap(items: FixPlanItem[]): FixRoadmapStep[] {
+  if (items.length === 0) {
+    return [
+      {
+        label: "01",
+        title: "Keep the launch gate",
+        body: "No open findings are queued. Keep running scans before major releases so small regressions are caught early.",
+        findingIds: [],
+      },
+      {
+        label: "02",
+        title: "Protect the basics",
+        body: "Keep tests, build checks, environment documentation, and error tracking visible in every release workflow.",
+        findingIds: [],
+      },
+      {
+        label: "03",
+        title: "Re-scan after changes",
+        body: "Run Vibe after meaningful code changes and compare the new score against the previous readiness snapshot.",
+        findingIds: [],
+      },
+    ];
+  }
+
+  const first = items[0];
+  const second = items[1];
+  const remaining = Math.max(items.length - 2, 0);
+
+  return [
+    {
+      label: "01",
+      title: `Fix first: ${first.title}`,
+      body: formatStepFocus(first),
+      findingIds: [first.id],
+    },
+    {
+      label: "02",
+      title: second ? `Fix next: ${second.title}` : "Then close the loop",
+      body: second
+        ? formatStepFocus(second)
+        : "Re-run the scanner and make sure the first fix removed the original evidence instead of only hiding the symptom.",
+      findingIds: second ? [second.id] : [],
+    },
+    {
+      label: "03",
+      title: remaining > 0 ? `Finish ${remaining} more queued item${remaining === 1 ? "" : "s"}` : "Verify and re-scan",
+      body:
+        remaining > 0
+          ? "Continue in severity order, keep each change scoped, run the project checks, then scan again before claiming readiness."
+          : "Run the project checks, review the diff for unrelated changes, and re-scan the same source to confirm the finding is gone.",
+      findingIds: items.slice(2).map((item) => item.id),
+    },
+  ];
+}
+
+function formatRoadmap(roadmap: FixRoadmapStep[]) {
+  return roadmap
+    .map((step) => `- ${step.label}. ${step.title}: ${step.body}`)
+    .join("\n");
+}
+
 export function generateFixPlan({
   projectName,
   findings,
@@ -87,6 +152,7 @@ export function generateFixPlan({
   facts?: ScannerFacts;
 }): FixPlan {
   const items = orderedItems(findings);
+  const roadmap = buildRoadmap(items);
   const branchName = `vibe/readiness-${slug(projectName)}`;
   const commands = verificationCommands(facts);
   const verification = commands.map((command) => `- [ ] \`${command}\``).join("\n");
@@ -128,6 +194,10 @@ Generated from triaged Vibe findings. This plan does not modify repository code.
 - Never weaken type checking, linting, tests, authentication, or secret handling to make verification pass.
 - Stop and ask when the requested fix requires a product, security, billing, or migration decision.
 
+## Readiness Roadmap
+
+${formatRoadmap(roadmap)}
+
 ${formatWorkItems(items)}
 
 ## Final Verification
@@ -145,5 +215,6 @@ ${verification}
     pullRequestBody,
     markdown,
     items,
+    roadmap,
   };
 }

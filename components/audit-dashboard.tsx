@@ -2429,6 +2429,8 @@ function FixAssistant({
         <Metric label="Ignored" value={ignoredCount.toString()} />
       </div>
 
+      <ReadinessRoadmap steps={plan.roadmap} findings={queuedFindings} />
+
       <div className="mt-7 border-t border-[#3d3d3d] pt-7">
         {queuedFindings.length === 0 ? (
           <div className="py-8 text-center">
@@ -2580,6 +2582,61 @@ function FixAssistant({
         </button>
       </div>
     </section>
+  );
+}
+
+function ReadinessRoadmap({
+  steps,
+  findings,
+}: {
+  steps: ReturnType<typeof generateFixPlan>["roadmap"];
+  findings: AuditFinding[];
+}) {
+  const findingById = new Map(findings.map((finding) => [finding.id, finding]));
+
+  return (
+    <div className="mt-7 rounded-[24px] border border-[#3d3d3d] bg-black/35 p-5 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mono text-[10px] text-[#fc74dd]">Readiness roadmap</p>
+          <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">The next three moves.</h3>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-[#d9d9d9]">
+          A short path for fixing the scan without trying to solve every production concern at once.
+        </p>
+      </div>
+
+      <ol className="mt-6 grid gap-3 lg:grid-cols-3">
+        {steps.map((step) => {
+          const linkedFindings = step.findingIds
+            .map((id) => findingById.get(id))
+            .filter((finding): finding is AuditFinding => Boolean(finding));
+          const primaryFinding = linkedFindings[0];
+
+          return (
+            <li key={`${step.label}-${step.title}`} className="rounded-[20px] bg-[#111212] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <span className="mono text-[10px] text-[#fc74dd]">{step.label}</span>
+                {primaryFinding && (
+                  <span className={`mono text-[10px] ${severityClass[primaryFinding.severity]}`}>
+                    {severityLabel[primaryFinding.severity]}
+                  </span>
+                )}
+              </div>
+              <p className="mt-4 text-base font-semibold leading-6 tracking-[-0.02em] text-white">{step.title}</p>
+              <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">{step.body}</p>
+              {linkedFindings.length > 0 && (
+                <div className="mt-5 border-t border-[#3d3d3d] pt-4">
+                  <p className="mono text-[10px] text-[#777]">
+                    {linkedFindings.length === 1 ? primaryFinding?.category : `${linkedFindings.length} queued findings`}
+                  </p>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

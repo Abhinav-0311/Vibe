@@ -18,6 +18,13 @@ export type FixPlanItem = {
   prompt: string;
 };
 
+export type FixRoadmapStep = {
+  label: string;
+  title: string;
+  body: string;
+  findingIds: string[];
+};
+
 export type FixPlan = {
   projectName: string;
   branchName: string;
@@ -25,6 +32,7 @@ export type FixPlan = {
   pullRequestBody: string;
   markdown: string;
   items: FixPlanItem[];
+  roadmap: FixRoadmapStep[];
 };
 
 export type ScanComparison = {
