@@ -165,4 +165,55 @@ describe("scanProject API route discovery", () => {
     expect(facts.deploymentEvidence?.ignoredTypeScriptBuildFiles).toEqual(["next.config.ts"]);
     expect(facts.deploymentEvidence?.ignoredEslintBuildFiles).toEqual(["next.config.ts"]);
   });
+
+  it("detects basic UI and accessibility readiness signals", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "app/page.tsx",
+      `export default function Page() {
+        return (
+          <main className="grid gap-4 md:grid-cols-2">
+            <img src="/hero.png" />
+            <input name="email" />
+            <p>{"Coming soon"}</p>
+          </main>
+        );
+      }\n`,
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.uiEvidence?.filesScanned).toContain("app/page.tsx");
+    expect(facts.uiEvidence?.imageWithoutAltFiles).toEqual(["app/page.tsx"]);
+    expect(facts.uiEvidence?.unlabeledControlFiles).toEqual(["app/page.tsx"]);
+    expect(facts.uiEvidence?.placeholderCopyFiles).toEqual(["app/page.tsx"]);
+    expect(facts.uiEvidence?.responsiveClassFiles).toEqual(["app/page.tsx"]);
+  });
+
+  it("accepts accessible image and form-control patterns", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "components/contact-form.tsx",
+      `export function ContactForm() {
+        return (
+          <form>
+            <img src="/logo.png" alt="Acme dashboard" />
+            <label htmlFor="email">Email</label>
+            <input id="email" name="email" />
+            {isLoading ? <span>Loading</span> : null}
+            {error ? <p role="alert">Something failed.</p> : null}
+          </form>
+        );
+      }\n`,
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.uiEvidence?.hasLoadingState).toBe(true);
+    expect(facts.uiEvidence?.hasErrorState).toBe(true);
+    expect(facts.uiEvidence?.imageWithoutAltFiles).toEqual([]);
+    expect(facts.uiEvidence?.unlabeledControlFiles).toEqual([]);
+  });
 });

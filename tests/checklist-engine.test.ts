@@ -363,4 +363,29 @@ describe("runChecklist", () => {
       "next.config.ts",
     );
   });
+
+  it("turns UI/UX evidence into launch-readiness findings", () => {
+    const uiFacts: ScannerFacts = {
+      ...baseFacts,
+      uiEvidence: {
+        filesScanned: ["app/page.tsx"],
+        hasLoadingState: false,
+        hasErrorState: false,
+        hasNotFoundState: false,
+        placeholderCopyFiles: ["app/page.tsx"],
+        imageWithoutAltFiles: ["app/page.tsx"],
+        unlabeledControlFiles: ["app/page.tsx"],
+        responsiveClassFiles: [],
+      },
+    };
+
+    const result = runChecklist(uiFacts, launchContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).toContain("missing-ui-loading-state");
+    expect(findingIds).toContain("missing-ui-error-state");
+    expect(findingIds).toContain("placeholder-ui-copy");
+    expect(findingIds).toContain("images-missing-alt");
+    expect(findingIds).toContain("unlabeled-form-controls");
+  });
 });

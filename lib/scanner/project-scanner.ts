@@ -23,7 +23,9 @@ const routeFilePattern = /^route\.(?:ts|js|mjs|cjs)$/i;
 const pagesApiFilePattern = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/i;
 const ignoredRouteDirectories = new Set(["node_modules", ".next", ".git"]);
 const maxRouteFiles = 500;
+const maxUiFiles = 600;
 const maxSecuritySampleBytes = 256 * 1024;
+const uiSourceFilePattern = /\.(?:tsx|jsx)$/i;
 
 async function pathExists(targetPath: string) {
   try {
@@ -221,6 +223,107 @@ async function collectRouteFiles(root: string, matcher: RegExp) {
   return files;
 }
 
+async function collectUiSourceFiles(projectRoot: string) {
+  const roots = ["app", "pages", "components", "src"].map((root) => path.join(projectRoot, root));
+  const files: string[] = [];
+
+  async function visit(directory: string, depth: number) {
+    if (depth > 10 || files.length >= maxUiFiles || !(await pathExists(directory))) return;
+
+    const entries = await fs.readdir(directory, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (files.length >= maxUiFiles) break;
+      if (ignoredRouteDirectories.has(entry.name)) continue;
+
+      const entryPath = path.join(directory, entry.name);
+
+      if (entry.isDirectory()) {
+        await visit(entryPath, depth + 1);
+      } else if (entry.isFile() && uiSourceFilePattern.test(entry.name)) {
+        const relativePath = normalizeRoutePath(path.relative(projectRoot, entryPath));
+        if (!relativePath.includes("/api/")) files.push(entryPath);
+      }
+    }
+  }
+
+  for (const root of roots) {
+    await visit(root, 0);
+  }
+
+  return Array.from(new Set(files)).sort();
+}
+
+function hasAccessibleImageUsage(source: string) {
+  const imageTags = source.match(/<(?:Image|img)\b[^>]*>/g) ?? [];
+  if (imageTags.length === 0) return true;
+
+  return imageTags.every((tag) => /\balt\s*=/.test(tag) || /\brole\s*=\s*["']presentation["']/.test(tag) || /\baria-hidden\s*=\s*{?true}?/.test(tag));
+}
+
+function hasUnlabeledFormControl(source: string) {
+  const controls = [
+    ...Array.from(source.matchAll(/<(input|textarea)\b[\s\S]*?\/>/gi)).map((match) => ({
+      tag: match[0],
+      index: match.index ?? 0,
+    })),
+    ...Array.from(source.matchAll(/<select\b[\s\S]*?<\/select>/gi)).map((match) => ({
+      tag: match[0],
+      index: match.index ?? 0,
+    })),
+  ];
+  if (controls.length === 0) return false;
+
+  return controls.some(({ tag, index }) => {
+    if (/\btype\s*=\s*["'](?:hidden|submit|button|checkbox|radio|file)["']/i.test(tag)) return false;
+    if (/\b(?:aria-label|aria-labelledby)\s*=/.test(tag)) return false;
+
+    const id = tag.match(/\bid\s*=\s*["']([^"']+)["']/)?.[1];
+    if (id && new RegExp(`<label\\b[^>]*(?:htmlFor|for)\\s*=\\s*["']${id}["']`, "i").test(source)) return false;
+
+    const beforeControl = source.slice(0, index);
+    const nearestOpenLabel = beforeControl.lastIndexOf("<label");
+    const nearestClosedLabel = beforeControl.lastIndexOf("</label>");
+    if (nearestOpenLabel > nearestClosedLabel) return false;
+
+    return true;
+  });
+}
+
+async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile[]) {
+  const uiFiles = await collectUiSourceFiles(projectRoot);
+  const samples = await Promise.all(
+    uiFiles.map(async (file) => ({
+      relativeFile: normalizeRoutePath(path.relative(projectRoot, file)),
+      sample: await readSecuritySample(file),
+    })),
+  );
+  const readableSamples = samples.filter((item): item is { relativeFile: string; sample: string } => Boolean(item.sample));
+  const placeholderPattern = /["'`][^"'`]*(?:lorem ipsum|coming soon|sample text|dummy data)[^"'`]*["'`]/i;
+  const responsiveClassPattern = /\b(?:sm|md|lg|xl|2xl):[a-z0-9-[\]/:%#.]+/i;
+
+  return {
+    filesScanned: readableSamples.map((item) => item.relativeFile),
+    hasLoadingState: detectedFiles.some((file) => file.exists && /(?:^|\/)loading\.(?:tsx|jsx|ts|js)$/.test(file.path)) ||
+      readableSamples.some(({ sample }) => /(?:isLoading|loading|Loader|Skeleton|Suspense)/i.test(sample)),
+    hasErrorState: detectedFiles.some((file) => file.exists && /(?:^|\/)error\.(?:tsx|jsx|ts|js)$/.test(file.path)) ||
+      readableSamples.some(({ sample }) => /(?:error|ErrorState|role=["']alert["'])/i.test(sample)),
+    hasNotFoundState: detectedFiles.some((file) => file.exists && /(?:^|\/)(?:not-found|404)\.(?:tsx|jsx|ts|js)$/.test(file.path)),
+    placeholderCopyFiles: readableSamples
+      .filter(({ sample }) => placeholderPattern.test(sample))
+      .map(({ relativeFile }) => relativeFile),
+    imageWithoutAltFiles: readableSamples
+      .filter(({ sample }) => !hasAccessibleImageUsage(sample))
+      .map(({ relativeFile }) => relativeFile),
+    unlabeledControlFiles: readableSamples
+      .filter(({ sample }) => hasUnlabeledFormControl(sample))
+      .map(({ relativeFile }) => relativeFile),
+    responsiveClassFiles: readableSamples
+      .filter(({ sample }) => responsiveClassPattern.test(sample))
+      .map(({ relativeFile }) => relativeFile),
+  };
+}
+
 function createDetectedRoute(projectRoot: string, file: string, route: string): DetectedApiRoute {
   return {
     route,
@@ -404,6 +507,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const wildcardCorsFiles = await detectWildcardCors(projectRoot, apiRoutes, detectedFiles);
   const insecureSessionCookieFiles = await detectInsecureSessionCookies(projectRoot, apiRoutes);
   const ignoredBuildChecks = await detectIgnoredBuildChecks(projectRoot, detectedFiles);
+  const uiEvidence = await detectUiEvidence(projectRoot, detectedFiles);
   const startCommand = scripts.start?.trim();
   const hasDevelopmentStartScript = Boolean(
     startCommand && /(?:\bnext\s+dev\b|\bvite\s+dev\b|\bnodemon\b|\btsx\s+watch\b)/i.test(startCommand),
@@ -434,6 +538,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       ...ignoredBuildChecks,
       ...(startCommand ? { startCommand } : {}),
     },
+    uiEvidence,
     signals: {
       hasPackageJson: detectedFiles.some((file) => file.path === "package.json" && file.exists),
       hasNextConfig,

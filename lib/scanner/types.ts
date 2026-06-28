@@ -39,6 +39,16 @@ export type ScannerFacts = {
     ignoredEslintBuildFiles: string[];
     startCommand?: string;
   };
+  uiEvidence?: {
+    filesScanned: string[];
+    hasLoadingState: boolean;
+    hasErrorState: boolean;
+    hasNotFoundState: boolean;
+    placeholderCopyFiles: string[];
+    imageWithoutAltFiles: string[];
+    unlabeledControlFiles: string[];
+    responsiveClassFiles: string[];
+  };
   signals: {
     hasPackageJson: boolean;
     hasNextConfig: boolean;

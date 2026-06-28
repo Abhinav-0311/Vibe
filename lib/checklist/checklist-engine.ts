@@ -298,6 +298,114 @@ const rules: ChecklistRule[] = [
     },
   },
   {
+    id: "missing-ui-loading-state",
+    category: "UI/UX",
+    severity: "medium",
+    evaluate: (facts) => {
+      if (!facts.uiEvidence || facts.uiEvidence.hasLoadingState) return null;
+
+      return finding({
+        id: "missing-ui-loading-state",
+        title: "No obvious loading state detected",
+        category: "UI/UX",
+        severity: "medium",
+        evidence: `Scanned ${facts.uiEvidence.filesScanned.length} UI source file(s), but no loading boundary, Suspense fallback, loader, skeleton, or isLoading state was detected.`,
+        impact:
+          "Users may see frozen screens or unclear delays while data, uploads, scans, auth, or navigation work in the background.",
+        fix: "Add clear loading states around slow actions and route-level data transitions.",
+        prompt:
+          "Inspect the app's main async workflows and add lightweight loading states. Prefer route-level loading.tsx where appropriate, use clear button disabled/loading feedback for submitted actions, and keep the design consistent with the existing UI.",
+      });
+    },
+  },
+  {
+    id: "missing-ui-error-state",
+    category: "UI/UX",
+    severity: "high",
+    evaluate: (facts) => {
+      if (!facts.uiEvidence || facts.uiEvidence.hasErrorState) return null;
+
+      return finding({
+        id: "missing-ui-error-state",
+        title: "No obvious user-facing error state detected",
+        category: "UI/UX",
+        severity: "high",
+        evidence: `Scanned ${facts.uiEvidence.filesScanned.length} UI source file(s), but no error boundary, alert role, ErrorState component, or visible error copy was detected.`,
+        impact:
+          "When requests fail, new users may hit a dead end instead of understanding what happened or how to retry.",
+        fix: "Add user-facing error states with clear copy and recovery actions for important workflows.",
+        prompt:
+          "Inspect the primary user flows and add clear error states. Include concise human-readable copy, a retry or recovery action where possible, accessible alert semantics for important failures, and tests or manual verification for failed requests.",
+      });
+    },
+  },
+  {
+    id: "placeholder-ui-copy",
+    category: "UI/UX",
+    severity: "medium",
+    evaluate: (facts) => {
+      const files = facts.uiEvidence?.placeholderCopyFiles ?? [];
+      if (files.length === 0) return null;
+
+      return finding({
+        id: "placeholder-ui-copy",
+        title: "Placeholder UI copy appears in the product surface",
+        category: "UI/UX",
+        severity: "medium",
+        evidence: `Placeholder-style copy was detected in ${files.slice(0, 4).join(", ")}${files.length > 4 ? ` and ${files.length - 4} more file(s)` : ""}.`,
+        impact:
+          "Placeholder copy makes an app feel unfinished and can confuse users about whether a workflow is real.",
+        fix: "Replace TODO, lorem ipsum, dummy, sample, or coming-soon copy with intentional product language.",
+        prompt:
+          "Inspect the files named in the UI/UX finding and replace placeholder copy with specific product copy. Keep wording short, user-facing, and consistent with the existing brand voice. Do not change unrelated layout or behavior.",
+      });
+    },
+  },
+  {
+    id: "images-missing-alt",
+    category: "UI/UX",
+    severity: "medium",
+    evaluate: (facts) => {
+      const files = facts.uiEvidence?.imageWithoutAltFiles ?? [];
+      if (files.length === 0) return null;
+
+      return finding({
+        id: "images-missing-alt",
+        title: "Images without accessible alternative text detected",
+        category: "UI/UX",
+        severity: "medium",
+        evidence: `Image usage without alt text or deliberate presentation semantics was detected in ${files.slice(0, 4).join(", ")}${files.length > 4 ? ` and ${files.length - 4} more file(s)` : ""}.`,
+        impact:
+          "Screen reader users may miss meaningful content or hear noisy, unhelpful image announcements.",
+        fix: "Add useful alt text for meaningful images and hide decorative images from assistive technology.",
+        prompt:
+          "Inspect the image usages named in this finding. Add descriptive alt text for meaningful images, use empty alt text or aria-hidden for decorative images, and keep the copy concise. Do not add generic alt values like image or screenshot.",
+      });
+    },
+  },
+  {
+    id: "unlabeled-form-controls",
+    category: "UI/UX",
+    severity: "high",
+    evaluate: (facts) => {
+      const files = facts.uiEvidence?.unlabeledControlFiles ?? [];
+      if (files.length === 0) return null;
+
+      return finding({
+        id: "unlabeled-form-controls",
+        title: "Form controls may be missing accessible labels",
+        category: "UI/UX",
+        severity: "high",
+        evidence: `Potential unlabeled input, textarea, or select controls were detected in ${files.slice(0, 4).join(", ")}${files.length > 4 ? ` and ${files.length - 4} more file(s)` : ""}.`,
+        impact:
+          "Users relying on assistive technology may not understand what information a form control expects.",
+        fix: "Connect each form control to a visible label or accessible name.",
+        prompt:
+          "Inspect the form controls named in this finding. Add visible labels where possible, or aria-label/aria-labelledby when a visible label would be inappropriate. Preserve styling, add validation/error copy where the flow already validates input, and verify keyboard and screen-reader behavior manually.",
+      });
+    },
+  },
+  {
     id: "missing-middleware",
     category: "Security",
     severity: "medium",

@@ -1267,6 +1267,35 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
           detail: "tests, test, or config",
           detected: scan.facts.signals.hasTests,
         },
+        ...(scan.facts.uiEvidence
+          ? [
+              {
+                label: "Loading states",
+                detail: "loading boundary, skeleton, loader, or isLoading state",
+                detected: scan.facts.uiEvidence.hasLoadingState,
+              },
+              {
+                label: "Error states",
+                detail: "error boundary, alert role, or visible error copy",
+                detected: scan.facts.uiEvidence.hasErrorState,
+              },
+              {
+                label: "Accessible images",
+                detail: "Image usage has alt text or presentation semantics",
+                detected: scan.facts.uiEvidence.imageWithoutAltFiles.length === 0,
+              },
+              {
+                label: "Labeled controls",
+                detail: "Input, textarea, and select controls have accessible names",
+                detected: scan.facts.uiEvidence.unlabeledControlFiles.length === 0,
+              },
+              {
+                label: "Responsive UI code",
+                detail: "Responsive class usage was detected in UI files",
+                detected: scan.facts.uiEvidence.responsiveClassFiles.length > 0,
+              },
+            ]
+          : []),
         {
           label: "Middleware",
           detail: "middleware.ts/js",
