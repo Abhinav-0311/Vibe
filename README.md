@@ -147,11 +147,11 @@ Vibe supports two memory layers:
 
 Database records are deduplicated with a deterministic scan hash.
 
-## Getting Started
+## Quick Start
 
 Install dependencies:
 
-```bash
+```powershell
 npm.cmd install
 ```
 
@@ -160,13 +160,82 @@ Create a local `.env` file:
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3005
 OPENAI_API_KEY=sk-placeholder
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/vibe?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vibe?schema=public
 SENTRY_DSN=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 GITHUB_TOKEN_ENCRYPTION_KEY=replace-with-at-least-32-random-characters
 OPENAI_REPORT_ENABLED=false
 OPENAI_REPORT_MODEL=gpt-5.4-mini
+```
+
+Start PostgreSQL with Docker:
+
+```powershell
+docker compose up -d
+```
+
+Generate Prisma Client:
+
+```powershell
+npm.cmd run db:generate
+```
+
+Apply migrations:
+
+```powershell
+npm.cmd run db:deploy
+```
+
+Run the app:
+
+```powershell
+npm.cmd run dev -- --port 3005
+```
+
+Open:
+
+```text
+http://localhost:3005
+```
+
+## PostgreSQL Setup
+
+The recommended MVP setup is Docker PostgreSQL on host port `5433`. This avoids conflicts with native PostgreSQL installations on `5432`.
+
+Use this `DATABASE_URL`:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vibe?schema=public
+```
+
+Start the database:
+
+```powershell
+docker compose up -d
+```
+
+Apply existing migrations:
+
+```powershell
+npm.cmd run db:deploy
+```
+
+Useful database commands:
+
+```powershell
+npm.cmd run db:generate
+npm.cmd run db:migrate
+npm.cmd run db:deploy
+npm.cmd run db:studio
+```
+
+If you intentionally use native PostgreSQL instead, create a `vibe` database yourself and change `DATABASE_URL` to match your local port, username, and password.
+
+Example native PostgreSQL URL:
+
+```env
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/vibe?schema=public
 ```
 
 ## AI Report Enhancement
@@ -184,69 +253,30 @@ Vibe sends normalized framework metadata, dependency names, route metadata, cont
 
 Keep AI enhancement disabled on an unauthenticated public deployment. The current MVP flag is intended for trusted local use; hosted usage controls belong with the authentication and workspace phase.
 
-Generate Prisma Client:
+## Demo Flow
 
-```bash
-npm.cmd run db:generate
-```
+Use this flow for a clean MVP walkthrough:
 
-Run the app:
+1. Start Docker Postgres with `docker compose up -d`.
+2. Run `npm.cmd run db:deploy`.
+3. Start Vibe with `npm.cmd run dev -- --port 3005`.
+4. Scan a local project, public GitHub repo, private GitHub repo, or ZIP upload.
+5. Review the readiness score, score breakdown, and UI/UX category score.
+6. Open the top finding and read the evidence, learning note, suggested fix, and copyable prompt.
+7. Export the report or implementation plan.
+8. Re-scan after fixes and compare resolved, remaining, and newly introduced findings.
 
-```bash
-npm.cmd run dev -- --port 3005
-```
+## What This Shows As An AI Engineering Project
 
-Open:
+Vibe is not only a frontend demo. It shows:
 
-```text
-http://localhost:3005
-```
-
-## PostgreSQL Setup
-
-This project is currently configured for local PostgreSQL.
-
-Example local database:
-
-```text
-host: localhost
-port: 5432
-database: vibe
-user: postgres
-```
-
-Create the database:
-
-```powershell
-& "E:\Tools\Postgre\bin\createdb.exe" -h localhost -p 5432 -U postgres vibe
-```
-
-Run migrations:
-
-```bash
-npm.cmd run db:migrate -- --name init_scan_records
-```
-
-Useful database commands:
-
-```bash
-npm.cmd run db:generate
-npm.cmd run db:migrate
-npm.cmd run db:deploy
-npm.cmd run db:studio
-```
-
-Docker Compose is also included for machines that prefer containerized Postgres:
-
-```bash
-docker compose up -d
-```
-
-The Docker database uses host port `5433` to avoid conflicts with an existing native PostgreSQL installation or another project using `5432`:
-
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vibe?schema=public
-```
+- deterministic codebase scanning without executing user code
+- evidence-backed scoring instead of generic AI opinions
+- prompt generation that is grounded in detected repository facts
+- optional AI enhancement with structured-output guardrails
+- GitHub OAuth, branch selection, issues, fix branches, and draft PR handoff
+- PostgreSQL persistence, deduplication, restore, and health visibility
+- tests around scanner, checklist, reports, GitHub handling, setup packs, and health checks
 
 ## GitHub Setup
 
