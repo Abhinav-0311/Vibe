@@ -411,6 +411,7 @@ Planned:
 - [PRODUCT_BLUEPRINT.md](./PRODUCT_BLUEPRINT.md)
 - [MVP_EXECUTION_PLAN.md](./MVP_EXECUTION_PLAN.md)
 - [TECHNICAL_ARCHITECTURE.md](./TECHNICAL_ARCHITECTURE.md)
+- [Demo script](./docs/DEMO_SCRIPT.md)
 - [Deployment and recovery](./docs/DEPLOYMENT.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)

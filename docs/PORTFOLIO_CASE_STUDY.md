@@ -57,6 +57,8 @@ flowchart LR
 4. Create a fix branch, implement changes, and open a draft pull request.
 5. Re-scan the branch and show resolved, remaining, and introduced findings.
 
+For a timed walkthrough, use [DEMO_SCRIPT.md](./DEMO_SCRIPT.md).
+
 ## Engineering Value Demonstrated
 
 - Designing an AI feature around deterministic evidence rather than unrestricted generation
