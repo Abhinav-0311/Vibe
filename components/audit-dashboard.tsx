@@ -33,6 +33,7 @@ import { buildScoreBreakdown } from "@/lib/score-breakdown";
 import type {
   SavedScanDetailApiResponse,
   SavedScansApiResponse,
+  HealthApiResponse,
   GitHubBranchesApiResponse,
   GitHubRepositoriesApiResponse,
   GitHubRepository,
@@ -48,6 +49,7 @@ type SeverityFilter = "all" | Severity;
 type CategoryFilter = "all" | string;
 type FindingStatus = AuditFinding["status"];
 type SavedScansState = "loading" | "ready" | "error";
+type HealthState = "loading" | "ready" | "error";
 type ProjectDiscoveryState = "loading" | "ready" | "error";
 type ProjectSourceMode = "local" | "github" | "upload";
 
@@ -126,6 +128,8 @@ export function AuditDashboard() {
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [savedScans, setSavedScans] = useState<SavedScansApiResponse | null>(null);
   const [savedScansState, setSavedScansState] = useState<SavedScansState>("loading");
+  const [health, setHealth] = useState<HealthApiResponse | null>(null);
+  const [healthState, setHealthState] = useState<HealthState>("loading");
   const [restoringRecordId, setRestoringRecordId] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -162,6 +166,7 @@ export function AuditDashboard() {
     setSelectedId(scan.checklist.findings[0]?.id);
     saveScanToHistory(scan);
     void refreshSavedScans();
+    void refreshHealth();
     setViewState("report");
   }
 
@@ -208,6 +213,20 @@ export function AuditDashboard() {
       setSavedScansState("ready");
     } catch {
       setSavedScansState("error");
+    }
+  }
+
+  async function refreshHealth() {
+    setHealthState("loading");
+
+    try {
+      const response = await fetch("/api/health");
+      const data = (await response.json()) as HealthApiResponse;
+      setHealth(data);
+      setHealthState("ready");
+    } catch {
+      setHealth(null);
+      setHealthState("error");
     }
   }
 
@@ -403,6 +422,7 @@ export function AuditDashboard() {
     setScanHistory(parseScanHistory(savedHistory));
     void refreshWorkspaceProjects();
     void refreshSavedScans();
+    void refreshHealth();
     void runScan(defaultAuditContext);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate and run the initial scan once.
 
@@ -483,7 +503,12 @@ export function AuditDashboard() {
               <DatabaseArchive
                 savedScans={savedScans}
                 state={savedScansState}
-                onRefresh={() => void refreshSavedScans()}
+                health={health}
+                healthState={healthState}
+                onRefresh={() => {
+                  void refreshSavedScans();
+                  void refreshHealth();
+                }}
                 restoringRecordId={restoringRecordId}
                 restoreError={restoreError}
                 onRestore={(recordId) => void restoreSavedScan(recordId)}
@@ -1655,6 +1680,8 @@ function ScanHistory({
 function DatabaseArchive({
   savedScans,
   state,
+  health,
+  healthState,
   onRefresh,
   restoringRecordId,
   restoreError,
@@ -1662,6 +1689,8 @@ function DatabaseArchive({
 }: {
   savedScans: SavedScansApiResponse | null;
   state: SavedScansState;
+  health: HealthApiResponse | null;
+  healthState: HealthState;
   onRefresh: () => void;
   restoringRecordId: string | null;
   restoreError: string | null;
@@ -1671,6 +1700,25 @@ function DatabaseArchive({
   const isError = state === "error" || savedScans?.error === "database_error";
   const isConfigured = savedScans?.databaseConfigured ?? false;
   const records = savedScans?.records ?? [];
+  const databaseCheck = health?.checks.database;
+  const databaseStatus =
+    healthState === "loading"
+      ? "Checking"
+      : healthState === "error"
+        ? "Unknown"
+        : databaseCheck === "ok"
+          ? "Connected"
+          : databaseCheck === "not_configured"
+            ? "Not configured"
+            : "Unavailable";
+  const databaseStatusClass =
+    healthState === "loading"
+      ? "border-[#3d3d3d] text-[#d9d9d9]"
+      : databaseCheck === "ok"
+      ? "border-[#a7f35b] text-[#a7f35b]"
+      : databaseCheck === "not_configured"
+        ? "border-[#ffd166] text-[#ffd166]"
+        : "border-[#ff5a5f] text-[#ff8f8f]";
 
   return (
     <section className="rounded-[30px] border border-[#1d1a1a] p-5 sm:p-6">
@@ -1686,6 +1734,9 @@ function DatabaseArchive({
         </div>
         <div className="flex items-center gap-3">
           <Server className="h-6 w-6 text-[#fc74dd]" aria-hidden="true" />
+          <span className={`mono rounded-full border px-4 py-2 text-[10px] ${databaseStatusClass}`}>
+            DB {databaseStatus}
+          </span>
           <button
             onClick={onRefresh}
             disabled={isLoading}

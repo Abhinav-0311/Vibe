@@ -59,6 +59,16 @@ export type SavedScanDetailApiResponse = {
   error?: "database_error" | "not_found";
 };
 
+export type HealthApiResponse = {
+  service: "vibe";
+  timestamp: string;
+  status: "ok" | "degraded";
+  checks: {
+    application: "ok";
+    database: "ok" | "not_configured" | "error";
+  };
+};
+
 export type WorkspaceProject = {
   name: string;
   path: string;
