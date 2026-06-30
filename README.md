@@ -1,6 +1,6 @@
 # Vibe
 
-Vibe is a launch-readiness auditor for AI-built apps.
+Vibe is a launch-readiness auditor for AI-built apps. It scans a project, finds the production systems a builder likely missed, and turns each finding into evidence, teaching, and a coding-agent handoff.
 
 It helps new coders, indie builders, and vibe coders answer one practical question:
 
@@ -8,9 +8,39 @@ It helps new coders, indie builders, and vibe coders answer one practical questi
 
 Vibe scans local folders, uploaded ZIP archives, and GitHub repositories; detects production-readiness signals; runs context-aware checklist rules; and turns evidence-backed findings into a verified implementation workflow.
 
+Hosted deployments should use GitHub or ZIP scanning. Local folder scanning is for trusted local/self-hosted use only and is disabled by default on Vercel.
+
+## Publication Links
+
+- [Demo script](./docs/DEMO_SCRIPT.md)
+- [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
+- [MVP QA report](./docs/MVP_QA_REPORT.md)
+- [Future roadmap](./docs/FUTURE_ROADMAP.md)
+- [Limitations](./docs/LIMITATIONS.md)
+- [Deployment and recovery](./docs/DEPLOYMENT.md)
+
+## Screenshots
+
+Add final screenshots or a short GIF before publishing broadly:
+
+```text
+docs/assets/vibe-scan-input.png
+docs/assets/vibe-score-breakdown.png
+docs/assets/vibe-finding-detail.png
+docs/assets/vibe-fix-assistant.png
+```
+
+Recommended capture flow:
+
+1. Scan input with GitHub or ZIP selected.
+2. Score breakdown showing the UI/UX category.
+3. Finding detail with evidence, learning note, and copy prompt.
+4. Fix Assistant roadmap and implementation queue.
+
 ## What It Does
 
-- Scans local projects under a controlled workspace path.
+- Scans local projects under a controlled workspace path in trusted local development.
+- Supports GitHub repository and ZIP upload scanning for hosted deployments.
 - Detects framework, package manager, dependencies, routes, tests, environment files, middleware, analytics, observability, and AI workspace rules.
 - Inventories Next.js API routes and classifies auth, payment, webhook, and health endpoints without executing project code.
 - Checks environment-file Git ignore coverage without reading or exposing secret values.
@@ -415,3 +445,5 @@ Planned:
 - [Deployment and recovery](./docs/DEPLOYMENT.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)
+- [Future roadmap](./docs/FUTURE_ROADMAP.md)
+- [Limitations](./docs/LIMITATIONS.md)

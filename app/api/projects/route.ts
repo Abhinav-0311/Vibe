@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import type { WorkspaceProject, WorkspaceProjectsApiResponse } from "@/lib/scan-api";
-import { allowedWorkspaceRoot } from "@/lib/workspace-paths";
+import { allowedWorkspaceRoot, isLocalWorkspaceScanEnabled } from "@/lib/workspace-paths";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,14 @@ async function pathExists(targetPath: string) {
 }
 
 export async function GET() {
+  if (!isLocalWorkspaceScanEnabled()) {
+    return NextResponse.json({
+      workspaceRoot: "",
+      localScanEnabled: false,
+      projects: [],
+    } satisfies WorkspaceProjectsApiResponse);
+  }
+
   const entries = await fs.readdir(allowedWorkspaceRoot, { withFileTypes: true });
   const projects = await Promise.all(
     entries
@@ -33,6 +41,7 @@ export async function GET() {
 
   const response: WorkspaceProjectsApiResponse = {
     workspaceRoot: allowedWorkspaceRoot,
+    localScanEnabled: true,
     projects: projects
       .filter((project) => project.hasPackageJson)
       .sort((a, b) => a.name.localeCompare(b.name)),

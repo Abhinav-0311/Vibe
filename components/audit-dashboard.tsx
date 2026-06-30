@@ -123,7 +123,7 @@ function createReportFromScan(scan: ScanApiResponse | null): AuditReport {
 }
 
 export function AuditDashboard() {
-  const [viewState, setViewState] = useState<ViewState>("report");
+  const [viewState, setViewState] = useState<ViewState>("empty");
   const [scanData, setScanData] = useState<ScanApiResponse | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
   const [savedScans, setSavedScans] = useState<SavedScansApiResponse | null>(null);
@@ -195,6 +195,14 @@ export function AuditDashboard() {
   function clearScanHistory() {
     setScanHistory([]);
     window.localStorage.removeItem(scanHistoryStorageKey);
+  }
+
+  function startNewScan() {
+    setScanComparison(null);
+    setScanError(null);
+    setUploadError(null);
+    setGithubError(null);
+    setViewState("empty");
   }
 
   async function refreshSavedScans() {
@@ -423,8 +431,7 @@ export function AuditDashboard() {
     void refreshWorkspaceProjects();
     void refreshSavedScans();
     void refreshHealth();
-    void runScan(defaultAuditContext);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- hydrate and run the initial scan once.
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(triageStorageKey, JSON.stringify(statusOverrides));
@@ -437,7 +444,7 @@ export function AuditDashboard() {
   return (
     <main className="min-h-screen bg-black text-white">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-10 px-5 py-5 sm:px-8 lg:px-10">
-        <TopBar onNewScan={runScan} />
+        <TopBar onNewScan={startNewScan} />
         <Hero />
         <ContextControls
           context={auditContext}
@@ -665,10 +672,25 @@ function ContextControls({
   const [sourceMode, setSourceMode] = useState<ProjectSourceMode>("local");
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
   const appTypes: AuditContext["appType"][] = ["saas", "internal-tool", "content-site", "api"];
+  const localScanEnabled = workspaceProjects?.localScanEnabled ?? true;
+  const sourceOptions: Array<{ value: ProjectSourceMode; label: string; icon: typeof FolderOpen }> = localScanEnabled
+    ? [
+        { value: "local", label: "Local", icon: FolderOpen },
+        { value: "github", label: "GitHub", icon: Github },
+        { value: "upload", label: "ZIP", icon: Upload },
+      ]
+    : [
+        { value: "github", label: "GitHub", icon: Github },
+        { value: "upload", label: "ZIP", icon: Upload },
+      ];
 
   function update(next: Partial<AuditContext>) {
     onChange({ ...context, ...next });
   }
+
+  useEffect(() => {
+    if (!localScanEnabled && sourceMode === "local") setSourceMode("github");
+  }, [localScanEnabled, sourceMode]);
 
   return (
     <section className="rounded-[24px] bg-[#1d1a1a] p-5 sm:p-7">
@@ -683,6 +705,11 @@ function ContextControls({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {!localScanEnabled && (
+            <span className="mono w-fit rounded-full border border-[#4a4444] px-3 py-2 text-[9px] text-[#b8b3b3]">
+              Hosted mode
+            </span>
+          )}
           <span className="mono w-fit rounded-full border border-[#4a4444] px-3 py-2 text-[9px] text-[#b8b3b3]">
             Node.js projects
           </span>
@@ -693,11 +720,7 @@ function ContextControls({
       </div>
 
       <div className="mt-7 grid grid-cols-3 gap-2 border-b border-[#3d3838] pb-5 sm:flex sm:w-fit">
-        {([
-          { value: "local", label: "Local", icon: FolderOpen },
-          { value: "github", label: "GitHub", icon: Github },
-          { value: "upload", label: "ZIP", icon: Upload },
-        ] as const).map((source) => {
+        {sourceOptions.map((source) => {
           const Icon = source.icon;
           const selected = sourceMode === source.value;
 

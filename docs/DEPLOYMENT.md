@@ -19,6 +19,27 @@ Vibe is currently a single-user MVP. A public deployment may scan uploaded ZIP a
 - `OPENAI_API_KEY`: required only when AI enhancement is enabled
 - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: required for private repositories
 - `GITHUB_TOKEN_ENCRYPTION_KEY`: random secret containing at least 32 characters
+- `VIBE_ENABLE_LOCAL_SCAN`: optional. Keep unset or `false` on Vercel. Use `true` only for trusted local/self-hosted environments.
+
+## Vercel Readiness
+
+Vercel deployments cannot scan a visitor's local filesystem. In hosted mode, Vibe should be used through:
+
+- public GitHub repository scan
+- connected private GitHub repository scan
+- ZIP upload scan
+
+Local workspace scanning is disabled by default when `VERCEL=1`. The dashboard hides the local source tab when the server reports local scanning is unavailable.
+
+Recommended Vercel setup:
+
+1. Create a managed PostgreSQL database.
+2. Set `DATABASE_URL` to the managed database connection string.
+3. Set `NEXT_PUBLIC_APP_URL` to the Vercel production URL.
+4. Keep `VIBE_ENABLE_LOCAL_SCAN` unset or set it to `false`.
+5. Keep `OPENAI_REPORT_ENABLED=false` unless the deployment is authenticated and trusted.
+6. Configure GitHub OAuth only if private repository scanning or issue/PR actions are needed.
+7. Run `npm.cmd run db:deploy` against the managed database before relying on saved scans.
 
 ## Deployment Sequence
 

@@ -77,5 +77,6 @@ export type WorkspaceProject = {
 
 export type WorkspaceProjectsApiResponse = {
   workspaceRoot: string;
+  localScanEnabled: boolean;
   projects: WorkspaceProject[];
 };

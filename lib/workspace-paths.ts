@@ -3,6 +3,12 @@ import path from "node:path";
 
 export const allowedWorkspaceRoot = path.resolve(process.cwd(), "..");
 
+export function isLocalWorkspaceScanEnabled() {
+  if (process.env.VIBE_ENABLE_LOCAL_SCAN === "true") return true;
+  if (process.env.VIBE_ENABLE_LOCAL_SCAN === "false") return false;
+  return process.env.VERCEL !== "1";
+}
+
 export type ProjectPathResult =
   | {
       projectPath: string;
@@ -12,6 +18,12 @@ export type ProjectPathResult =
     };
 
 export function resolveWorkspaceProjectPath(value: string | null): ProjectPathResult {
+  if (!isLocalWorkspaceScanEnabled()) {
+    return {
+      error: "Local workspace scanning is disabled in this deployment. Use GitHub scanning or ZIP upload instead.",
+    };
+  }
+
   const requestedPath = value?.trim() || process.cwd();
   const resolvedPath = path.resolve(requestedPath);
   const relativePath = path.relative(allowedWorkspaceRoot, resolvedPath);

@@ -113,5 +113,5 @@ export const auditReport: AuditReport = {
 
 export const emptyReport = {
   title: "No scan selected",
-  body: "Create a project or run a scan to see launch-readiness findings here.",
+  body: "Choose a local project, GitHub repository, or ZIP upload to generate launch-readiness findings.",
 };
