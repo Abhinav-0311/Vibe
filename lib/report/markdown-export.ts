@@ -65,7 +65,7 @@ function formatFindings(checklist: ChecklistResult) {
 - Action priority: ${finding.actionPriority ?? "recommended"}
 - Category: ${finding.category}
 - Status: ${finding.status}
-- Evidence: ${finding.evidence}
+${finding.status === "ignored" && finding.statusReason ? `- Not relevant reason: ${finding.statusReason}\n` : ""}- Evidence: ${finding.evidence}
 - Why this rank: ${finding.severityReason ?? "Severity is based on the selected audit context and detected project evidence."}
 - Impact: ${finding.impact}
 - Fix: ${finding.fix}

@@ -57,6 +57,7 @@ const defaultAuditContext: AuditContext = {
 };
 
 const triageStorageKey = "vibe:finding-status-overrides";
+const triageReasonStorageKey = "vibe:finding-status-reasons";
 const defaultProjectPath = "";
 
 const severityLabel: Record<Severity, string> = {
@@ -147,6 +148,7 @@ export function AuditDashboard() {
   const [workspaceProjects, setWorkspaceProjects] = useState<WorkspaceProjectsApiResponse | null>(null);
   const [projectDiscoveryState, setProjectDiscoveryState] = useState<ProjectDiscoveryState>("loading");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, FindingStatus>>({});
+  const [statusReasonOverrides, setStatusReasonOverrides] = useState<Record<string, string>>({});
 
   const report = useMemo(() => createReportFromScan(scanData), [scanData]);
   const reportWithStatuses = useMemo(
@@ -155,9 +157,10 @@ export function AuditDashboard() {
       findings: report.findings.map((finding) => ({
         ...finding,
         status: statusOverrides[finding.id] ?? finding.status,
+        statusReason: statusReasonOverrides[finding.id] ?? finding.statusReason,
       })),
     }),
-    [report, statusOverrides],
+    [report, statusOverrides, statusReasonOverrides],
   );
   const [selectedId, setSelectedId] = useState(report.findings[0]?.id);
 
@@ -176,8 +179,20 @@ export function AuditDashboard() {
     setViewState("report");
   }
 
-  function updateFindingStatus(findingId: string, status: FindingStatus) {
+  function updateFindingStatus(findingId: string, status: FindingStatus, reason?: string) {
     setStatusOverrides((current) => ({ ...current, [findingId]: status }));
+    setStatusReasonOverrides((current) => {
+      const next = { ...current };
+      const cleanReason = reason?.trim();
+
+      if (status === "ignored" && cleanReason) {
+        next[findingId] = cleanReason;
+      } else {
+        delete next[findingId];
+      }
+
+      return next;
+    });
   }
 
   function saveScanToHistory(scan: ScanApiResponse) {
@@ -382,6 +397,7 @@ export function AuditDashboard() {
 
   useEffect(() => {
     const savedStatuses = window.localStorage.getItem(triageStorageKey);
+    const savedStatusReasons = window.localStorage.getItem(triageReasonStorageKey);
     const savedHistory = window.localStorage.getItem(scanHistoryStorageKey);
 
     if (savedStatuses) {
@@ -389,6 +405,14 @@ export function AuditDashboard() {
         setStatusOverrides(JSON.parse(savedStatuses) as Record<string, FindingStatus>);
       } catch {
         window.localStorage.removeItem(triageStorageKey);
+      }
+    }
+
+    if (savedStatusReasons) {
+      try {
+        setStatusReasonOverrides(JSON.parse(savedStatusReasons) as Record<string, string>);
+      } catch {
+        window.localStorage.removeItem(triageReasonStorageKey);
       }
     }
 
@@ -401,6 +425,10 @@ export function AuditDashboard() {
   useEffect(() => {
     window.localStorage.setItem(triageStorageKey, JSON.stringify(statusOverrides));
   }, [statusOverrides]);
+
+  useEffect(() => {
+    window.localStorage.setItem(triageReasonStorageKey, JSON.stringify(statusReasonOverrides));
+  }, [statusReasonOverrides]);
 
   useEffect(() => {
     window.localStorage.setItem(scanHistoryStorageKey, JSON.stringify(scanHistory));
@@ -2188,7 +2216,7 @@ function ReportView({
   selectedFinding?: AuditFinding;
   selectedId?: string;
   onSelect: (id: string) => void;
-  onStatusChange: (findingId: string, status: FindingStatus) => void;
+  onStatusChange: (findingId: string, status: FindingStatus, reason?: string) => void;
   repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
 }) {
   const criticalCount = report.findings.filter((finding) => finding.severity === "critical").length;
@@ -2424,6 +2452,11 @@ function FindingsList({
             </div>
             <h3 className="text-xl font-semibold tracking-[-0.02em]">{finding.title}</h3>
             <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d9d9d9]">{finding.impact}</p>
+            {finding.status === "ignored" && finding.statusReason && (
+              <p className="mt-3 rounded-[16px] border border-[#3d3d3d] px-3 py-2 text-xs leading-5 text-[#b8b3b3]">
+                Not relevant: {finding.statusReason}
+              </p>
+            )}
           </button>
         ))}
       </div>
@@ -2469,22 +2502,25 @@ function FilterGroup<T extends string>({
 
 function FindingDetail({
   finding,
+  onStatusChange,
   repository,
 }: {
   finding?: AuditFinding;
-  onStatusChange: (findingId: string, status: FindingStatus) => void;
+  onStatusChange: (findingId: string, status: FindingStatus, reason?: string) => void;
   repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
 }) {
   const [copied, setCopied] = useState(false);
   const [issueState, setIssueState] = useState<"idle" | "creating" | "created" | "error">("idle");
   const [issueError, setIssueError] = useState<string | null>(null);
   const [issueUrl, setIssueUrl] = useState<string | null>(null);
+  const [notRelevantReason, setNotRelevantReason] = useState("");
 
   useEffect(() => {
     setIssueState("idle");
     setIssueError(null);
     setIssueUrl(null);
-  }, [finding?.id]);
+    setNotRelevantReason(finding?.statusReason ?? "");
+  }, [finding?.id, finding?.statusReason]);
 
   async function createGitHubIssue() {
     if (!finding || !repository) return;
@@ -2534,6 +2570,62 @@ function FindingDetail({
         <DetailBlock title="Evidence" body={finding.evidence} />
         <DetailBlock title="Impact" body={finding.impact} />
         <DetailBlock title="Suggested fix" body={finding.fix} />
+      </div>
+
+      <div className="mt-8 rounded-[24px] border border-[#2f2a2a] bg-black p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="mono text-[10px] text-[#fc74dd]">Finding relevance</p>
+            <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">
+              Mark this as not relevant only when the evidence is real but the recommendation does not apply to this project.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => onStatusChange(finding.id, "open")}
+              aria-pressed={finding.status !== "ignored"}
+              className={`mono rounded-full border px-4 py-2 text-[10px] transition ${
+                finding.status !== "ignored"
+                  ? "border-[#fc74dd] bg-[#fc74dd] text-black"
+                  : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white hover:text-white"
+              }`}
+            >
+              Still relevant
+            </button>
+            <button
+              onClick={() => {
+                const reason = notRelevantReason || "Marked not relevant by reviewer.";
+                setNotRelevantReason(reason);
+                onStatusChange(finding.id, "ignored", reason);
+              }}
+              aria-pressed={finding.status === "ignored"}
+              className={`mono rounded-full border px-4 py-2 text-[10px] transition ${
+                finding.status === "ignored"
+                  ? "border-[#fc74dd] bg-[#fc74dd] text-black"
+                  : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white hover:text-white"
+              }`}
+            >
+              Not relevant
+            </button>
+          </div>
+        </div>
+
+        {finding.status === "ignored" && (
+          <div className="mt-5">
+            <label htmlFor={`not-relevant-${finding.id}`} className="mono text-[10px] text-[#d9d9d9]">
+              Reason
+            </label>
+            <textarea
+              id={`not-relevant-${finding.id}`}
+              value={notRelevantReason}
+              onChange={(event) => setNotRelevantReason(event.target.value)}
+              onBlur={() => onStatusChange(finding.id, "ignored", notRelevantReason || "Marked not relevant by reviewer.")}
+              rows={3}
+              className="mt-3 w-full resize-none rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-[#777] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
+              placeholder="Example: This is a static portfolio with no forms or authenticated routes."
+            />
+          </div>
+        )}
       </div>
 
       {finding.actionPriority && (

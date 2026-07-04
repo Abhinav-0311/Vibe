@@ -139,15 +139,27 @@ describe("generateReport", () => {
 
   it("formats a copyable markdown handoff report", () => {
     const checklist = runChecklist(facts, launchContext);
+    const checklistWithIgnoredFinding = {
+      ...checklist,
+      findings: checklist.findings.map((finding, index) =>
+        index === 0
+          ? {
+              ...finding,
+              status: "ignored" as const,
+              statusReason: "This repo is a static portfolio with no login route.",
+            }
+          : finding,
+      ),
+    };
     const report = generateReport({
       facts,
-      checklist,
+      checklist: checklistWithIgnoredFinding,
       scannedAt: "2026-06-13T00:00:00.000Z",
     });
     const markdown = formatMarkdownReport({
       projectName: "Vibe Workspace",
       facts,
-      checklist,
+      checklist: checklistWithIgnoredFinding,
       report,
     });
 
@@ -156,6 +168,8 @@ describe("generateReport", () => {
     expect(markdown).toContain("- Stage: launch-prep");
     expect(markdown).toContain("## Top Risks");
     expect(markdown).toContain("## Finding 1:");
+    expect(markdown).toContain("- Status: ignored");
+    expect(markdown).toContain("- Not relevant reason: This repo is a static portfolio with no login route.");
     expect(markdown).toContain("### Learn the mistake");
     expect(markdown).toContain("### Implementation prompt");
   });
