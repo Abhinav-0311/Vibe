@@ -5,6 +5,10 @@ import { extractUploadedProject } from "@/lib/upload/zip-project";
 
 export const dynamic = "force-dynamic";
 
+function formatUploadDetail(fileName: string, relativeProjectRoot: string) {
+  return relativeProjectRoot ? `${fileName} / ${relativeProjectRoot}` : fileName;
+}
+
 export async function POST(request: Request) {
   let uploadedProject: Awaited<ReturnType<typeof extractUploadedProject>> | null = null;
 
@@ -29,7 +33,7 @@ export async function POST(request: Request) {
     const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(searchParams), {
       type: "upload",
       label: "ZIP upload",
-      detail: file.name,
+      detail: formatUploadDetail(file.name, uploadedProject.relativeProjectRoot),
     }, projectName);
 
     return NextResponse.json({

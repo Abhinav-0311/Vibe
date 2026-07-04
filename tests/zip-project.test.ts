@@ -20,9 +20,33 @@ describe("ZIP project extraction", () => {
 
     const project = await extractProjectZipBuffer(zip.toBuffer());
     expect(await exists(project.projectRoot)).toBe(true);
+    expect(project.relativeProjectRoot).toBe("sample");
 
     await project.cleanup();
     expect(await exists(project.projectRoot)).toBe(false);
+  });
+
+  it("detects a Node app nested below the repository wrapper", async () => {
+    const zip = new AdmZip();
+    zip.addFile("repo-main/docs/README.md", Buffer.from("Documentation"));
+    zip.addFile("repo-main/client/package.json", Buffer.from('{"name":"client"}'));
+    zip.addFile("repo-main/client/app/page.tsx", Buffer.from("export default function Page() { return null; }"));
+
+    const project = await extractProjectZipBuffer(zip.toBuffer());
+    expect(project.relativeProjectRoot).toBe("repo-main/client");
+
+    await project.cleanup();
+  });
+
+  it("prefers a common app folder when multiple nested package manifests exist at the same depth", async () => {
+    const zip = new AdmZip();
+    zip.addFile("repo-main/examples/package.json", Buffer.from('{"name":"example"}'));
+    zip.addFile("repo-main/frontend/package.json", Buffer.from('{"name":"frontend"}'));
+
+    const project = await extractProjectZipBuffer(zip.toBuffer());
+    expect(project.relativeProjectRoot).toBe("repo-main/frontend");
+
+    await project.cleanup();
   });
 
   it("rejects archives without a package manifest", async () => {

@@ -8,6 +8,11 @@ import { extractProjectZipBuffer } from "@/lib/upload/zip-project";
 
 export const dynamic = "force-dynamic";
 
+function formatArchiveDetail(archiveName: string, branch: string, relativeProjectRoot: string) {
+  const nestedRoot = relativeProjectRoot.split(/[\\/]+/).filter(Boolean).slice(1).join("/");
+  return nestedRoot ? `${archiveName} / ${branch} / ${nestedRoot}` : `${archiveName} / ${branch}`;
+}
+
 export async function POST(request: Request) {
   let uploadedProject: Awaited<ReturnType<typeof extractProjectZipBuffer>> | null = null;
 
@@ -39,7 +44,7 @@ export async function POST(request: Request) {
     const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(params), {
       type: "github",
       label: "GitHub repository",
-      detail: `${archive.name} / ${archive.branch}`,
+      detail: formatArchiveDetail(archive.name, archive.branch, uploadedProject.relativeProjectRoot),
       repository: {
         ...archive.repository,
         branch: archive.branch,
