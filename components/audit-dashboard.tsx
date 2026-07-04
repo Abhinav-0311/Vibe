@@ -2899,15 +2899,24 @@ function DetailBlock({ title, body, compact = false }: { title: string; body: st
 }
 
 function LoadingState() {
+  const steps = ["Reading files", "Scoring launch risk", "Preparing fix prompts"];
+
   return (
     <section className="grid min-h-[420px] place-items-center rounded-[30px] bg-[#1d1a1a] p-8 text-center">
-      <div className="max-w-md">
+      <div className="max-w-xl">
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#fc74dd]" aria-hidden="true" />
         <p className="mono mt-8 text-[11px] text-[#fc74dd]">Scanning project</p>
-        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Reading structure, routes, and launch signals.</h2>
+        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Checking the launch surface.</h2>
         <p className="mt-5 text-sm leading-6 text-[#d9d9d9]">
-          In the real scanner, this is where Vibe detects framework, auth, payments, tests, policy pages, and AI workspace context.
+          Vibe is inspecting framework signals, routes, tests, UI/UX basics, deployment files, and AI workspace context without running the scanned project.
         </p>
+        <div className="mt-7 grid gap-2 sm:grid-cols-3">
+          {steps.map((step) => (
+            <div key={step} className="rounded-full border border-[#3d3838] px-4 py-3">
+              <p className="mono text-[9px] text-[#b8b3b3]">{step}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -2916,12 +2925,12 @@ function LoadingState() {
 function EmptyState({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
-      <section className="grid min-h-[260px] place-items-center rounded-[30px] border border-[#1d1a1a] bg-white p-8 text-center text-[#111212]">
+      <section className="grid min-h-[260px] place-items-center rounded-[30px] border border-[#1d1a1a] bg-[#111212] p-8 text-center text-white">
         <div className="max-w-md">
           <CheckCircle2 className="mx-auto h-8 w-8 text-[#fc74dd]" aria-hidden="true" />
-          <p className="mono mt-8 text-[11px] text-[#3d3d3d]">Empty state</p>
+          <p className="mono mt-8 text-[11px] text-[#fc74dd]">Empty state</p>
           <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">{emptyReport.title}</h2>
-          <p className="mt-5 text-sm leading-6 text-[#3d3d3d]">{emptyReport.body}</p>
+          <p className="mt-5 text-sm leading-6 text-[#b8b3b3]">{emptyReport.body}</p>
         </div>
       </section>
     );
@@ -2965,13 +2974,13 @@ function ErrorState({ message, onRetry }: { message: string | null; onRetry: () 
       <div className="max-w-md">
         <AlertTriangle className="mx-auto h-8 w-8 text-[#ff5a5f]" aria-hidden="true" />
         <p className="mono mt-8 text-[11px] text-[#ff5a5f]">Scan failed</p>
-        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">The workspace could not be read.</h2>
+        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Vibe could not complete this scan.</h2>
         <p className="mt-5 text-sm leading-6 text-[#d9d9d9]">
-          {message ?? "Vibe should explain what failed, preserve the user's context, and offer a clear retry path instead of dropping them into a dead end."}
+          {message ?? "Check the repository URL, branch, ZIP archive, or project path, then try again. Your selected readiness profile is preserved."}
         </p>
         <button
           onClick={onRetry}
-          className="mono mt-8 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-[#111212] transition hover:brightness-95"
+          className="mono mt-8 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-[#111212] transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           Retry scan
         </button>
