@@ -1,11 +1,11 @@
 # MVP QA Report
 
-Date: 2026-07-04
+Date: 2026-07-05
 
 ## Automated Gates
 
 - ESLint 9: passed with no warnings or errors
-- Vitest: 81 tests across 16 files passed
+- Vitest: 88 tests across 17 files passed
 - Next.js production build: passed
 - TypeScript validation: passed through the production build
 - Secret-pattern scan: no committed GitHub or OpenAI token pattern detected
@@ -30,6 +30,9 @@ Environment: local Next.js server at `http://localhost:3005`.
 - Score breakdown rendered category scores, including UI/UX.
 - Generated report and AI workspace setup pack rendered in the implementation handoff section.
 - Database archive exposed the database health state and saved records.
+- Public GitHub scans support repositories with nested Node.js app roots.
+- Portfolio/content-site scans avoid SaaS-only findings when auth, payments, and user-data signals are absent.
+- Hosted-mode copy explains that Vercel deployments should use GitHub or ZIP scanning rather than local filesystem scanning.
 
 ## Known Environment Limits
 
@@ -39,4 +42,4 @@ Environment: local Next.js server at `http://localhost:3005`.
 
 ## Release Verdict
 
-The single-user MVP is ready for a portfolio demo and controlled deployment. Public multi-user access remains blocked on authentication, tenant isolation, quotas, billing, background jobs, and hosted abuse controls; those are explicitly post-MVP capabilities.
+The single-user MVP is ready for a portfolio demo, public GitHub/ZIP scanning, and controlled Vercel deployment. Public multi-user SaaS access remains blocked on authentication, tenant isolation, quotas, billing, background jobs, and hosted abuse controls; those are explicitly post-MVP capabilities.

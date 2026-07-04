@@ -35,9 +35,16 @@ Point out:
 
 Action:
 
-1. Keep the context on `launch-prep`.
-2. Scan the current local project or a known public GitHub repository.
+1. Keep the default context unless you are intentionally demoing a SaaS app.
+2. Scan a known public GitHub repository, or upload a ZIP when you want a predictable offline demo.
 3. Wait for the report state.
+
+Reliable public demo repos:
+
+- Simple portfolio/content site: `https://github.com/Aayush10016/HipHopHub`
+- More app-like repository: use a Node.js project with `package.json`, routes, and UI states
+
+For a portfolio repo, call out that Vibe should avoid SaaS-only warnings such as payment, auth, and account recovery unless the repository actually contains those signals.
 
 Say:
 
@@ -47,6 +54,7 @@ Proves:
 
 - safe static analysis
 - context-aware scoring
+- portfolio and SaaS scans are scored differently
 - usable input methods
 
 ## Step 2: Explain The Score
@@ -156,9 +164,13 @@ Mention:
 
 Answer:
 
-- hosted authentication
+- Vercel production deployment with managed PostgreSQL
+- GitHub OAuth verification on the production domain
+- final screenshots and launch README cleanup
+- scan quotas and abuse controls
+- hosted auth and user accounts
 - team workspaces
-- scan quotas and billing
+- billing
 - background scan jobs
 - more frameworks beyond Node.js
 - deeper UI/UX heuristics
