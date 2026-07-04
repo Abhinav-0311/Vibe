@@ -22,7 +22,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { AuditContext } from "@/lib/checklist/types";
-import { auditReport, emptyReport, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
+import { auditReport, emptyReport, type ActionPriority, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import { buildScoreBreakdown } from "@/lib/score-breakdown";
 import type {
@@ -71,6 +71,18 @@ const severityClass: Record<Severity, string> = {
   high: "text-[#ffd166]",
   medium: "text-[#d9d9d9]",
   low: "text-[#a7f35b]",
+};
+
+const actionPriorityLabel: Record<ActionPriority, string> = {
+  required: "Required",
+  recommended: "Recommended",
+  optional: "Optional",
+};
+
+const actionPriorityClass: Record<ActionPriority, string> = {
+  required: "border-[#ff5a5f] bg-[#2a0f11] text-[#ff8f8f]",
+  recommended: "border-[#5a4d2b] bg-[#211d10] text-[#ffd166]",
+  optional: "border-[#315f46] bg-[#07130d] text-[#a7f35b]",
 };
 
 const scoreStatusLabel: Record<ReturnType<typeof buildScoreBreakdown>[number]["status"], string> = {
@@ -2360,6 +2372,11 @@ function FindingsList({
               <span className={`mono text-[10px] ${severityClass[finding.severity]}`}>
                 {severityLabel[finding.severity]}
               </span>
+              {finding.actionPriority && (
+                <span className={`mono rounded-full border px-3 py-1 text-[9px] ${actionPriorityClass[finding.actionPriority]}`}>
+                  {actionPriorityLabel[finding.actionPriority]}
+                </span>
+              )}
               <span className="mono rounded-full border border-[#3d3d3d] px-3 py-1 text-[9px] text-[#d9d9d9]">
                 {finding.category}
               </span>
@@ -2480,6 +2497,24 @@ function FindingDetail({
         <DetailBlock title="Impact" body={finding.impact} />
         <DetailBlock title="Suggested fix" body={finding.fix} />
       </div>
+
+      {finding.actionPriority && (
+        <div className="mt-8 rounded-[24px] border border-[#2f2a2a] bg-black p-5">
+          <p className="mono text-[10px] text-[#fc74dd]">Action priority</p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <span className={`mono inline-flex w-fit rounded-full border px-4 py-2 text-[10px] ${actionPriorityClass[finding.actionPriority]}`}>
+              {actionPriorityLabel[finding.actionPriority]}
+            </span>
+            <p className="text-sm leading-6 text-[#d9d9d9]">
+              {finding.actionPriority === "required"
+                ? "Handle this before treating the project as ready for the selected profile."
+                : finding.actionPriority === "recommended"
+                  ? "Handle this soon, but it should not block a simple prototype or portfolio review."
+                  : "Useful polish or future hardening once required work is under control."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {finding.learning && (
         <div className="mt-8 rounded-[24px] border border-[#2f2a2a] bg-black p-5">

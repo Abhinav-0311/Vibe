@@ -97,6 +97,7 @@ describe("runChecklist", () => {
     const result = runChecklist(baseFacts, portfolioContext);
     const findingIds = result.findings.map((finding) => finding.id);
     const severityById = new Map(result.findings.map((finding) => [finding.id, finding.severity]));
+    const priorityById = new Map(result.findings.map((finding) => [finding.id, finding.actionPriority]));
 
     expect(result.context.appType).toBe("content-site");
     expect(result.score).toBe(88);
@@ -104,6 +105,9 @@ describe("runChecklist", () => {
     expect(severityById.get("missing-env-example")).toBe("low");
     expect(severityById.get("missing-tests")).toBe("medium");
     expect(severityById.get("missing-ai-rules")).toBe("medium");
+    expect(priorityById.get("missing-env-example")).toBe("optional");
+    expect(priorityById.get("missing-tests")).toBe("recommended");
+    expect(priorityById.get("missing-ai-rules")).toBe("recommended");
     expect(findingIds).not.toContain("missing-auth");
     expect(findingIds).not.toContain("missing-stripe");
     expect(findingIds).not.toContain("missing-analytics");
@@ -119,6 +123,8 @@ describe("runChecklist", () => {
     expect(result.summary.critical).toBe(1);
     expect(findingIds).toContain("missing-auth");
     expect(findingIds).toContain("missing-stripe");
+    expect(result.findings.find((finding) => finding.id === "missing-auth")?.actionPriority).toBe("required");
+    expect(result.findings.find((finding) => finding.id === "missing-tests")?.actionPriority).toBe("required");
     expect(findingIds).not.toContain("missing-middleware");
   });
 

@@ -1,10 +1,12 @@
 export type Severity = "critical" | "high" | "medium" | "low";
+export type ActionPriority = "required" | "recommended" | "optional";
 
 export type AuditFinding = {
   id: string;
   title: string;
   category: string;
   severity: Severity;
+  actionPriority?: ActionPriority;
   status: "open" | "planned" | "ignored";
   evidence: string;
   severityReason?: string;

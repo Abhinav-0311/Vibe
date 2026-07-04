@@ -1,4 +1,4 @@
-import type { AuditFinding, Severity } from "@/lib/mock-audit";
+import type { ActionPriority, AuditFinding, Severity } from "@/lib/mock-audit";
 import type { ScannerFacts } from "@/lib/scanner/types";
 import type { AuditContext, ChecklistResult, ChecklistRule } from "./types";
 
@@ -81,6 +81,23 @@ function severityReasonFor(finding: AuditFinding, context: AuditContext) {
   return `${contextPrefix} has a lower-risk improvement that still improves maintainability and launch confidence.`;
 }
 
+function actionPriorityFor(finding: AuditFinding, context: AuditContext): ActionPriority {
+  if (finding.severity === "critical") return "required";
+
+  const launchOrProduction = context.stage === "launch-prep" || context.stage === "production";
+  const sensitiveCategory = ["Auth", "Payments", "Security"].includes(finding.category);
+
+  if (finding.severity === "high" && (launchOrProduction || sensitiveCategory)) {
+    return "required";
+  }
+
+  if (finding.severity === "high" || finding.severity === "medium") {
+    return "recommended";
+  }
+
+  return "optional";
+}
+
 function verificationFor(finding: AuditFinding, facts: ScannerFacts) {
   const commands: string[] = [];
   const packageRunner = facts.packageManager === "unknown" ? "npm" : facts.packageManager;
@@ -116,6 +133,7 @@ Detected stack signals: ${formatProjectSignals(facts)}
 
 Finding: ${finding.title}
 Severity: ${finding.severity}
+Action priority: ${finding.actionPriority ?? "recommended"}
 Evidence: ${finding.evidence}
 Why it matters: ${finding.impact}
 ${learning}
@@ -285,15 +303,17 @@ function learningFor(finding: AuditFinding): NonNullable<AuditFinding["learning"
 
 function enrichFinding(finding: AuditFinding, facts: ScannerFacts, context: AuditContext): AuditFinding {
   const severityReason = finding.severityReason ?? severityReasonFor(finding, context);
+  const actionPriority = finding.actionPriority ?? actionPriorityFor(finding, context);
   const verification = finding.verification ?? verificationFor(finding, facts);
   const learning = finding.learning ?? learningFor(finding);
 
   return {
     ...finding,
+    actionPriority,
     severityReason,
     verification,
     learning,
-    prompt: formatImplementationPrompt({ ...finding, severityReason, verification, learning }, facts, context),
+    prompt: formatImplementationPrompt({ ...finding, actionPriority, severityReason, verification, learning }, facts, context),
   };
 }
 

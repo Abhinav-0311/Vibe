@@ -62,6 +62,7 @@ function formatFindings(checklist: ChecklistResult) {
       (finding, index) => `## Finding ${index + 1}: ${finding.title}
 
 - Severity: ${finding.severity}
+- Action priority: ${finding.actionPriority ?? "recommended"}
 - Category: ${finding.category}
 - Status: ${finding.status}
 - Evidence: ${finding.evidence}
