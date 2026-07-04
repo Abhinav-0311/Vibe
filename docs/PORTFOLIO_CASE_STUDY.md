@@ -6,7 +6,7 @@ AI coding tools help new builders produce working interfaces quickly, but a loca
 
 ## Product
 
-Vibe scans a local Next.js project, uploaded ZIP archive, or GitHub repository without executing project code. It converts repository facts into context-aware findings, a readiness report, an architecture stress test, an AI workspace setup pack, and a verified fix workflow.
+Vibe scans a local Node.js project, uploaded ZIP archive, or GitHub repository without executing project code. It converts repository facts into context-aware findings, a readiness report, an architecture stress test, and an AI workspace setup pack.
 
 ## AI Engineering Decisions
 
@@ -26,9 +26,7 @@ flowchart LR
     C --> E[Evidence-backed report]
     E --> F[Optional constrained AI enhancement]
     C --> G[AI workspace setup pack]
-    E --> H[Fix Assistant]
-    H --> I[Branch, draft PR, and re-scan comparison]
-    E --> J[(PostgreSQL scan archive)]
+    E --> H[(PostgreSQL scan archive)]
 ```
 
 ## Safety Boundaries
@@ -37,8 +35,8 @@ flowchart LR
 - Uploaded archives are size-limited, path-validated, extracted temporarily, and deleted.
 - Local paths are restricted to the configured workspace root.
 - OAuth tokens are encrypted before cookie storage.
-- GitHub branches, issues, and draft pull requests require explicit user actions.
-- Vibe never edits repository code or claims a finding is fixed without a comparable re-scan.
+- GitHub issue creation requires explicit user action.
+- Vibe never edits repository code or claims production readiness beyond static evidence.
 
 ## Technical Stack
 
@@ -53,9 +51,9 @@ flowchart LR
 
 1. Scan a repository using launch-prep context.
 2. Open a finding and inspect its exact evidence.
-3. Export the implementation plan or AI workspace setup pack.
-4. Create a fix branch, implement changes, and open a draft pull request.
-5. Re-scan the branch and show resolved, remaining, and introduced findings.
+3. Copy the finding prompt or generated report.
+4. Export the AI workspace setup pack.
+5. Show saved scan history and PostgreSQL archive.
 
 For a timed walkthrough, use [DEMO_SCRIPT.md](./DEMO_SCRIPT.md).
 

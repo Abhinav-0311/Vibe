@@ -4,13 +4,10 @@ export type AnalyticsEvent =
   | "scan_completed"
   | "scan_failed"
   | "finding_selected"
-  | "finding_status_changed"
   | "prompt_copied"
-  | "prompt_queue_copied"
-  | "fix_plan_downloaded"
-  | "fix_branch_created"
-  | "draft_pull_request_created"
-  | "rescan_compared";
+  | "report_copied"
+  | "setup_pack_exported"
+  | "github_issue_created";
 
 export type AnalyticsEventDefinition = {
   name: AnalyticsEvent;
@@ -45,39 +42,24 @@ export const analyticsEvents: AnalyticsEventDefinition[] = [
     properties: ["finding_id", "category", "severity"],
   },
   {
-    name: "finding_status_changed",
-    purpose: "Measure whether findings become planned, ignored, or remain open.",
-    properties: ["finding_id", "category", "severity", "status"],
-  },
-  {
     name: "prompt_copied",
     purpose: "Measure whether individual findings lead to implementation action.",
     properties: ["finding_id", "category", "severity"],
   },
   {
-    name: "prompt_queue_copied",
-    purpose: "Measure whether users export a full implementation queue.",
-    properties: ["queued_count", "planned_count", "open_count"],
+    name: "report_copied",
+    purpose: "Measure whether users export the generated readiness report.",
+    properties: ["project_id", "score", "finding_count"],
   },
   {
-    name: "fix_plan_downloaded",
-    purpose: "Measure whether users export the evidence-backed implementation plan.",
-    properties: ["queued_count", "project_source"],
+    name: "setup_pack_exported",
+    purpose: "Measure whether users export AI workspace setup artifacts.",
+    properties: ["artifact_count", "project_source"],
   },
   {
-    name: "fix_branch_created",
-    purpose: "Measure explicit GitHub handoffs from findings to implementation.",
-    properties: ["repository", "base_branch", "finding_count"],
-  },
-  {
-    name: "draft_pull_request_created",
-    purpose: "Measure completed GitHub handoffs after users push their fixes.",
-    properties: ["repository", "base_branch", "head_branch", "finding_count"],
-  },
-  {
-    name: "rescan_compared",
-    purpose: "Measure whether users verify fixes with new repository evidence.",
-    properties: ["score_delta", "resolved_count", "remaining_count", "introduced_count"],
+    name: "github_issue_created",
+    purpose: "Measure explicit GitHub issue handoffs from selected findings.",
+    properties: ["repository", "finding_id", "category", "severity"],
   },
 ];
 

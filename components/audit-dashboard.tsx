@@ -436,7 +436,7 @@ export function AuditDashboard() {
             <ResultSection
               eyebrow="Implementation handoff"
               title="Turn the scan into work."
-              description="Use this section after you understand the first findings. It exports the report, setup pack, and implementation queue."
+              description="Use this section after you understand the first findings. It exports the report and AI workspace setup pack."
             >
               {scanData && <ReportNarrative scan={scanData} />}
               {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}

@@ -84,22 +84,22 @@ Proves:
 - actionable handoff for experienced devs
 - evidence-backed prompt generation
 
-## Step 4: Show The Fix Assistant
+## Step 4: Show The Report Export
 
 Action:
 
 1. Scroll to `Implementation handoff`.
-2. Show the readiness roadmap.
-3. Show `Copy queue` and `Download plan`.
+2. Show the generated report narrative.
+3. Use `Copy report`.
 
 Say:
 
-> Vibe does not stop at diagnosis. It creates an ordered implementation path: fix first, fix next, then verify and re-scan.
+> Vibe does not stop at diagnosis. It gives the builder a concise report they can share, save, or use as the next prompt context.
 
 Proves:
 
-- triage workflow
-- implementation sequencing
+- report handoff
+- evidence-backed next-step context
 - coding-agent handoff
 
 ## Step 5: Show Persistence

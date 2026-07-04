@@ -32,7 +32,7 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 - Billing and plan limits
 - Background scan jobs for large repositories
 - Durable object storage for uploaded archives if async processing is added
-- Audit logs for GitHub actions, issue creation, branch creation, and draft PR creation
+- Audit logs for GitHub actions and issue creation
 
 ## Scanner Expansion
 

@@ -38,7 +38,7 @@ Recommended Vercel setup:
 3. Set `NEXT_PUBLIC_APP_URL` to the Vercel production URL.
 4. Keep `VIBE_ENABLE_LOCAL_SCAN` unset or set it to `false`.
 5. Keep `OPENAI_REPORT_ENABLED=false` unless the deployment is authenticated and trusted.
-6. Configure GitHub OAuth only if private repository scanning or issue/PR actions are needed.
+6. Configure GitHub OAuth only if private repository scanning or GitHub issue creation is needed.
 7. Run `npm.cmd run db:deploy` against the managed database before relying on saved scans.
 
 ## Deployment Sequence
@@ -50,7 +50,7 @@ Recommended Vercel setup:
 5. Run `npm run db:deploy` against the target database.
 6. Deploy the same verified commit.
 7. Request `/api/health`; require HTTP 200 before directing traffic.
-8. Run one public-repository scan and verify report, setup-pack export, and Fix Assistant output.
+8. Run one public-repository scan and verify report, finding prompt copy, and setup-pack export.
 
 ## GitHub OAuth
 
