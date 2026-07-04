@@ -24,3 +24,6 @@ Thumbs.db
 # generated
 coverage/
 dist/
+
+# deployment metadata
+.vercel/

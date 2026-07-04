@@ -445,9 +445,9 @@ Planned:
 
 ## Planning Docs
 
-- [PRODUCT_BLUEPRINT.md](./PRODUCT_BLUEPRINT.md)
-- [MVP_EXECUTION_PLAN.md](./MVP_EXECUTION_PLAN.md)
-- [TECHNICAL_ARCHITECTURE.md](./TECHNICAL_ARCHITECTURE.md)
+- [Product blueprint](./docs/planning/PRODUCT_BLUEPRINT.md)
+- [MVP execution plan](./docs/planning/MVP_EXECUTION_PLAN.md)
+- [Technical architecture](./docs/planning/TECHNICAL_ARCHITECTURE.md)
 - [Demo script](./docs/DEMO_SCRIPT.md)
 - [Deployment and recovery](./docs/DEPLOYMENT.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
