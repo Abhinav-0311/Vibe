@@ -790,6 +790,8 @@ function ContextControls({
         })}
       </div>
 
+      <ScanSafetyNote sourceMode={sourceMode} localScanEnabled={localScanEnabled} />
+
       {sourceMode === "local" && <div className="mt-6">
         <label className="block">
           <span className="mono text-[10px] text-[#d9d9d9]">Project path</span>
@@ -919,6 +921,40 @@ function ContextControls({
         </div>
       </details>
     </section>
+  );
+}
+
+function ScanSafetyNote({
+  sourceMode,
+  localScanEnabled,
+}: {
+  sourceMode: ProjectSourceMode;
+  localScanEnabled: boolean;
+}) {
+  const modeDetail =
+    sourceMode === "github"
+      ? "GitHub scans download a repository archive for static inspection. Private repository access requires OAuth, and issues are created only after an explicit click."
+      : sourceMode === "upload"
+        ? "ZIP uploads are size-limited, path-validated, extracted to a temporary folder, scanned, and removed after the request finishes."
+        : localScanEnabled
+          ? "Local scans are limited to the configured workspace path and are intended only for trusted local or self-hosted use."
+          : "Hosted deployments cannot read a visitor's local filesystem; use GitHub or ZIP scanning instead.";
+
+  return (
+    <div className="mt-5 rounded-[24px] border border-[#2b2727] bg-black p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="flex items-center gap-3">
+            <ShieldAlert className="h-5 w-5 text-[#fc74dd]" aria-hidden="true" />
+            <p className="mono text-[10px] text-[#fc74dd]">Scan safety</p>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">
+            Vibe reads repository files and metadata. It does not run install scripts, start the app, execute tests, call project code, or print secret values.
+          </p>
+        </div>
+        <p className="max-w-xl text-sm leading-6 text-[#b8b3b3]">{modeDetail}</p>
+      </div>
+    </div>
   );
 }
 

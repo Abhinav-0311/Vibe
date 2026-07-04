@@ -10,6 +10,17 @@ Vibe scans local folders, uploaded ZIP archives, and GitHub repositories; detect
 
 Hosted deployments should use GitHub or ZIP scanning. Local folder scanning is for trusted local/self-hosted use only and is disabled by default on Vercel.
 
+## Scan Safety
+
+Vibe is a static repository scanner. It reads files and metadata, but it does not execute scanned project code.
+
+- It does not run `npm install`, lifecycle scripts, tests, builds, migrations, or app servers from the scanned repository.
+- ZIP uploads are size-limited, path-validated, extracted to a temporary folder, scanned, and removed after the request finishes.
+- GitHub scans download a repository archive for inspection. Private repositories require OAuth, and GitHub issues are created only after explicit user action.
+- Local folder scanning is limited to the configured workspace path and should only be enabled in trusted local or self-hosted environments.
+- Environment files are detected by filename and ignore rules; Vibe should not print or expose secret values.
+- Findings are evidence-based static signals, not a proof of runtime security. Users can mark findings as not relevant with a reason.
+
 ## Publication Links
 
 - [Demo script](./docs/DEMO_SCRIPT.md)
