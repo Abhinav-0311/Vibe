@@ -156,6 +156,7 @@ export function AuditDashboard() {
 
   function applyCompletedScan(scan: ScanApiResponse) {
     setScanData(scan);
+    setAuditContext(scan.checklist.context);
     setSelectedId(scan.checklist.findings[0]?.id);
     saveScanToHistory(scan);
     void refreshSavedScans();
@@ -1276,7 +1277,10 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
     { label: "Framework", value: scan?.facts.framework.name ?? "Scanning..." },
     { label: "Package manager", value: scan?.facts.packageManager ?? "Scanning..." },
     { label: "Project", value: scan?.scannedProject ?? "Scanning..." },
-    { label: "Context", value: scan ? scan.checklist.context.stage : "Scanning..." },
+    {
+      label: "Profile",
+      value: scan ? `${scan.checklist.context.appType} / ${scan.checklist.context.stage}` : "Scanning...",
+    },
     { label: "API routes", value: scan ? apiRoutes.length.toString() : "Scanning..." },
     { label: "Source", value: scan ? formatScanSource(scan) : "Scanning..." },
   ];
