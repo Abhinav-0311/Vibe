@@ -196,7 +196,7 @@ Create a local `.env` file:
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3005
 VIBE_ENABLE_LOCAL_SCAN=
-OPENAI_API_KEY=sk-placeholder
+OPENAI_API_KEY=
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vibe?schema=public
 SENTRY_DSN=
 GITHUB_CLIENT_ID=
@@ -281,7 +281,7 @@ Every scan first creates a complete deterministic report. OpenAI enhancement is 
 
 To enable it:
 
-1. Replace `sk-placeholder` with a real server-side `OPENAI_API_KEY` in `.env`.
+1. Add a real server-side `OPENAI_API_KEY` in `.env`.
 2. Set `OPENAI_REPORT_ENABLED=true`.
 3. Keep `OPENAI_REPORT_MODEL` configurable for model availability and cost control.
 4. Restart the development server.

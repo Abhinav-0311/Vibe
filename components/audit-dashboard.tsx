@@ -1799,7 +1799,7 @@ function ScanHistory({
             Keep the last six readiness snapshots.
           </h2>
           <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">
-            Local history lets you revisit previous contexts without rescanning. This is the prototype version of the saved reports we will later move into PostgreSQL.
+            Local history lets you revisit previous contexts without rescanning. PostgreSQL records provide the durable archive when the database is connected.
           </p>
         </div>
         <div className="flex items-center gap-3">
