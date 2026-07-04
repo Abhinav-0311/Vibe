@@ -2,6 +2,8 @@
 
 Vibe is a launch-readiness auditor for AI-built apps. It scans a project, finds the production systems a builder likely missed, and turns each finding into evidence, teaching, and a coding-agent handoff.
 
+Live deployment: [vibe-seven-snowy.vercel.app](https://vibe-seven-snowy.vercel.app)
+
 It helps new coders, indie builders, and vibe coders answer one practical question:
 
 > My app runs locally. Is it ready for real users?

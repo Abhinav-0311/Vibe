@@ -34,6 +34,15 @@ Environment: local Next.js server at `http://localhost:3005`.
 - Portfolio/content-site scans avoid SaaS-only findings when auth, payments, and user-data signals are absent.
 - Hosted-mode copy explains that Vercel deployments should use GitHub or ZIP scanning rather than local filesystem scanning.
 
+## Production Smoke Test
+
+Environment: Vercel production deployment at `https://vibe-seven-snowy.vercel.app`.
+
+- Production deployment is ready on commit `1ded341`.
+- `/api/health` returned application `ok` and database `ok`.
+- Production database migrations were applied to Neon PostgreSQL.
+- Hosted deployment uses GitHub and ZIP scanning; local workspace scanning is disabled for Vercel.
+
 ## Known Environment Limits
 
 - Live private-repository OAuth and GitHub issue creation require the deployment owner's GitHub OAuth credentials and were not mutated during automated QA.
