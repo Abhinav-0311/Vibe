@@ -28,6 +28,7 @@ Vibe is a static repository scanner. It reads files and metadata, but it does no
 - [MVP QA report](./docs/MVP_QA_REPORT.md)
 - [Future roadmap](./docs/FUTURE_ROADMAP.md)
 - [Limitations](./docs/LIMITATIONS.md)
+- [Vercel deployment](./docs/VERCEL.md)
 - [Deployment and recovery](./docs/DEPLOYMENT.md)
 
 ## Screenshots
@@ -195,6 +196,7 @@ Create a local `.env` file:
 
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3005
+VIBE_ENABLE_LOCAL_SCAN=
 OPENAI_API_KEY=sk-placeholder
 DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vibe?schema=public
 SENTRY_DSN=
