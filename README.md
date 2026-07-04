@@ -34,19 +34,17 @@ Vibe is a static repository scanner. It reads files and metadata, but it does no
 
 ## Screenshots
 
-Add final screenshots or a short GIF before publishing broadly:
+### Scan Input
 
-```text
-docs/assets/vibe-scan-input.png
-docs/assets/vibe-score-breakdown.png
-docs/assets/vibe-finding-detail.png
-```
+![Vibe scan input](./docs/assets/vibe-scan-input.png)
 
-Recommended capture flow:
+### Score Breakdown
 
-1. Scan input with GitHub or ZIP selected.
-2. Score breakdown showing the UI/UX category.
-3. Finding detail with evidence, learning note, and copy prompt.
+![Vibe score breakdown](./docs/assets/vibe-score-breakdown.png)
+
+### Finding Detail
+
+![Vibe finding detail](./docs/assets/vibe-finding-detail.png)
 
 ## What It Does
 
