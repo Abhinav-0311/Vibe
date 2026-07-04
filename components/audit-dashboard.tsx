@@ -931,6 +931,20 @@ function ScanSafetyNote({
   sourceMode: ProjectSourceMode;
   localScanEnabled: boolean;
 }) {
+  const trustPoints = [
+    {
+      title: "Static inspection",
+      body: "No install scripts, tests, builds, migrations, or app servers are run from the scanned project.",
+    },
+    {
+      title: "Secret-aware",
+      body: "Environment files are detected as risk signals; secret values are not printed in the report.",
+    },
+    {
+      title: "User-controlled",
+      body: "GitHub issues, exports, and fix prompts are generated only after explicit user actions.",
+    },
+  ];
   const modeDetail =
     sourceMode === "github"
       ? "GitHub scans download a repository archive for static inspection. Private repository access requires OAuth, and issues are created only after an explicit click."
@@ -941,7 +955,7 @@ function ScanSafetyNote({
           : "Hosted deployments cannot read a visitor's local filesystem; use GitHub or ZIP scanning instead.";
 
   return (
-    <div className="mt-5 rounded-[24px] border border-[#2b2727] bg-black p-5">
+    <div className="mt-5 rounded-[24px] border border-[#2b2727] bg-black p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
           <div className="flex items-center gap-3">
@@ -953,6 +967,17 @@ function ScanSafetyNote({
           </p>
         </div>
         <p className="max-w-xl text-sm leading-6 text-[#b8b3b3]">{modeDetail}</p>
+      </div>
+      <div className="mt-5 grid gap-3 border-t border-[#242020] pt-5 md:grid-cols-3">
+        {trustPoints.map((point) => (
+          <div key={point.title} className="rounded-[18px] border border-[#242020] bg-[#111212] p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[#fc74dd]" aria-hidden="true" />
+              <p className="text-sm font-semibold tracking-[-0.02em] text-white">{point.title}</p>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-[#9b9696]">{point.body}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
