@@ -1497,6 +1497,44 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
         ))}
       </div>
 
+      {scan?.profileInference && (
+        <div className="mt-4 rounded-[24px] border border-[#242424] bg-[#111212] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="mono text-[10px] text-[#fc74dd]">Profile decision</p>
+              <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                {scan.profileInference.adjusted ? "Vibe adjusted the scan profile." : "Vibe used the selected profile."}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">{scan.profileInference.reasons[0]}</p>
+            </div>
+            <div className="grid shrink-0 grid-cols-2 gap-2 text-left sm:min-w-[280px]">
+              <div className="rounded-[16px] bg-black p-3">
+                <p className="mono text-[9px] text-[#9b9696]">Requested</p>
+                <p className="mt-2 text-sm text-white">
+                  {scan.profileInference.requested.appType} / {scan.profileInference.requested.stage}
+                </p>
+              </div>
+              <div className="rounded-[16px] bg-black p-3">
+                <p className="mono text-[9px] text-[#9b9696]">Applied</p>
+                <p className="mt-2 text-sm text-white">
+                  {scan.profileInference.applied.appType} / {scan.profileInference.applied.stage}
+                </p>
+              </div>
+            </div>
+          </div>
+          {scan.profileInference.reasons.length > 1 && (
+            <ul className="mt-4 grid gap-2 border-t border-[#2f2a2a] pt-4 text-sm leading-6 text-[#d9d9d9]">
+              {scan.profileInference.reasons.slice(1).map((reason) => (
+                <li key={reason} className="flex gap-3">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#fc74dd]" aria-hidden="true" />
+                  <span>{reason}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {scan && apiRoutes.length > 0 && (
         <div className="mt-4 rounded-[24px] border border-[#242424] p-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferAuditContext } from "@/lib/checklist/context-inference";
+import { inferAuditContext, inferAuditProfile } from "@/lib/checklist/context-inference";
 import type { AuditContext } from "@/lib/checklist/types";
 import type { ScannerFacts } from "@/lib/scanner/types";
 
@@ -63,7 +63,14 @@ const baseFacts: ScannerFacts = {
 
 describe("inferAuditContext", () => {
   it("keeps a simple public portfolio on the content-site profile", () => {
+    const profile = inferAuditProfile(baseFacts, requestedContentContext);
+
     expect(inferAuditContext(baseFacts, requestedContentContext)).toEqual(requestedContentContext);
+    expect(profile).toMatchObject({
+      applied: requestedContentContext,
+      adjusted: false,
+    });
+    expect(profile.reasons[0]).toContain("content-site profile");
   });
 
   it("promotes obvious auth and payment projects from content-site to launch-prep SaaS", () => {
@@ -81,12 +88,22 @@ describe("inferAuditContext", () => {
       },
     };
 
-    expect(inferAuditContext(facts, requestedContentContext)).toMatchObject({
+    const profile = inferAuditProfile(facts, requestedContentContext);
+
+    expect(profile.applied).toMatchObject({
       appType: "saas",
       stage: "launch-prep",
       hasPayments: true,
       hasUserAccounts: true,
     });
+    expect(profile.adjusted).toBe(true);
+    expect(profile.reasons).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Auth dependency"),
+        expect.stringContaining("Stripe"),
+        expect.stringContaining("SaaS"),
+      ]),
+    );
   });
 
   it("promotes backend-only projects to the API profile", () => {
@@ -104,12 +121,16 @@ describe("inferAuditContext", () => {
       },
     };
 
-    expect(inferAuditContext(facts, requestedContentContext)).toMatchObject({
+    const profile = inferAuditProfile(facts, requestedContentContext);
+
+    expect(profile.applied).toMatchObject({
       appType: "api",
       stage: "prototype",
       hasPayments: false,
       hasUserAccounts: false,
     });
+    expect(profile.adjusted).toBe(true);
+    expect(profile.reasons).toEqual(expect.arrayContaining([expect.stringContaining("API project")]));
   });
 
   it("does not downgrade an explicit SaaS profile", () => {
@@ -121,6 +142,13 @@ describe("inferAuditContext", () => {
       storesUserData: true,
     };
 
+    const profile = inferAuditProfile(baseFacts, requestedSaasContext);
+
     expect(inferAuditContext(baseFacts, requestedSaasContext)).toEqual(requestedSaasContext);
+    expect(profile).toMatchObject({
+      applied: requestedSaasContext,
+      adjusted: false,
+    });
+    expect(profile.reasons[0]).toContain("without adjustment");
   });
 });

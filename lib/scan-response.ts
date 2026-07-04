@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { AuditContext } from "@/lib/checklist/types";
-import { inferAuditContext } from "@/lib/checklist/context-inference";
+import { inferAuditProfile } from "@/lib/checklist/context-inference";
 import { runChecklist } from "@/lib/checklist/checklist-engine";
 import { saveScanRecord } from "@/lib/db/scan-records";
 import { generateReport } from "@/lib/report/report-generator";
@@ -21,8 +21,8 @@ export async function createScanResponse(
   projectName = path.basename(projectPath),
 ): Promise<ScanApiResponse> {
   const facts = await scanProject(projectPath);
-  const inferredContext = inferAuditContext(facts, context);
-  const deterministicChecklist = runChecklist(facts, inferredContext);
+  const profileInference = inferAuditProfile(facts, context);
+  const deterministicChecklist = runChecklist(facts, profileInference.applied);
   const scannedAt = new Date().toISOString();
   const deterministicReport = generateReport({ facts, checklist: deterministicChecklist, scannedAt });
   const scannedProject = projectName;
@@ -42,6 +42,7 @@ export async function createScanResponse(
     scanSource: source,
     scannedAt,
     facts,
+    profileInference,
     checklist,
     report,
     setupPack,
