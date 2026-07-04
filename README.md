@@ -6,7 +6,7 @@ It helps new coders, indie builders, and vibe coders answer one practical questi
 
 > My app runs locally. Is it ready for real users?
 
-Vibe scans local folders, uploaded ZIP archives, and GitHub repositories; detects production-readiness signals; runs context-aware checklist rules; and turns evidence-backed findings into a verified implementation workflow.
+Vibe scans local folders, uploaded ZIP archives, and GitHub repositories; detects production-readiness signals; runs context-aware checklist rules; and turns evidence-backed findings into clear explanations and copyable fix prompts.
 
 Hosted deployments should use GitHub or ZIP scanning. Local folder scanning is for trusted local/self-hosted use only and is disabled by default on Vercel.
 
@@ -27,7 +27,6 @@ Add final screenshots or a short GIF before publishing broadly:
 docs/assets/vibe-scan-input.png
 docs/assets/vibe-score-breakdown.png
 docs/assets/vibe-finding-detail.png
-docs/assets/vibe-fix-assistant.png
 ```
 
 Recommended capture flow:
@@ -35,13 +34,14 @@ Recommended capture flow:
 1. Scan input with GitHub or ZIP selected.
 2. Score breakdown showing the UI/UX category.
 3. Finding detail with evidence, learning note, and copy prompt.
-4. Fix Assistant roadmap and implementation queue.
 
 ## What It Does
 
 - Scans local projects under a controlled workspace path in trusted local development.
 - Supports GitHub repository and ZIP upload scanning for hosted deployments.
+- Detects root and nested Node.js app folders inside GitHub repositories and ZIP uploads.
 - Detects framework, package manager, dependencies, routes, tests, environment files, middleware, analytics, observability, and AI workspace rules.
+- Recognizes common Node.js app types including Next.js, Vite React, Vite, Create React App, Remix, Astro, SvelteKit, Nuxt, Express, and NestJS.
 - Inventories Next.js API routes and classifies auth, payment, webhook, and health endpoints without executing project code.
 - Checks environment-file Git ignore coverage without reading or exposing secret values.
 - Detects in-repo rate-limiting evidence for sensitive API surfaces.
@@ -59,9 +59,6 @@ Recommended capture flow:
 - Restores saved database scans into the full report UI.
 - Scans public or private GitHub repositories on a selected branch.
 - Turns individual findings into GitHub issues after explicit user approval.
-- Generates a deterministic Markdown implementation plan from triaged findings.
-- Creates a dedicated GitHub fix branch and draft pull request only after explicit user actions.
-- Compares re-scans to show resolved, remaining, and newly introduced findings.
 - Reports GitHub rate limits, permission failures, missing branches, and oversized repositories clearly.
 - Generates a project-specific AI workspace setup pack without inventing unknown business facts.
 - Exports `AGENTS.md`, product, decision, roadmap, and user-profile memory, a session-start checklist, and an MCP/API wiring checklist as a ZIP.
@@ -118,6 +115,7 @@ Testing and tooling:
 The scanner reads local project files and detects:
 
 - `package.json`
+- nested app folders such as `client`, `frontend`, `app`, `web`, and `server`
 - lockfiles
 - Next.js config
 - App Router / Pages Router
@@ -157,14 +155,11 @@ The dashboard includes:
 - route-level API evidence
 - secret-file hygiene and rate-limit checks
 - prioritized findings
-- Fix Assistant with prompt queue and Markdown implementation plan
 - Markdown report export
 - local scan history
 - PostgreSQL archive
 - GitHub repository and branch picker
 - GitHub issue creation from a selected finding
-- explicit GitHub fix-branch and draft-pull-request handoff
-- before-and-after scan comparison
 - architecture stress-test evidence and next actions
 - AI workspace setup-pack preview and ZIP export
 
@@ -293,8 +288,8 @@ Use this flow for a clean MVP walkthrough:
 4. Scan a local project, public GitHub repo, private GitHub repo, or ZIP upload.
 5. Review the readiness score, score breakdown, and UI/UX category score.
 6. Open the top finding and read the evidence, learning note, suggested fix, and copyable prompt.
-7. Export the report or implementation plan.
-8. Re-scan after fixes and compare resolved, remaining, and newly introduced findings.
+7. Copy the report or a focused finding prompt.
+8. Re-scan after fixes to generate a fresh readiness report.
 
 ## What This Shows As An AI Engineering Project
 
@@ -304,7 +299,7 @@ Vibe is not only a frontend demo. It shows:
 - evidence-backed scoring instead of generic AI opinions
 - prompt generation that is grounded in detected repository facts
 - optional AI enhancement with structured-output guardrails
-- GitHub OAuth, branch selection, issues, fix branches, and draft PR handoff
+- GitHub OAuth, branch selection, and issue creation from findings
 - PostgreSQL persistence, deduplication, restore, and health visibility
 - tests around scanner, checklist, reports, GitHub handling, setup packs, and health checks
 
@@ -373,14 +368,13 @@ POST /api/github-scan
 ```
 
 Scans a public or connected private GitHub repository. Accepts `repoUrl`, optional `branch`, and the audit-context fields.
+If the repository root does not contain `package.json`, Vibe searches nested app folders and scans the best detected Node.js project root.
 
 ```text
 GET /api/github/status
 GET /api/github/repos
 GET /api/github/branches
-POST /api/github/branches
 POST /api/github/issues
-POST /api/github/pull-requests
 POST /api/github/disconnect
 ```
 
@@ -425,7 +419,6 @@ Built:
 - opt-in AI report narrative and implementation-prompt enhancement
 - deterministic fallback with model latency and token-usage metadata
 - deterministic architecture stress test
-- Fix Assistant plan, branch, draft-PR, and re-scan workflow
 - `/api/health`, GitHub Actions verification, and deployment/rollback runbook
 - portfolio case study and architecture diagram
 

@@ -55,6 +55,10 @@ type PackageRootCandidate = {
   preference: number;
 };
 
+function normalizeArchivePath(archivePath: string) {
+  return archivePath.replace(/\\/g, "/").replace(/^\/+/, "");
+}
+
 function scorePackageRootCandidate(candidate: PackageRootCandidate) {
   return candidate.depth * 100 + candidate.preference;
 }
@@ -106,6 +110,44 @@ async function findPackageRoot(root: string): Promise<PackageRootCandidate | nul
   return candidates[0] ?? null;
 }
 
+function describeUnsupportedArchive(entryNames: string[]) {
+  const normalizedEntries = entryNames.map(normalizeArchivePath).map((entry) => entry.toLowerCase());
+  const fileNames = new Set(normalizedEntries.map((entry) => entry.split("/").at(-1) ?? entry));
+  const hasExtension = (extension: string) => normalizedEntries.some((entry) => entry.endsWith(extension));
+  const hasFile = (fileName: string) => fileNames.has(fileName);
+  const detectedStacks: string[] = [];
+
+  if (hasFile("requirements.txt") || hasFile("pyproject.toml") || hasFile("manage.py") || hasExtension(".py")) {
+    detectedStacks.push("Python");
+  }
+
+  if (hasFile("pom.xml") || hasFile("build.gradle") || hasFile("settings.gradle") || hasExtension(".java")) {
+    detectedStacks.push("Java");
+  }
+
+  if (hasFile("composer.json") || hasExtension(".php")) {
+    detectedStacks.push("PHP");
+  }
+
+  if (hasFile("go.mod") || hasExtension(".go")) {
+    detectedStacks.push("Go");
+  }
+
+  if (hasFile("cargo.toml") || hasExtension(".rs")) {
+    detectedStacks.push("Rust");
+  }
+
+  if (hasFile("index.html") || hasExtension(".html")) {
+    detectedStacks.push("static HTML");
+  }
+
+  const stackSummary = detectedStacks.length > 0
+    ? ` Detected possible ${Array.from(new Set(detectedStacks)).join(", ")} files.`
+    : "";
+
+  return `No supported Node.js app was found.${stackSummary} Vibe currently scans projects with a package.json file.`;
+}
+
 async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
   if (buffer.byteLength > maxUploadBytes) {
     throw new Error("Upload must be 25MB or smaller.");
@@ -146,7 +188,7 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
 
     if (!packageRoot) {
       throw new Error(
-        "This repository does not contain package.json. Vibe currently supports Node.js projects only.",
+        describeUnsupportedArchive(entries.map((entry) => entry.entryName)),
       );
     }
 

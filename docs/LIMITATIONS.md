@@ -10,6 +10,7 @@ Vibe is a launch-readiness assistant, not a security certification system.
 - Generate implementation prompts grounded in detected repository facts
 - Save and restore scan reports when PostgreSQL is connected
 - Scan local projects in trusted local development, public GitHub repositories, private GitHub repositories with OAuth, and uploaded ZIP archives
+- Detect nested Node.js app roots inside common folders such as `client`, `frontend`, `app`, `web`, and `server`
 
 ## What Vibe Cannot Prove
 
@@ -43,7 +44,9 @@ Local workspace scanning is intended for trusted local development only and is d
 
 ## Current Framework Scope
 
-The MVP is optimized for Node.js and Next.js projects. Other stacks may be uploaded or scanned, but results are not guaranteed to be useful until dedicated rule packs are added.
+The MVP is optimized for Node.js projects with `package.json`. It recognizes common frontend and backend frameworks such as Next.js, Vite React, Vite, Create React App, Remix, Astro, SvelteKit, Nuxt, Express, and NestJS.
+
+Other stacks may be uploaded or scanned, but Vibe will report them as unsupported until dedicated rule packs are added.
 
 ## AI Enhancement Limits
 

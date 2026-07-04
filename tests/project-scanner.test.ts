@@ -31,6 +31,54 @@ afterEach(async () => {
 });
 
 describe("scanProject API route discovery", () => {
+  it("detects a Vite React frontend", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "package.json",
+      JSON.stringify({
+        scripts: { dev: "vite", build: "vite build" },
+        dependencies: { "@vitejs/plugin-react": "latest", react: "latest", vite: "latest" },
+      }),
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.framework).toEqual({ name: "Vite React", confidence: "high" });
+  });
+
+  it("detects Create React App projects", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "package.json",
+      JSON.stringify({
+        scripts: { start: "react-scripts start", build: "react-scripts build" },
+        dependencies: { react: "latest", "react-scripts": "latest" },
+      }),
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.framework).toEqual({ name: "Create React App", confidence: "high" });
+  });
+
+  it("detects Express APIs", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "package.json",
+      JSON.stringify({
+        scripts: { start: "node server.js" },
+        dependencies: { express: "latest" },
+      }),
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.framework).toEqual({ name: "Express", confidence: "medium" });
+  });
+
   it("detects and classifies App Router and Pages Router API routes", async () => {
     const projectRoot = await createProject();
     await createFile(projectRoot, "app/api/auth/login/route.ts");

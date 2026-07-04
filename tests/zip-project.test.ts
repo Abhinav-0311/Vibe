@@ -54,7 +54,18 @@ describe("ZIP project extraction", () => {
     zip.addFile("README.md", Buffer.from("No project here"));
 
     await expect(extractProjectZipBuffer(zip.toBuffer())).rejects.toThrow(
-      "This repository does not contain package.json. Vibe currently supports Node.js projects only.",
+      "No supported Node.js app was found. Vibe currently scans projects with a package.json file.",
+    );
+  });
+
+  it("describes likely unsupported stacks when no package manifest exists", async () => {
+    const zip = new AdmZip();
+    zip.addFile("api/requirements.txt", Buffer.from("fastapi"));
+    zip.addFile("api/main.py", Buffer.from("print('hello')"));
+    zip.addFile("public/index.html", Buffer.from("<main>Hello</main>"));
+
+    await expect(extractProjectZipBuffer(zip.toBuffer())).rejects.toThrow(
+      "No supported Node.js app was found. Detected possible Python, static HTML files. Vibe currently scans projects with a package.json file.",
     );
   });
 });

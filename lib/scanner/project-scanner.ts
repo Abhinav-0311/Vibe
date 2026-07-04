@@ -102,8 +102,27 @@ function hasAnyDependency(dependencies: DependencySignal[], packageNames: string
   return packageNames.some((packageName) => dependencyNames.has(packageName));
 }
 
-function detectFramework(dependencies: DependencySignal[], hasNextConfig: boolean) {
+function hasDependency(dependencies: DependencySignal[], packageName: string) {
+  return dependencies.some((dependency) => dependency.name === packageName);
+}
+
+function detectFramework(
+  dependencies: DependencySignal[],
+  scripts: Record<string, string>,
+  files: DetectedFile[],
+) {
+  const scriptText = Object.values(scripts).join(" ");
   const hasNext = dependencies.some((dependency) => dependency.name === "next");
+  const hasNextConfig = files.some((file) => file.exists && file.path.startsWith("next.config"));
+  const hasVite = hasDependency(dependencies, "vite") || /\bvite\b/i.test(scriptText);
+  const hasReact = hasDependency(dependencies, "react");
+  const hasReactScripts = hasDependency(dependencies, "react-scripts") || /\breact-scripts\b/i.test(scriptText);
+  const hasRemix = dependencies.some((dependency) => dependency.name.startsWith("@remix-run/"));
+  const hasAstro = hasDependency(dependencies, "astro");
+  const hasSvelteKit = hasDependency(dependencies, "@sveltejs/kit");
+  const hasNuxt = hasDependency(dependencies, "nuxt");
+  const hasExpress = hasDependency(dependencies, "express");
+  const hasNest = dependencies.some((dependency) => dependency.name.startsWith("@nestjs/"));
 
   if (hasNext && hasNextConfig) {
     return { name: "Next.js", confidence: "high" as const };
@@ -111,6 +130,46 @@ function detectFramework(dependencies: DependencySignal[], hasNextConfig: boolea
 
   if (hasNext) {
     return { name: "Next.js", confidence: "medium" as const };
+  }
+
+  if (hasVite && hasReact) {
+    return { name: "Vite React", confidence: "high" as const };
+  }
+
+  if (hasVite) {
+    return { name: "Vite", confidence: "medium" as const };
+  }
+
+  if (hasReactScripts && hasReact) {
+    return { name: "Create React App", confidence: "high" as const };
+  }
+
+  if (hasRemix) {
+    return { name: "Remix", confidence: "medium" as const };
+  }
+
+  if (hasAstro) {
+    return { name: "Astro", confidence: "medium" as const };
+  }
+
+  if (hasSvelteKit) {
+    return { name: "SvelteKit", confidence: "medium" as const };
+  }
+
+  if (hasNuxt) {
+    return { name: "Nuxt", confidence: "medium" as const };
+  }
+
+  if (hasNest) {
+    return { name: "NestJS", confidence: "medium" as const };
+  }
+
+  if (hasExpress) {
+    return { name: "Express", confidence: "medium" as const };
+  }
+
+  if (hasReact) {
+    return { name: "React", confidence: "medium" as const };
   }
 
   return { name: "Unknown", confidence: "low" as const };
@@ -525,7 +584,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   return {
     projectRoot,
     packageManager: detectPackageManager(projectRoot, absoluteDetectedFiles),
-    framework: detectFramework(dependencies, hasNextConfig),
+    framework: detectFramework(dependencies, scripts, detectedFiles),
     scripts,
     dependencies,
     detectedFiles,

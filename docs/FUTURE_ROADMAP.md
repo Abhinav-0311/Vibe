@@ -4,12 +4,13 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 
 ## MVP Complete
 
-- Static scanner for Node.js and Next.js projects
+- Static scanner for Node.js projects
 - Local project scan, ZIP upload scan, and GitHub repository scan
+- Nested app-root detection for GitHub and ZIP scans
+- Framework detection for Next.js, Vite React, Vite, Create React App, Remix, Astro, SvelteKit, Nuxt, Express, and NestJS
 - Context-aware launch-readiness checklist
 - UI/UX, security, reliability, launch basics, and AI workspace scoring
 - Evidence-backed findings with learning notes and copyable prompts
-- Fix Assistant with roadmap, implementation queue, Markdown export, GitHub branch, draft PR, and re-scan comparison
 - AI workspace setup-pack preview and ZIP export
 - PostgreSQL scan archive, deduplication, restore, and health visibility
 - Optional OpenAI report enhancement with deterministic fallback
@@ -38,6 +39,7 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 - Better UI/UX heuristics for forms, navigation, empty states, and responsive layouts
 - Deeper deployment checks for Vercel, Render, Railway, and Fly.io
 - More framework support beyond Node.js projects
+- Optional advanced implementation workflow for grouped fix queues, branch handoff, and re-scan comparison
 - Framework-specific rule packs for Django, Laravel, FastAPI, Rails, and mobile apps
 - Dependency vulnerability and license-surface reporting
 
