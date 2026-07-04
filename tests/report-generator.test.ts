@@ -167,7 +167,8 @@ describe("generateReport", () => {
     expect(markdown).toContain("Score: 20/100");
     expect(markdown).toContain("- Stage: launch-prep");
     expect(markdown).toContain("## Top Risks");
-    expect(markdown).toContain("## Finding 1:");
+    expect(markdown).toContain("## Required Findings");
+    expect(markdown).toContain("### Finding 1:");
     expect(markdown).toContain("- Status: ignored");
     expect(markdown).toContain("- Not relevant reason: This repo is a static portfolio with no login route.");
     expect(markdown).toContain("### Learn the mistake");

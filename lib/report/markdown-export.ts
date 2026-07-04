@@ -1,6 +1,14 @@
 import type { ChecklistResult } from "@/lib/checklist/types";
+import type { ActionPriority } from "@/lib/mock-audit";
 import type { ScannerFacts } from "@/lib/scanner/types";
 import type { GeneratedReport } from "./types";
+
+const actionPriorityOrder: ActionPriority[] = ["required", "recommended", "optional"];
+const actionPriorityLabel: Record<ActionPriority, string> = {
+  required: "Required",
+  recommended: "Recommended",
+  optional: "Optional",
+};
 
 type FormatMarkdownReportInput = {
   projectName: string;
@@ -57,9 +65,18 @@ function formatFindings(checklist: ChecklistResult) {
     return "No findings were produced by the current checklist.";
   }
 
-  return checklist.findings
-    .map(
-      (finding, index) => `## Finding ${index + 1}: ${finding.title}
+  let index = 0;
+
+  return actionPriorityOrder
+    .map((priority) => {
+      const findings = checklist.findings.filter((finding) => (finding.actionPriority ?? "recommended") === priority);
+      if (findings.length === 0) return "";
+
+      const formattedFindings = findings
+        .map((finding) => {
+          index += 1;
+
+          return `### Finding ${index}: ${finding.title}
 
 - Severity: ${finding.severity}
 - Action priority: ${finding.actionPriority ?? "recommended"}
@@ -82,8 +99,13 @@ ${(finding.verification ?? ["Re-run Vibe and confirm the finding is resolved."])
 
 ### Implementation prompt
 
-${finding.prompt}`,
-    )
+${finding.prompt}`;
+        })
+        .join("\n\n");
+
+      return `## ${actionPriorityLabel[priority]} Findings\n\n${formattedFindings}`;
+    })
+    .filter(Boolean)
     .join("\n\n");
 }
 

@@ -86,6 +86,8 @@ const actionPriorityClass: Record<ActionPriority, string> = {
   optional: "border-[#315f46] bg-[#07130d] text-[#a7f35b]",
 };
 
+const actionPriorityOrder: ActionPriority[] = ["required", "recommended", "optional"];
+
 const scoreStatusLabel: Record<ReturnType<typeof buildScoreBreakdown>[number]["status"], string> = {
   clear: "Clear",
   watch: "Watch",
@@ -1962,6 +1964,7 @@ function DatabaseArchive({
 
 function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
   const [copied, setCopied] = useState(false);
+  const [copiedRequired, setCopiedRequired] = useState(false);
   const markdownReport = useMemo(
     () =>
       formatMarkdownReport({
@@ -1972,11 +1975,41 @@ function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
       }),
     [scan],
   );
+  const requiredFixes = useMemo(
+    () =>
+      scan.checklist.findings.filter(
+        (finding) => finding.actionPriority === "required" && finding.status !== "ignored",
+      ),
+    [scan.checklist.findings],
+  );
+  const requiredFixesText = useMemo(() => {
+    if (requiredFixes.length === 0) {
+      return "No required fixes are currently open for this scan.";
+    }
+
+    return requiredFixes
+      .map(
+        (finding, index) => `${index + 1}. ${finding.title}
+Category: ${finding.category}
+Evidence: ${finding.evidence}
+Fix: ${finding.fix}
+
+Prompt:
+${finding.prompt}`,
+      )
+      .join("\n\n---\n\n");
+  }, [requiredFixes]);
 
   async function copyReport() {
     await navigator.clipboard?.writeText(markdownReport);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  async function copyRequiredFixes() {
+    await navigator.clipboard?.writeText(requiredFixesText);
+    setCopiedRequired(true);
+    window.setTimeout(() => setCopiedRequired(false), 1600);
   }
 
   const generation = scan.report.generation;
@@ -2013,13 +2046,23 @@ function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
             {scan.report.readinessLabel}
           </h2>
           <p className="mt-5 max-w-xl text-base leading-7 text-[#d9d9d9]">{scan.report.interpretation}</p>
-          <button
-            onClick={copyReport}
-            className="mono mt-7 inline-flex items-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#111212]"
-          >
-            <Clipboard className="h-4 w-4" aria-hidden="true" />
-            {copied ? "Copied report" : "Copy report"}
-          </button>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <button
+              onClick={copyReport}
+              className="mono inline-flex items-center gap-2 rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[#111212]"
+            >
+              <Clipboard className="h-4 w-4" aria-hidden="true" />
+              {copied ? "Copied report" : "Copy report"}
+            </button>
+            <button
+              onClick={copyRequiredFixes}
+              disabled={requiredFixes.length === 0}
+              className="mono inline-flex items-center gap-2 rounded-full border border-[#3d3d3d] px-5 py-3 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white focus:outline-none focus:ring-2 focus:ring-[#fc74dd] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Clipboard className="h-4 w-4" aria-hidden="true" />
+              {copiedRequired ? "Copied required" : `Copy required fixes (${requiredFixes.length})`}
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6">
@@ -2391,6 +2434,16 @@ function FindingsList({
       }),
     [categoryFilter, findings, severityFilter],
   );
+  const groupedFindings = useMemo(
+    () =>
+      actionPriorityOrder
+        .map((priority) => ({
+          priority,
+          findings: visibleFindings.filter((finding) => (finding.actionPriority ?? "recommended") === priority),
+        }))
+        .filter((group) => group.findings.length > 0),
+    [visibleFindings],
+  );
 
   useEffect(() => {
     if (visibleFindings.length === 0) return;
@@ -2444,40 +2497,56 @@ function FindingsList({
           </div>
         )}
 
-        {visibleFindings.map((finding) => (
-          <button
-            key={finding.id}
-            onClick={() => onSelect(finding.id)}
-            className={`w-full rounded-[24px] border p-5 text-left transition ${
-              selectedId === finding.id
-                ? "border-[#fc74dd] bg-[#1d1a1a]"
-                : "border-transparent bg-[#111212] hover:border-[#3d3d3d] hover:bg-[#1d1a1a]"
-            }`}
-          >
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span className={`mono text-[10px] ${severityClass[finding.severity]}`}>
-                {severityLabel[finding.severity]}
+        {groupedFindings.map((group) => (
+          <div key={group.priority} className="col-span-full">
+            <div className="mb-3 flex items-center gap-3 px-1">
+              <span className={`mono rounded-full border px-3 py-1 text-[9px] ${actionPriorityClass[group.priority]}`}>
+                {actionPriorityLabel[group.priority]}
               </span>
-              {finding.actionPriority && (
-                <span className={`mono rounded-full border px-3 py-1 text-[9px] ${actionPriorityClass[finding.actionPriority]}`}>
-                  {actionPriorityLabel[finding.actionPriority]}
-                </span>
-              )}
-              <span className="mono rounded-full border border-[#3d3d3d] px-3 py-1 text-[9px] text-[#d9d9d9]">
-                {finding.category}
-              </span>
-              <span className="mono rounded-full border border-[#3d3d3d] px-3 py-1 text-[9px] text-[#d9d9d9]">
-                {finding.status}
-              </span>
-            </div>
-            <h3 className="text-xl font-semibold tracking-[-0.02em]">{finding.title}</h3>
-            <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d9d9d9]">{finding.impact}</p>
-            {finding.status === "ignored" && finding.statusReason && (
-              <p className="mt-3 rounded-[16px] border border-[#3d3d3d] px-3 py-2 text-xs leading-5 text-[#b8b3b3]">
-                Not relevant: {finding.statusReason}
+              <p className="mono text-[9px] text-[#9b9696]">
+                {group.findings.length} finding{group.findings.length === 1 ? "" : "s"}
               </p>
-            )}
-          </button>
+              <div className="h-px flex-1 bg-[#242424]" />
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              {group.findings.map((finding) => (
+                <button
+                  key={finding.id}
+                  onClick={() => onSelect(finding.id)}
+                  className={`w-full rounded-[24px] border p-5 text-left transition ${
+                    selectedId === finding.id
+                      ? "border-[#fc74dd] bg-[#1d1a1a]"
+                      : "border-transparent bg-[#111212] hover:border-[#3d3d3d] hover:bg-[#1d1a1a]"
+                  }`}
+                >
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <span className={`mono text-[10px] ${severityClass[finding.severity]}`}>
+                      {severityLabel[finding.severity]}
+                    </span>
+                    {finding.actionPriority && (
+                      <span className={`mono rounded-full border px-3 py-1 text-[9px] ${actionPriorityClass[finding.actionPriority]}`}>
+                        {actionPriorityLabel[finding.actionPriority]}
+                      </span>
+                    )}
+                    <span className="mono rounded-full border border-[#3d3d3d] px-3 py-1 text-[9px] text-[#d9d9d9]">
+                      {finding.category}
+                    </span>
+                    <span className="mono rounded-full border border-[#3d3d3d] px-3 py-1 text-[9px] text-[#d9d9d9]">
+                      {finding.status}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-semibold tracking-[-0.02em]">{finding.title}</h3>
+                  <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d9d9d9]">{finding.impact}</p>
+                  {finding.status === "ignored" && finding.statusReason && (
+                    <p className="mt-3 rounded-[16px] border border-[#3d3d3d] px-3 py-2 text-xs leading-5 text-[#b8b3b3]">
+                      Not relevant: {finding.statusReason}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </section>
