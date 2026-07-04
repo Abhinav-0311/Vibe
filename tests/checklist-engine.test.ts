@@ -62,6 +62,14 @@ const prototypeContext: AuditContext = {
   storesUserData: false,
 };
 
+const portfolioContext: AuditContext = {
+  appType: "content-site",
+  stage: "prototype",
+  hasPayments: false,
+  hasUserAccounts: false,
+  storesUserData: false,
+};
+
 const launchContext: AuditContext = {
   appType: "saas",
   stage: "launch-prep",
@@ -83,6 +91,23 @@ describe("runChecklist", () => {
     expect(findingIds).not.toContain("missing-auth");
     expect(findingIds).not.toContain("missing-stripe");
     expect(findingIds).not.toContain("missing-middleware");
+  });
+
+  it("keeps simple portfolio scans focused on public-site readiness", () => {
+    const result = runChecklist(baseFacts, portfolioContext);
+    const findingIds = result.findings.map((finding) => finding.id);
+    const severityById = new Map(result.findings.map((finding) => [finding.id, finding.severity]));
+
+    expect(result.context.appType).toBe("content-site");
+    expect(result.score).toBe(88);
+    expect(findingIds).toEqual(["missing-env-example", "missing-tests", "missing-ai-rules"]);
+    expect(severityById.get("missing-env-example")).toBe("low");
+    expect(severityById.get("missing-tests")).toBe("medium");
+    expect(severityById.get("missing-ai-rules")).toBe("medium");
+    expect(findingIds).not.toContain("missing-auth");
+    expect(findingIds).not.toContain("missing-stripe");
+    expect(findingIds).not.toContain("missing-analytics");
+    expect(findingIds).not.toContain("missing-error-tracking");
   });
 
   it("becomes stricter when the app is preparing for launch with users and payments", () => {

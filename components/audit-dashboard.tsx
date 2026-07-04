@@ -49,11 +49,11 @@ type ProjectDiscoveryState = "loading" | "ready" | "error";
 type ProjectSourceMode = "local" | "github" | "upload";
 
 const defaultAuditContext: AuditContext = {
-  appType: "saas",
-  stage: "launch-prep",
+  appType: "content-site",
+  stage: "prototype",
   hasPayments: false,
-  hasUserAccounts: true,
-  storesUserData: true,
+  hasUserAccounts: false,
+  storesUserData: false,
 };
 
 const triageStorageKey = "vibe:finding-status-overrides";

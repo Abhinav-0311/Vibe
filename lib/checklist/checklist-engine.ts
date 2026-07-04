@@ -49,9 +49,22 @@ function formatProjectSignals(facts: ScannerFacts) {
   return `${facts.framework.name} (${facts.framework.confidence} confidence), ${facts.packageManager}, ${routes}, ${dependencyCount}.`;
 }
 
+function isSimpleContentProject(context: AuditContext) {
+  return (
+    context.appType === "content-site" &&
+    !context.hasUserAccounts &&
+    !context.hasPayments &&
+    !context.storesUserData
+  );
+}
+
 function severityReasonFor(finding: AuditFinding, context: AuditContext) {
   const severityLabel = finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1);
   const contextPrefix = `${severityLabel} because this ${context.stage} ${context.appType}`;
+
+  if (isSimpleContentProject(context)) {
+    return `${severityLabel} because this is a public content or portfolio site, so Vibe focuses on deployability, accessibility, clear UI states, and basic maintainability instead of SaaS-only systems.`;
+  }
 
   if (finding.severity === "critical") {
     return `${contextPrefix} has a gap that can directly expose users, credentials, payments, or account access before normal product usage reveals it.`;
@@ -311,20 +324,24 @@ const rules: ChecklistRule[] = [
     id: "missing-env-example",
     category: "Deployment",
     severity: "high",
-    evaluate: (facts) => {
+    evaluate: (facts, context) => {
       if (facts.signals.hasEnvExample) return null;
+      const simpleContent = isSimpleContentProject(context);
 
       return finding({
         id: "missing-env-example",
         title: "Environment variable example file is missing",
         category: "Deployment",
-        severity: "high",
+        severity: simpleContent ? "low" : "high",
         evidence: "No .env.example file was detected in the project root.",
-        impact:
-          "New deployments and collaborators can miss required secrets or configure production incorrectly.",
-        fix: "Create a .env.example file that lists required environment variables without real secret values.",
+        impact: simpleContent
+          ? "A portfolio may not need secrets, but a small example file or note helps future deployment and handoff stay clear."
+          : "New deployments and collaborators can miss required secrets or configure production incorrectly.",
+        fix: simpleContent
+          ? "Add a minimal .env.example only if the project reads environment variables, otherwise document that no env vars are required."
+          : "Create a .env.example file that lists required environment variables without real secret values.",
         prompt:
-          "Inspect the project for environment variable usage. Create a safe .env.example file that lists every required variable with placeholder values, add short comments where useful, and do not include real secrets.",
+          "Inspect the project for environment variable usage. If variables are used, create a safe .env.example file with placeholder values. If none are used, add a short setup note saying no environment variables are required. Do not include real secrets.",
       });
     },
   },
@@ -430,8 +447,9 @@ const rules: ChecklistRule[] = [
     id: "missing-tests",
     category: "Testing",
     severity: "high",
-    evaluate: (facts) => {
+    evaluate: (facts, context) => {
       if (facts.signals.hasTests) return null;
+      const simpleContent = isSimpleContentProject(context);
 
       const frameworkName =
         facts.framework.name === "Unknown" ? "detected JavaScript or TypeScript" : facts.framework.name;
@@ -440,13 +458,18 @@ const rules: ChecklistRule[] = [
         id: "missing-tests",
         title: "No test setup detected",
         category: "Testing",
-        severity: "high",
+        severity: simpleContent ? "medium" : "high",
         evidence: "No tests, __tests__ folder, Vitest config, Jest config, or Playwright config was detected.",
-        impact:
-          "Core behavior can regress silently as the app changes, especially around auth, payments, and scanner logic.",
-        fix: "Add a minimal test setup and start with tests for the project's core domain logic.",
+        impact: simpleContent
+          ? "A portfolio can ship without a large test suite, but a build smoke check or one basic component test prevents broken deploys."
+          : "Core behavior can regress silently as the app changes, especially around auth, payments, and scanner logic.",
+        fix: simpleContent
+          ? "Add the lightest verification path: build script, lint script, or one smoke test for the main page."
+          : "Add a minimal test setup and start with tests for the project's core domain logic.",
         prompt:
-          `Add a minimal test setup appropriate for this ${frameworkName} project. Prioritize unit tests for core domain logic before UI tests. Keep the setup lightweight and document the test command in package.json.`,
+          simpleContent
+            ? `Add lightweight verification for this ${frameworkName} portfolio or content site. Prefer a reliable build command, lint command, or one smoke test that confirms the main page renders. Keep it minimal and document the command in package.json.`
+            : `Add a minimal test setup appropriate for this ${frameworkName} project. Prioritize unit tests for core domain logic before UI tests. Keep the setup lightweight and document the test command in package.json.`,
       });
     },
   },
@@ -454,20 +477,24 @@ const rules: ChecklistRule[] = [
     id: "missing-ui-loading-state",
     category: "UI/UX",
     severity: "medium",
-    evaluate: (facts) => {
+    evaluate: (facts, context) => {
       if (!facts.uiEvidence || facts.uiEvidence.hasLoadingState) return null;
+      const simpleContent = isSimpleContentProject(context);
 
       return finding({
         id: "missing-ui-loading-state",
         title: "No obvious loading state detected",
         category: "UI/UX",
-        severity: "medium",
+        severity: simpleContent ? "low" : "medium",
         evidence: `Scanned ${facts.uiEvidence.filesScanned.length} UI source file(s), but no loading boundary, Suspense fallback, loader, skeleton, or isLoading state was detected.`,
-        impact:
-          "Users may see frozen screens or unclear delays while data, uploads, scans, auth, or navigation work in the background.",
-        fix: "Add clear loading states around slow actions and route-level data transitions.",
+        impact: simpleContent
+          ? "Mostly static portfolios may not need loading UI unless they fetch remote data, submit forms, or lazy-load heavy sections."
+          : "Users may see frozen screens or unclear delays while data, uploads, scans, auth, or navigation work in the background.",
+        fix: simpleContent
+          ? "Add loading feedback only around real async work such as contact forms, project filters, or remote content."
+          : "Add clear loading states around slow actions and route-level data transitions.",
         prompt:
-          "Inspect the app's main async workflows and add lightweight loading states. Prefer route-level loading.tsx where appropriate, use clear button disabled/loading feedback for submitted actions, and keep the design consistent with the existing UI.",
+          "Inspect the app's real async workflows. If the site is static, do not add fake loading UI. If it submits forms, loads remote content, or performs slow actions, add lightweight feedback and keep the design consistent with the existing UI.",
       });
     },
   },
@@ -475,20 +502,24 @@ const rules: ChecklistRule[] = [
     id: "missing-ui-error-state",
     category: "UI/UX",
     severity: "high",
-    evaluate: (facts) => {
+    evaluate: (facts, context) => {
       if (!facts.uiEvidence || facts.uiEvidence.hasErrorState) return null;
+      const simpleContent = isSimpleContentProject(context);
 
       return finding({
         id: "missing-ui-error-state",
         title: "No obvious user-facing error state detected",
         category: "UI/UX",
-        severity: "high",
+        severity: simpleContent ? "medium" : "high",
         evidence: `Scanned ${facts.uiEvidence.filesScanned.length} UI source file(s), but no error boundary, alert role, ErrorState component, or visible error copy was detected.`,
-        impact:
-          "When requests fail, new users may hit a dead end instead of understanding what happened or how to retry.",
-        fix: "Add user-facing error states with clear copy and recovery actions for important workflows.",
+        impact: simpleContent
+          ? "For a portfolio, this matters mainly where users submit contact forms, load external projects, or navigate broken dynamic routes."
+          : "When requests fail, new users may hit a dead end instead of understanding what happened or how to retry.",
+        fix: simpleContent
+          ? "Add clear failure copy only for real failure points such as contact forms, dynamic routes, and external content."
+          : "Add user-facing error states with clear copy and recovery actions for important workflows.",
         prompt:
-          "Inspect the primary user flows and add clear error states. Include concise human-readable copy, a retry or recovery action where possible, accessible alert semantics for important failures, and tests or manual verification for failed requests.",
+          "Inspect the primary user flows and identify real failure points. Add concise user-facing error copy, a retry or recovery action where useful, and accessible alert semantics for important failures. Do not add generic error UI to static sections that cannot fail.",
       });
     },
   },
@@ -826,19 +857,26 @@ const rules: ChecklistRule[] = [
     severity: "medium",
     evaluate: (facts, context) => {
       if (facts.signals.hasAnalyticsDependency) return null;
+      if (isSimpleContentProject(context) && context.stage === "prototype") return null;
       if (context.stage === "prototype" && facts.signals.hasAnalyticsPlan) return null;
+      const simpleContent = isSimpleContentProject(context);
 
       return finding({
         id: "missing-analytics",
         title: "No product analytics detected",
         category: "Analytics",
-        severity: "medium",
+        severity: simpleContent ? "low" : "medium",
         evidence: "No PostHog, Vercel Analytics, Mixpanel, or similar analytics dependency was detected.",
-        impact:
-          "You will not know where users drop off, which findings they copy, or whether scans lead to fixes.",
-        fix: "Track a small set of meaningful product events.",
+        impact: simpleContent
+          ? "You may not know which portfolio sections visitors view or whether contact links are working, but this is optional for a simple public site."
+          : "You will not know where users drop off, which findings they copy, or whether scans lead to fixes.",
+        fix: simpleContent
+          ? "Add privacy-friendly analytics only if you want traffic insight."
+          : "Track a small set of meaningful product events.",
         prompt:
-          "Add a minimal analytics plan for this product. Define events for project created, scan started, scan completed, finding selected, prompt copied, and scan failed. Recommend the lightest implementation path for a Next.js app.",
+          simpleContent
+            ? "Recommend a privacy-friendly analytics option for this portfolio or content site. Track only basic page views and key outbound/contact clicks, document consent/privacy implications, and avoid invasive event collection."
+            : "Add a minimal analytics plan for this product. Define events for project created, scan started, scan completed, finding selected, prompt copied, and scan failed. Recommend the lightest implementation path for a Next.js app.",
       });
     },
   },
@@ -848,6 +886,7 @@ const rules: ChecklistRule[] = [
     severity: "high",
     evaluate: (facts, context) => {
       if (facts.signals.hasErrorTrackingDependency) return null;
+      if (isSimpleContentProject(context) && context.stage === "prototype") return null;
       if (context.stage === "prototype" && facts.signals.hasObservabilityPlan) return null;
 
       if (context.stage === "prototype") {
@@ -869,13 +908,18 @@ const rules: ChecklistRule[] = [
         id: "missing-error-tracking",
         title: "No error tracking detected",
         category: "Reliability",
-        severity: "high",
+        severity: isSimpleContentProject(context) ? "low" : "high",
         evidence: "No Sentry, Highlight, Bugsnag, or equivalent error tracking dependency was detected.",
-        impact:
-          "Scanner failures, API errors, and report generation issues can happen silently in production.",
-        fix: "Add error tracking before real users run scans.",
+        impact: isSimpleContentProject(context)
+          ? "For a static portfolio, hosting build checks and browser testing are usually more important than full error tracking."
+          : "Scanner failures, API errors, and report generation issues can happen silently in production.",
+        fix: isSimpleContentProject(context)
+          ? "Use lightweight monitoring only if the site has forms, dynamic routes, or client-side integrations."
+          : "Add error tracking before real users run scans.",
         prompt:
-          "Add production error tracking to this Next.js app. Capture API route errors, scanner failures, and client rendering errors. Keep the setup minimal and document required environment variables in .env.example.",
+          isSimpleContentProject(context)
+            ? "Review whether this portfolio has forms, dynamic routes, or client-side integrations that can fail. If yes, recommend lightweight monitoring and document required environment variables. If no, rely on build checks and manual browser verification."
+            : "Add production error tracking to this Next.js app. Capture API route errors, scanner failures, and client rendering errors. Keep the setup minimal and document required environment variables in .env.example.",
       });
     },
   },
@@ -883,18 +927,22 @@ const rules: ChecklistRule[] = [
     id: "missing-ai-rules",
     category: "AI Workspace",
     severity: "high",
-    evaluate: (facts) => {
+    evaluate: (facts, context) => {
       if (facts.signals.hasAiRules) return null;
+      const simpleContent = isSimpleContentProject(context);
 
       return finding({
         id: "missing-ai-rules",
         title: "No durable AI rules file detected",
         category: "AI Workspace",
-        severity: "high",
+        severity: simpleContent ? "medium" : "high",
         evidence: "No AGENTS.md, .cursor/rules, or .cursorrules file was detected in the project root.",
-        impact:
-          "AI coding tools may lose product context, design constraints, architecture boundaries, and mentoring expectations between sessions.",
-        fix: "Add a project-level AI rules file that captures operating rules and product context.",
+        impact: simpleContent
+          ? "For a portfolio, AI rules mainly protect visual taste, content tone, responsive behavior, and what should not be overbuilt."
+          : "AI coding tools may lose product context, design constraints, architecture boundaries, and mentoring expectations between sessions.",
+        fix: simpleContent
+          ? "Add a short project rules file covering brand voice, design constraints, content boundaries, and deployment notes."
+          : "Add a project-level AI rules file that captures operating rules and product context.",
         prompt:
           "Create a project-specific AGENTS.md. Include the product purpose, target user, technical stack, design constraints, coding standards, safety boundaries, and instructions to explain important steps before implementation.",
       });
@@ -903,7 +951,7 @@ const rules: ChecklistRule[] = [
 ];
 
 const defaultContext: AuditContext = {
-  appType: "saas",
+  appType: "content-site",
   stage: "prototype",
   hasPayments: false,
   hasUserAccounts: false,

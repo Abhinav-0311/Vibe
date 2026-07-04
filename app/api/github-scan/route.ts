@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
 
     const params = new URLSearchParams({
-      appType: body.appType ?? "saas",
+      appType: body.appType ?? "content-site",
       stage: body.stage ?? "prototype",
       hasPayments: String(Boolean(body.hasPayments)),
       hasUserAccounts: String(Boolean(body.hasUserAccounts)),
