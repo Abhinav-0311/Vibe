@@ -264,4 +264,29 @@ describe("scanProject API route discovery", () => {
     expect(facts.uiEvidence?.imageWithoutAltFiles).toEqual([]);
     expect(facts.uiEvidence?.unlabeledControlFiles).toEqual([]);
   });
+
+  it("detects portfolio contact, resume, social, and project detail signals", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "app/page.tsx",
+      `export default function Page() {
+        return (
+          <main>
+            <a href="mailto:hello@example.com">Get in touch</a>
+            <a href="/resume.pdf">Resume</a>
+            <a href="https://github.com/example">GitHub</a>
+            <section>Selected work with tech stack and live demo links.</section>
+          </main>
+        );
+      }\n`,
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.uiEvidence?.portfolioContactFiles).toEqual(["app/page.tsx"]);
+    expect(facts.uiEvidence?.portfolioResumeFiles).toEqual(["app/page.tsx"]);
+    expect(facts.uiEvidence?.portfolioSocialLinkFiles).toEqual(["app/page.tsx"]);
+    expect(facts.uiEvidence?.portfolioProjectDetailFiles).toEqual(["app/page.tsx"]);
+  });
 });

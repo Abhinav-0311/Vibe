@@ -407,6 +407,10 @@ describe("runChecklist", () => {
         imageWithoutAltFiles: ["app/page.tsx"],
         unlabeledControlFiles: ["app/page.tsx"],
         responsiveClassFiles: [],
+        portfolioContactFiles: [],
+        portfolioResumeFiles: [],
+        portfolioSocialLinkFiles: [],
+        portfolioProjectDetailFiles: [],
       },
     };
 
@@ -423,5 +427,39 @@ describe("runChecklist", () => {
       commonMistake: expect.stringContaining("placeholder"),
       goodFix: expect.stringContaining("visible label"),
     });
+  });
+
+  it("adds portfolio-specific findings only for simple content sites", () => {
+    const portfolioFacts: ScannerFacts = {
+      ...baseFacts,
+      uiEvidence: {
+        filesScanned: ["app/page.tsx"],
+        hasLoadingState: true,
+        hasErrorState: true,
+        hasNotFoundState: false,
+        placeholderCopyFiles: [],
+        imageWithoutAltFiles: [],
+        unlabeledControlFiles: [],
+        responsiveClassFiles: ["app/page.tsx"],
+        portfolioContactFiles: [],
+        portfolioResumeFiles: [],
+        portfolioSocialLinkFiles: [],
+        portfolioProjectDetailFiles: [],
+      },
+    };
+
+    const portfolioResult = runChecklist(portfolioFacts, portfolioContext);
+    const saasResult = runChecklist(portfolioFacts, launchContext);
+    const portfolioFindingIds = portfolioResult.findings.map((finding) => finding.id);
+    const saasFindingIds = saasResult.findings.map((finding) => finding.id);
+
+    expect(portfolioFindingIds).toContain("portfolio-contact-path-missing");
+    expect(portfolioFindingIds).toContain("portfolio-resume-link-missing");
+    expect(portfolioFindingIds).toContain("portfolio-social-proof-missing");
+    expect(portfolioFindingIds).toContain("portfolio-project-detail-missing");
+    expect(
+      portfolioResult.findings.find((finding) => finding.id === "portfolio-resume-link-missing")?.actionPriority,
+    ).toBe("optional");
+    expect(saasFindingIds).not.toContain("portfolio-contact-path-missing");
   });
 });

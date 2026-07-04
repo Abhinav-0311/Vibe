@@ -48,6 +48,10 @@ export type ScannerFacts = {
     imageWithoutAltFiles: string[];
     unlabeledControlFiles: string[];
     responsiveClassFiles: string[];
+    portfolioContactFiles: string[];
+    portfolioResumeFiles: string[];
+    portfolioSocialLinkFiles: string[];
+    portfolioProjectDetailFiles: string[];
   };
   signals: {
     hasPackageJson: boolean;

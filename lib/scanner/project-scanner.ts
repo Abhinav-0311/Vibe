@@ -360,6 +360,10 @@ async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile
   const readableSamples = samples.filter((item): item is { relativeFile: string; sample: string } => Boolean(item.sample));
   const placeholderPattern = /["'`][^"'`]*(?:lorem ipsum|coming soon|sample text|dummy data)[^"'`]*["'`]/i;
   const responsiveClassPattern = /\b(?:sm|md|lg|xl|2xl):[a-z0-9-[\]/:%#.]+/i;
+  const contactPattern = /(?:mailto:|contact|book\s+(?:a\s+)?call|hire\s+me|get\s+in\s+touch|let'?s\s+talk)/i;
+  const resumePattern = /(?:resume|résumé|cv|curriculum\s+vitae)(?:\.(?:pdf|docx?))?/i;
+  const socialLinkPattern = /(?:github\.com|linkedin\.com|x\.com|twitter\.com|dribbble\.com|behance\.net)/i;
+  const projectDetailPattern = /(?:case\s+study|projects?|selected\s+work|built\s+with|tech\s+stack|github\.com|live\s+demo)/i;
 
   return {
     filesScanned: readableSamples.map((item) => item.relativeFile),
@@ -379,6 +383,18 @@ async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile
       .map(({ relativeFile }) => relativeFile),
     responsiveClassFiles: readableSamples
       .filter(({ sample }) => responsiveClassPattern.test(sample))
+      .map(({ relativeFile }) => relativeFile),
+    portfolioContactFiles: readableSamples
+      .filter(({ sample }) => contactPattern.test(sample))
+      .map(({ relativeFile }) => relativeFile),
+    portfolioResumeFiles: readableSamples
+      .filter(({ sample }) => resumePattern.test(sample))
+      .map(({ relativeFile }) => relativeFile),
+    portfolioSocialLinkFiles: readableSamples
+      .filter(({ sample }) => socialLinkPattern.test(sample))
+      .map(({ relativeFile }) => relativeFile),
+    portfolioProjectDetailFiles: readableSamples
+      .filter(({ sample }) => projectDetailPattern.test(sample))
       .map(({ relativeFile }) => relativeFile),
   };
 }

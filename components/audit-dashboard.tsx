@@ -1408,6 +1408,26 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
                 detail: "Responsive class usage was detected in UI files",
                 detected: scan.facts.uiEvidence.responsiveClassFiles.length > 0,
               },
+              {
+                label: "Portfolio contact",
+                detail: "Contact, mailto, hire-me, or booking path",
+                detected: scan.facts.uiEvidence.portfolioContactFiles.length > 0,
+              },
+              {
+                label: "Portfolio resume",
+                detail: "Resume or CV link",
+                detected: scan.facts.uiEvidence.portfolioResumeFiles.length > 0,
+              },
+              {
+                label: "Professional links",
+                detail: "GitHub, LinkedIn, or relevant social proof",
+                detected: scan.facts.uiEvidence.portfolioSocialLinkFiles.length > 0,
+              },
+              {
+                label: "Project detail",
+                detail: "Selected work, case study, stack, repo, or demo detail",
+                detected: scan.facts.uiEvidence.portfolioProjectDetailFiles.length > 0,
+              },
             ]
           : []),
         {

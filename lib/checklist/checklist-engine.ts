@@ -610,6 +610,101 @@ const rules: ChecklistRule[] = [
     },
   },
   {
+    id: "portfolio-contact-path-missing",
+    category: "Portfolio",
+    severity: "medium",
+    evaluate: (facts, context) => {
+      if (!isSimpleContentProject(context)) return null;
+      if (!facts.uiEvidence) return null;
+      if ((facts.uiEvidence?.portfolioContactFiles ?? []).length > 0) return null;
+
+      return finding({
+        id: "portfolio-contact-path-missing",
+        title: "No clear contact path detected",
+        category: "Portfolio",
+        severity: "medium",
+        evidence:
+          "No mailto link, contact section, hire-me CTA, booking CTA, or get-in-touch copy was detected in scanned UI files.",
+        impact:
+          "A portfolio can look polished but still fail its main job if a recruiter, client, or collaborator cannot quickly contact the owner.",
+        fix: "Add one obvious contact path near the hero or footer.",
+        prompt:
+          "Inspect the portfolio homepage and add one clear contact path. Prefer a visible email/mailto link, contact section, booking link, or concise hire-me CTA. Keep it tasteful, avoid noisy banners, and verify it works on mobile.",
+      });
+    },
+  },
+  {
+    id: "portfolio-resume-link-missing",
+    category: "Portfolio",
+    severity: "low",
+    evaluate: (facts, context) => {
+      if (!isSimpleContentProject(context)) return null;
+      if (!facts.uiEvidence) return null;
+      if ((facts.uiEvidence?.portfolioResumeFiles ?? []).length > 0) return null;
+
+      return finding({
+        id: "portfolio-resume-link-missing",
+        title: "No resume or CV link detected",
+        category: "Portfolio",
+        severity: "low",
+        evidence: "No resume, résumé, CV, or downloadable profile link was detected in scanned UI files.",
+        impact:
+          "Hiring reviewers often need a fast PDF or CV path after the portfolio creates interest.",
+        fix: "Add a restrained resume or CV link if this portfolio is meant for hiring.",
+        prompt:
+          "Add a tasteful resume/CV link only if this portfolio is used for hiring or freelance leads. Place it where users naturally look after the hero or in the footer, use clear link text, and avoid making it compete with the primary contact CTA.",
+      });
+    },
+  },
+  {
+    id: "portfolio-social-proof-missing",
+    category: "Portfolio",
+    severity: "low",
+    evaluate: (facts, context) => {
+      if (!isSimpleContentProject(context)) return null;
+      if (!facts.uiEvidence) return null;
+      if ((facts.uiEvidence?.portfolioSocialLinkFiles ?? []).length > 0) return null;
+
+      return finding({
+        id: "portfolio-social-proof-missing",
+        title: "No professional social links detected",
+        category: "Portfolio",
+        severity: "low",
+        evidence:
+          "No GitHub, LinkedIn, X/Twitter, Dribbble, or Behance link was detected in scanned UI files.",
+        impact:
+          "For portfolio visitors, external profiles help validate real work, contribution history, and professional identity.",
+        fix: "Add one or two relevant professional links.",
+        prompt:
+          "Add only the professional social links that strengthen this portfolio. For developers, prioritize GitHub and LinkedIn. Keep icons accessible with labels, avoid clutter, and verify links open correctly.",
+      });
+    },
+  },
+  {
+    id: "portfolio-project-detail-missing",
+    category: "Portfolio",
+    severity: "medium",
+    evaluate: (facts, context) => {
+      if (!isSimpleContentProject(context)) return null;
+      if (!facts.uiEvidence) return null;
+      if ((facts.uiEvidence?.portfolioProjectDetailFiles ?? []).length > 0) return null;
+
+      return finding({
+        id: "portfolio-project-detail-missing",
+        title: "Project work lacks clear detail signals",
+        category: "Portfolio",
+        severity: "medium",
+        evidence:
+          "No project, selected work, case study, tech stack, GitHub link, or live-demo copy was detected in scanned UI files.",
+        impact:
+          "A portfolio needs enough project detail for reviewers to understand what was built, what role the owner played, and why it matters.",
+        fix: "Add concise project cards or case-study details with outcome, stack, and proof links.",
+        prompt:
+          "Review the portfolio project section. Add concise project detail: what was built, the stack, the owner's role, a result or learning, and proof links such as GitHub or live demo where available. Keep the layout quiet and scannable.",
+      });
+    },
+  },
+  {
     id: "missing-middleware",
     category: "Security",
     severity: "medium",
