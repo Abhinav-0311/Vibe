@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
 
 function loadLocalEnv() {
   const envPath = join(process.cwd(), ".env");
@@ -26,9 +26,13 @@ function loadLocalEnv() {
 
 loadLocalEnv();
 
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  "postgresql://postgres:postgres@localhost:5432/vibe?schema=public";
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   datasource: {
-    url: env("DATABASE_URL"),
+    url: databaseUrl,
   },
 });

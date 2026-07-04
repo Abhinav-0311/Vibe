@@ -35,6 +35,8 @@ Required for a basic public launch:
 - `DATABASE_URL`
 - `VIBE_ENABLE_LOCAL_SCAN=false`
 
+Set `DATABASE_URL` before the first Vercel deployment. The build can generate Prisma Client without it, but saved scans and `/api/health` require a real managed PostgreSQL connection.
+
 Required only for private GitHub repositories:
 
 - `GITHUB_CLIENT_ID`
