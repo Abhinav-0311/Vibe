@@ -15,6 +15,7 @@ Vibe is currently a single-user MVP. A public deployment may scan uploaded ZIP a
 
 - `NEXT_PUBLIC_APP_URL`: canonical HTTPS deployment URL
 - `DATABASE_URL`: managed PostgreSQL connection string
+- `VIBE_RATE_LIMIT_SECRET`: random secret used to hash public scan limiter keys
 - `OPENAI_REPORT_ENABLED`: keep `false` unless the deployment is trusted
 - `OPENAI_API_KEY`: required only when AI enhancement is enabled
 - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: required for private repositories
@@ -39,7 +40,7 @@ Recommended Vercel setup:
 4. Keep `VIBE_ENABLE_LOCAL_SCAN` unset or set it to `false`.
 5. Keep `OPENAI_REPORT_ENABLED=false` unless the deployment is authenticated and trusted.
 6. Configure GitHub OAuth only if private repository scanning or GitHub issue creation is needed.
-7. Run `npm.cmd run db:deploy` against the managed database before relying on saved scans.
+7. Set `VIBE_RATE_LIMIT_SECRET` and run `npm.cmd run db:deploy` against the managed database before relying on saved scans or shared public scan limits.
 
 ## Deployment Sequence
 
@@ -76,3 +77,4 @@ The callback origin must match `NEXT_PUBLIC_APP_URL`.
 - CI must pass tests and the production build for the deployed commit.
 - Logs must not contain repository archives, OAuth tokens, encryption keys, database URLs, or OpenAI keys.
 - Uploaded archives are temporary and must continue to be deleted after every success or failure path.
+- Confirm public GitHub and ZIP scans return HTTP `429` after four requests in one minute from the same test address; do not use a real customer address for this check.

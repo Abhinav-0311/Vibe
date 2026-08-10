@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { readAuditContext } from "@/lib/audit-context";
+import { readAuditContext, readAuditProfileMode } from "@/lib/audit-context";
 import { githubErrorPayload } from "@/lib/github/github-api";
 import { downloadGitHubRepoZip } from "@/lib/github/github-repo";
 import { getGitHubAccessToken } from "@/lib/github/github-session";
 import { createScanResponse } from "@/lib/scan-response";
+import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
 import { extractProjectZipBuffer } from "@/lib/upload/zip-project";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,13 @@ export async function POST(request: Request) {
   let uploadedProject: Awaited<ReturnType<typeof extractProjectZipBuffer>> | null = null;
 
   try {
+    const rateLimit = await enforcePublicScanRateLimit(request, "github");
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many GitHub scans. Wait a minute before trying again." },
+        { status: 429, headers: { "Retry-After": rateLimit.retryAfterSeconds.toString() } },
+      );
+    }
     const body = (await request.json()) as {
       repoUrl?: string;
       branch?: string;
@@ -25,6 +33,7 @@ export async function POST(request: Request) {
       hasPayments?: boolean;
       hasUserAccounts?: boolean;
       storesUserData?: boolean;
+      profileMode?: string;
     };
 
     if (!body.repoUrl) {
@@ -37,6 +46,7 @@ export async function POST(request: Request) {
       hasPayments: String(Boolean(body.hasPayments)),
       hasUserAccounts: String(Boolean(body.hasUserAccounts)),
       storesUserData: String(Boolean(body.storesUserData)),
+      profileMode: body.profileMode ?? "auto",
     });
     const token = await getGitHubAccessToken();
     const archive = await downloadGitHubRepoZip(body.repoUrl, { token, branch: body.branch });
@@ -49,7 +59,7 @@ export async function POST(request: Request) {
         ...archive.repository,
         branch: archive.branch,
       },
-    }, archive.name);
+    }, archive.name, readAuditProfileMode(params));
 
     return NextResponse.json({
       ...response,
@@ -57,8 +67,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const payload = githubErrorPayload(error);
-    const status = payload.status === 500 && error instanceof Error ? 400 : payload.status;
-    return NextResponse.json(payload.body, { status });
+    return NextResponse.json(payload.body, { status: payload.status });
   } finally {
     await uploadedProject?.cleanup();
   }

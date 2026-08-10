@@ -38,6 +38,24 @@ describe("parseGitHubRepoUrl", () => {
 });
 
 describe("downloadGitHubRepoZip", () => {
+  it("shares one anonymous download between concurrent scans of the same repository", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4]), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const [first, second] = await Promise.all([
+      downloadGitHubRepoZip("https://github.com/owner/project"),
+      downloadGitHubRepoZip("https://github.com/owner/project"),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(second).toEqual(first);
+  });
+
   it("returns an actionable error when GitHub cannot be reached", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
 

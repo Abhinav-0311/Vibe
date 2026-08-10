@@ -241,8 +241,9 @@ function normalizeRoutePath(value: string) {
 function classifyRoute(route: string): DetectedApiRoute["signals"] {
   const normalized = route.toLowerCase();
   const signals: DetectedApiRoute["signals"] = [];
+  const isIntegrationOAuthRoute = /^\/api\/(?:github|gitlab|bitbucket|slack|notion)\/oauth(?:\/|$)/.test(normalized);
 
-  if (/(?:auth|login|signin|signup|register|password|session)/.test(normalized)) signals.push("auth");
+  if (!isIntegrationOAuthRoute && /(?:auth|login|signin|signup|register|password|session)/.test(normalized)) signals.push("auth");
   if (/(?:login|signin|signup|register|password)/.test(normalized)) signals.push("credential-auth");
   if (/(?:forgot|recover|reset)[-_\/]?(?:password)?|password[-_\/]?(?:forgot|recover|reset)/.test(normalized)) {
     signals.push("recovery");
@@ -320,6 +321,14 @@ function hasAccessibleImageUsage(source: string) {
   return imageTags.every((tag) => /\balt\s*=/.test(tag) || /\brole\s*=\s*["']presentation["']/.test(tag) || /\baria-hidden\s*=\s*{?true}?/.test(tag));
 }
 
+function jsxAttributeValue(tag: string, attribute: string) {
+  return tag.match(new RegExp(`\\b${attribute}\\s*=\\s*({[^}]+}|["'][^"']+["'])`, "i"))?.[1];
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function hasUnlabeledFormControl(source: string) {
   const controls = [
     ...Array.from(source.matchAll(/<(input|textarea)\b[\s\S]*?\/>/gi)).map((match) => ({
@@ -337,8 +346,8 @@ function hasUnlabeledFormControl(source: string) {
     if (/\btype\s*=\s*["'](?:hidden|submit|button|checkbox|radio|file)["']/i.test(tag)) return false;
     if (/\b(?:aria-label|aria-labelledby)\s*=/.test(tag)) return false;
 
-    const id = tag.match(/\bid\s*=\s*["']([^"']+)["']/)?.[1];
-    if (id && new RegExp(`<label\\b[^>]*(?:htmlFor|for)\\s*=\\s*["']${id}["']`, "i").test(source)) return false;
+    const id = jsxAttributeValue(tag, "id");
+    if (id && new RegExp(`<label\\b[^>]*(?:htmlFor|for)\\s*=\\s*${escapeRegExp(id)}`, "i").test(source)) return false;
 
     const beforeControl = source.slice(0, index);
     const nearestOpenLabel = beforeControl.lastIndexOf("<label");

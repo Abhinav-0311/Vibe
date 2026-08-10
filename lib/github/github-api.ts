@@ -21,6 +21,9 @@ export class GitHubApiError extends Error {
   }
 }
 
+// ponytail: per-instance cooldown; use shared rate-limit storage only after hosted users have identities and quotas.
+let publicRetryAt = 0;
+
 function readRetryAt(response: Response) {
   const retryAfter = response.headers.get("retry-after");
   if (retryAfter) {
@@ -78,6 +81,15 @@ export async function githubFetch(
     accept?: string;
   } = {},
 ) {
+  if (!options.token && publicRetryAt > Date.now()) {
+    throw new GitHubApiError(
+      "GitHub rate limit reached. Wait until the reset time before retrying.",
+      429,
+      "rate_limited",
+      new Date(publicRetryAt).toISOString(),
+    );
+  }
+
   let response: Response;
 
   try {
@@ -102,24 +114,49 @@ export async function githubFetch(
     );
   }
 
-  if (!response.ok) await throwGitHubError(response);
+  if (!response.ok) {
+    try {
+      await throwGitHubError(response);
+    } catch (error) {
+      if (!options.token && error instanceof GitHubApiError && error.code === "rate_limited" && error.retryAt) {
+        publicRetryAt = new Date(error.retryAt).getTime();
+      }
+
+      throw error;
+    }
+  }
   return response;
 }
 
+export function resetPublicGitHubCooldownForTests() {
+  publicRetryAt = 0;
+}
+
 export function githubErrorPayload(error: unknown) {
-  if (error instanceof GitHubApiError) {
+  const githubError = error instanceof GitHubApiError || (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: unknown }).name === "GitHubApiError" &&
+    typeof (error as { status?: unknown }).status === "number" &&
+    typeof (error as { code?: unknown }).code === "string" &&
+    typeof (error as { message?: unknown }).message === "string"
+  )
+    ? error as GitHubApiError
+    : null;
+
+  if (githubError) {
     return {
-      status: error.status,
+      status: githubError.status,
       body: {
-        error: error.message,
-        code: error.code,
-        ...(error.retryAt ? { retryAt: error.retryAt } : {}),
+        error: githubError.message,
+        code: githubError.code,
+        ...(githubError.retryAt ? { retryAt: githubError.retryAt } : {}),
       },
     };
   }
 
   return {
     status: 500,
-    body: { error: error instanceof Error ? error.message : "GitHub operation failed.", code: "github_error" },
+    body: { error: "GitHub operation failed. Try again.", code: "github_error" },
   };
 }

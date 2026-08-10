@@ -265,6 +265,26 @@ describe("scanProject API route discovery", () => {
     expect(facts.uiEvidence?.unlabeledControlFiles).toEqual([]);
   });
 
+  it("accepts dynamic React label and control identifiers", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "components/review-note.tsx",
+      `export function ReviewNote({ finding }) {
+        return (
+          <div>
+            <label htmlFor={\`note-\${finding.id}\`}>Reason</label>
+            <textarea id={\`note-\${finding.id}\`} />
+          </div>
+        );
+      }\n`,
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.uiEvidence?.unlabeledControlFiles).toEqual([]);
+  });
+
   it("detects portfolio contact, resume, social, and project detail signals", async () => {
     const projectRoot = await createProject();
     await createFile(

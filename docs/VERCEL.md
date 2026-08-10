@@ -19,6 +19,7 @@ Set these in Vercel project settings:
 ```env
 NEXT_PUBLIC_APP_URL=https://YOUR_DOMAIN
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public
+VIBE_RATE_LIMIT_SECRET=
 VIBE_ENABLE_LOCAL_SCAN=false
 OPENAI_REPORT_ENABLED=false
 OPENAI_API_KEY=
@@ -33,6 +34,7 @@ Required for a basic public launch:
 
 - `NEXT_PUBLIC_APP_URL`
 - `DATABASE_URL`
+- `VIBE_RATE_LIMIT_SECRET` (a random secret used to hash public scan limiter keys)
 - `VIBE_ENABLE_LOCAL_SCAN=false`
 
 Set `DATABASE_URL` before the first Vercel deployment. The build can generate Prisma Client without it, but saved scans and `/api/health` require a real managed PostgreSQL connection.
@@ -90,5 +92,6 @@ After deploying, verify:
 
 - Local folder scanning is unavailable in hosted mode.
 - ZIP uploads are temporary and size-limited.
+- Public GitHub and ZIP scans are limited to four requests per minute per visitor. The shared limit requires `DATABASE_URL`, `VIBE_RATE_LIMIT_SECRET`, and the latest Prisma migration.
 - Scans are static; Vibe does not run install scripts, tests, builds, migrations, or app code from scanned projects.
 - Long-running scans may need a background job queue in the future if repository size grows beyond serverless request limits.

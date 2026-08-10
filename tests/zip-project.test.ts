@@ -68,4 +68,14 @@ describe("ZIP project extraction", () => {
       "No supported Node.js app was found. Detected possible Python, static HTML files. Vibe currently scans projects with a package.json file.",
     );
   });
+
+  it("rejects highly compressed archive entries before extraction", async () => {
+    const zip = new AdmZip();
+    zip.addFile("sample/package.json", Buffer.from('{"name":"sample"}'));
+    zip.addFile("sample/repeated.txt", Buffer.alloc(2 * 1024 * 1024));
+
+    await expect(extractProjectZipBuffer(zip.toBuffer())).rejects.toThrow(
+      "Archive exceeds Vibe's safe compression limit.",
+    );
+  });
 });

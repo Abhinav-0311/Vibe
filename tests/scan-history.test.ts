@@ -1,8 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { addScanToHistory, createScanHistoryItem, parseScanHistory } from "@/lib/scan-history";
+import { compareScans, findPreviousComparableScan } from "@/lib/scan-comparison";
 import type { ScanApiResponse } from "@/lib/scan-api";
 
-function createScan(scannedAt: string, score: number): ScanApiResponse {
+function createFinding(id: string): ScanApiResponse["checklist"]["findings"][number] {
+  return {
+    id,
+    title: id,
+    category: "Testing",
+    severity: "medium",
+    status: "open",
+    evidence: "Evidence",
+    severityReason: "Reason",
+    impact: "Impact",
+    fix: "Fix",
+    verification: [],
+    prompt: "Prompt",
+    actionPriority: "recommended",
+  };
+}
+
+function createScan(scannedAt: string, score: number, findingIds: string[] = []): ScanApiResponse {
   return {
     scannedProject: "current workspace",
     scannedAt,
@@ -62,7 +80,7 @@ function createScan(scannedAt: string, score: number): ScanApiResponse {
         hasUserAccounts: false,
         storesUserData: false,
       },
-      findings: [],
+      findings: findingIds.map(createFinding),
       summary: {
         critical: 0,
         high: 0,
@@ -123,5 +141,23 @@ describe("scan history", () => {
 
     expect(history).toHaveLength(6);
     expect(history[0].scan.scannedAt).toBe("2026-06-13T00:07:00.000Z");
+  });
+
+  it("compares only the same source and readiness profile", () => {
+    const baseline = createScan("2026-06-13T00:00:00.000Z", 72, ["missing-tests", "missing-env-example"]);
+    const current = createScan("2026-06-13T00:05:00.000Z", 86, ["missing-env-example", "missing-rate-limiting"]);
+    const comparison = compareScans(baseline, current);
+
+    expect(findPreviousComparableScan([createScanHistoryItem(baseline)], current)).toEqual(baseline);
+    expect(comparison.scoreChange).toBe(14);
+    expect(comparison.resolvedFindingIds).toEqual(["missing-tests"]);
+    expect(comparison.newFindingIds).toEqual(["missing-rate-limiting"]);
+    expect(comparison.unchangedFindingIds).toEqual(["missing-env-example"]);
+
+    const differentProfile = {
+      ...current,
+      checklist: { ...current.checklist, context: { ...current.checklist.context, appType: "content-site" as const } },
+    };
+    expect(findPreviousComparableScan([createScanHistoryItem(baseline)], differentProfile)).toBeNull();
   });
 });

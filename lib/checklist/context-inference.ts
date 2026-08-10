@@ -90,6 +90,15 @@ export function inferAuditProfile(facts: ScannerFacts, requestedContext: AuditCo
   };
 }
 
+export function selectedAuditProfile(requestedContext: AuditContext): AuditProfileInference {
+  return {
+    requested: requestedContext,
+    applied: requestedContext,
+    adjusted: false,
+    reasons: ["Vibe used the readiness profile you selected."],
+  };
+}
+
 export function inferAuditContext(facts: ScannerFacts, requestedContext: AuditContext): AuditContext {
   return inferAuditProfile(facts, requestedContext).applied;
 }

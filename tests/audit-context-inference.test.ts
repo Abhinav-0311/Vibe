@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferAuditContext, inferAuditProfile } from "@/lib/checklist/context-inference";
+import { inferAuditContext, inferAuditProfile, selectedAuditProfile } from "@/lib/checklist/context-inference";
 import type { AuditContext } from "@/lib/checklist/types";
 import type { ScannerFacts } from "@/lib/scanner/types";
 
@@ -150,5 +150,21 @@ describe("inferAuditContext", () => {
       adjusted: false,
     });
     expect(profile.reasons[0]).toContain("without adjustment");
+  });
+
+  it("keeps a manually selected profile even when automatic inference would promote it", () => {
+    const facts: ScannerFacts = {
+      ...baseFacts,
+      signals: {
+        ...baseFacts.signals,
+        hasAuthRoute: true,
+      },
+    };
+
+    expect(inferAuditProfile(facts, requestedContentContext).applied.appType).toBe("saas");
+    expect(selectedAuditProfile(requestedContentContext)).toMatchObject({
+      applied: requestedContentContext,
+      adjusted: false,
+    });
   });
 });

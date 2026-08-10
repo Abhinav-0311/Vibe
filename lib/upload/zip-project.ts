@@ -6,6 +6,15 @@ import path from "node:path";
 const maxUploadBytes = 25 * 1024 * 1024;
 const maxExtractedBytes = 100 * 1024 * 1024;
 const maxArchiveEntries = 20_000;
+const maxArchiveEntryBytes = 20 * 1024 * 1024;
+const maxCompressionRatio = 100;
+
+export class UploadValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UploadValidationError";
+  }
+}
 
 export type UploadedProject = {
   projectRoot: string;
@@ -150,7 +159,7 @@ function describeUnsupportedArchive(entryNames: string[]) {
 
 async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
   if (buffer.byteLength > maxUploadBytes) {
-    throw new Error("Upload must be 25MB or smaller.");
+    throw new UploadValidationError("Upload must be 25MB or smaller.");
   }
 
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vibe-upload-"));
@@ -163,14 +172,20 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
     const zip = new AdmZip(zipPath);
     const entries = zip.getEntries();
     if (entries.length > maxArchiveEntries) {
-      throw new Error(`Archive contains more than ${maxArchiveEntries.toLocaleString()} entries.`);
+      throw new UploadValidationError(`Archive contains more than ${maxArchiveEntries.toLocaleString()} entries.`);
     }
 
     let extractedBytes = 0;
     for (const entry of entries) {
+      if (entry.header.size > maxArchiveEntryBytes) {
+        throw new UploadValidationError("Archive contains a file larger than Vibe's 20 MB per-file limit.");
+      }
+      if (entry.header.size > 0 && (entry.header.compressedSize === 0 || entry.header.size / entry.header.compressedSize > maxCompressionRatio)) {
+        throw new UploadValidationError("Archive exceeds Vibe's safe compression limit.");
+      }
       extractedBytes += entry.header.size;
       if (extractedBytes > maxExtractedBytes) {
-        throw new Error("Archive expands beyond Vibe's 100 MB extraction limit.");
+        throw new UploadValidationError("Archive expands beyond Vibe's 100 MB extraction limit.");
       }
 
       const targetPath = path.resolve(extractRoot, entry.entryName);
@@ -179,7 +194,7 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
         relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 
       if (!isInsideExtractRoot) {
-        throw new Error("Archive contains unsafe file paths.");
+        throw new UploadValidationError("Archive contains unsafe file paths.");
       }
     }
 
@@ -187,7 +202,7 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
     const packageRoot = await findPackageRoot(extractRoot);
 
     if (!packageRoot) {
-      throw new Error(
+      throw new UploadValidationError(
         describeUnsupportedArchive(entries.map((entry) => entry.entryName)),
       );
     }
@@ -205,7 +220,7 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
 
 export async function extractUploadedProject(file: File): Promise<UploadedProject> {
   if (!file.name.toLowerCase().endsWith(".zip")) {
-    throw new Error("Upload must be a .zip archive.");
+    throw new UploadValidationError("Upload must be a .zip archive.");
   }
 
   return extractZipBuffer(Buffer.from(await file.arrayBuffer()));

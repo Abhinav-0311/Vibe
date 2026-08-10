@@ -12,23 +12,23 @@ export function parseGitHubRepoUrl(value: string): GitHubRepoRef {
   try {
     url = new URL(value.trim());
   } catch {
-    throw new Error("Enter a valid GitHub repository URL.");
+    throw new GitHubApiError("Enter a valid GitHub repository URL.", 400, "validation_failed");
   }
 
   if (url.hostname !== "github.com" && url.hostname !== "www.github.com") {
-    throw new Error("Only github.com repository URLs are supported.");
+    throw new GitHubApiError("Only github.com repository URLs are supported.", 400, "validation_failed");
   }
 
   const [owner, repo, extra] = url.pathname.split("/").filter(Boolean);
 
   if (!owner || !repo || extra) {
-    throw new Error("Use a repository URL like https://github.com/owner/repo.");
+    throw new GitHubApiError("Use a repository URL like https://github.com/owner/repo.", 400, "validation_failed");
   }
 
   const normalizedRepo = repo.replace(/\.git$/i, "");
 
   if (!normalizedRepo) {
-    throw new Error("Use a repository URL like https://github.com/owner/repo.");
+    throw new GitHubApiError("Use a repository URL like https://github.com/owner/repo.", 400, "validation_failed");
   }
 
   return {
@@ -38,17 +38,42 @@ export function parseGitHubRepoUrl(value: string): GitHubRepoRef {
 }
 
 const maxArchiveBytes = 25 * 1024 * 1024;
-
-export async function downloadGitHubRepoZip(
-  repoUrl: string,
-  options: { token?: string | null; branch?: string } = {},
-): Promise<{
+type GitHubArchive = {
   name: string;
   buffer: Buffer;
   branch: string;
   repository: GitHubRepoRef;
-}> {
+};
+
+// ponytail: dedupes only concurrent requests within one server instance; add durable caching after tenant ownership exists.
+const publicDownloads = new Map<string, Promise<GitHubArchive>>();
+
+export async function downloadGitHubRepoZip(
+  repoUrl: string,
+  options: { token?: string | null; branch?: string } = {},
+): Promise<GitHubArchive> {
   const repo = parseGitHubRepoUrl(repoUrl);
+
+  if (options.token) return downloadGitHubRepoZipFromRepo(repo, options);
+
+  const key = `${repo.owner}/${repo.repo}:${options.branch?.trim() ?? ""}`.toLowerCase();
+  const existing = publicDownloads.get(key);
+  if (existing) return existing;
+
+  const download = downloadGitHubRepoZipFromRepo(repo, options);
+  publicDownloads.set(key, download);
+
+  try {
+    return await download;
+  } finally {
+    publicDownloads.delete(key);
+  }
+}
+
+async function downloadGitHubRepoZipFromRepo(
+  repo: GitHubRepoRef,
+  options: { token?: string | null; branch?: string },
+): Promise<GitHubArchive> {
   const metadataResponse = await githubFetch(`/repos/${repo.owner}/${repo.repo}`, { token: options.token });
 
   const metadata = (await metadataResponse.json()) as { default_branch?: string; full_name?: string };

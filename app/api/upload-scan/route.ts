@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { readAuditContext } from "@/lib/audit-context";
+import { readAuditContext, readAuditProfileMode } from "@/lib/audit-context";
 import { createScanResponse } from "@/lib/scan-response";
-import { extractUploadedProject } from "@/lib/upload/zip-project";
+import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
+import { extractUploadedProject, UploadValidationError } from "@/lib/upload/zip-project";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,13 @@ export async function POST(request: Request) {
   let uploadedProject: Awaited<ReturnType<typeof extractUploadedProject>> | null = null;
 
   try {
+    const rateLimit = await enforcePublicScanRateLimit(request, "upload");
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many upload scans. Wait a minute before trying again." },
+        { status: 429, headers: { "Retry-After": rateLimit.retryAfterSeconds.toString() } },
+      );
+    }
     const formData = await request.formData();
     const file = formData.get("project");
 
@@ -34,7 +42,7 @@ export async function POST(request: Request) {
       type: "upload",
       label: "ZIP upload",
       detail: formatUploadDetail(file.name, uploadedProject.relativeProjectRoot),
-    }, projectName);
+    }, projectName, readAuditProfileMode(searchParams));
 
     return NextResponse.json({
       ...response,
@@ -42,10 +50,8 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Upload scan failed.",
-      },
-      { status: 400 },
+      { error: error instanceof UploadValidationError ? error.message : "Vibe could not safely inspect this upload. Try a different ZIP." },
+      { status: error instanceof UploadValidationError ? 400 : 500 },
     );
   } finally {
     await uploadedProject?.cleanup();

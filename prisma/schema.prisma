@@ -24,3 +24,12 @@ model ScanRecord {
   @@index([appType, createdAt])
   @@index([score, createdAt])
 }
+
+model ScanRateLimit {
+  key         String   @id
+  windowStart DateTime
+  count       Int
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt])
+}

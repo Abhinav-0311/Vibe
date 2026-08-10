@@ -21,10 +21,12 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import type { AuditProfileMode } from "@/lib/audit-context";
 import type { AuditContext } from "@/lib/checklist/types";
 import { auditReport, emptyReport, type ActionPriority, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import { buildScoreBreakdown } from "@/lib/score-breakdown";
+import { compareScans, findPreviousComparableScan } from "@/lib/scan-comparison";
 import type {
   SavedScanDetailApiResponse,
   SavedScansApiResponse,
@@ -136,6 +138,7 @@ export function AuditDashboard() {
   const [viewState, setViewState] = useState<ViewState>("empty");
   const [scanData, setScanData] = useState<ScanApiResponse | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
+  const [comparisonBaseline, setComparisonBaseline] = useState<ScanApiResponse | null>(null);
   const [savedScans, setSavedScans] = useState<SavedScansApiResponse | null>(null);
   const [savedScansState, setSavedScansState] = useState<SavedScansState>("loading");
   const [health, setHealth] = useState<HealthApiResponse | null>(null);
@@ -144,6 +147,7 @@ export function AuditDashboard() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [auditContext, setAuditContext] = useState<AuditContext>(defaultAuditContext);
+  const [auditProfileMode, setAuditProfileMode] = useState<AuditProfileMode>("auto");
   const [projectPath, setProjectPath] = useState(defaultProjectPath);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [githubError, setGithubError] = useState<string | null>(null);
@@ -171,9 +175,11 @@ export function AuditDashboard() {
     [reportWithStatuses.findings, selectedId],
   );
 
-  function applyCompletedScan(scan: ScanApiResponse) {
+  function applyCompletedScan(scan: ScanApiResponse, profileMode: AuditProfileMode) {
+    setComparisonBaseline(findPreviousComparableScan(scanHistory, scan));
     setScanData(scan);
     setAuditContext(scan.checklist.context);
+    setAuditProfileMode(profileMode);
     setSelectedId(scan.checklist.findings[0]?.id);
     saveScanToHistory(scan);
     void refreshSavedScans();
@@ -202,8 +208,10 @@ export function AuditDashboard() {
   }
 
   function selectHistoryItem(item: ScanHistoryItem) {
+    setComparisonBaseline(findPreviousComparableScan(scanHistory, item.scan));
     setScanData(item.scan);
     setAuditContext(item.scan.checklist.context);
+    setAuditProfileMode("manual");
     setProjectPath(item.scan.facts.projectRoot);
     setSelectedId(item.scan.checklist.findings[0]?.id);
     setViewState("report");
@@ -211,6 +219,7 @@ export function AuditDashboard() {
 
   function clearScanHistory() {
     setScanHistory([]);
+    setComparisonBaseline(null);
     window.localStorage.removeItem(scanHistoryStorageKey);
   }
 
@@ -283,7 +292,9 @@ export function AuditDashboard() {
       }
 
       setScanData(data.record.scan);
+      setComparisonBaseline(findPreviousComparableScan(scanHistory, data.record.scan));
       setAuditContext(data.record.scan.checklist.context);
+      setAuditProfileMode("manual");
       setProjectPath(data.record.scan.facts.projectRoot);
       setSelectedId(data.record.scan.checklist.findings[0]?.id);
       saveScanToHistory(data.record.scan);
@@ -295,7 +306,7 @@ export function AuditDashboard() {
     }
   }
 
-  async function runScan(context = auditContext, targetPath = projectPath) {
+  async function runScan(context = auditContext, targetPath = projectPath, profileMode = auditProfileMode) {
     setScanError(null);
     setGithubError(null);
     setViewState("loading");
@@ -307,6 +318,7 @@ export function AuditDashboard() {
         hasPayments: String(context.hasPayments),
         hasUserAccounts: String(context.hasUserAccounts),
         storesUserData: String(context.storesUserData),
+        profileMode,
         projectPath: targetPath,
       });
       const response = await fetch(`/api/scan?${params.toString()}`);
@@ -316,14 +328,14 @@ export function AuditDashboard() {
       }
 
       const data = (await response.json()) as ScanApiResponse;
-      applyCompletedScan(data);
+      applyCompletedScan(data, profileMode);
     } catch (error) {
       setScanError(error instanceof Error ? error.message : "Unknown scan failure");
       setViewState("error");
     }
   }
 
-  async function runUploadScan(file: File, context = auditContext) {
+  async function runUploadScan(file: File, context = auditContext, profileMode = auditProfileMode) {
     setScanError(null);
     setUploadError(null);
     setGithubError(null);
@@ -337,6 +349,7 @@ export function AuditDashboard() {
       formData.set("hasPayments", String(context.hasPayments));
       formData.set("hasUserAccounts", String(context.hasUserAccounts));
       formData.set("storesUserData", String(context.storesUserData));
+      formData.set("profileMode", profileMode);
 
       const response = await fetch("/api/upload-scan", {
         method: "POST",
@@ -349,7 +362,7 @@ export function AuditDashboard() {
       }
 
       const data = (await response.json()) as ScanApiResponse;
-      applyCompletedScan(data);
+      applyCompletedScan(data, profileMode);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload scan failed";
       setUploadError(message);
@@ -357,7 +370,7 @@ export function AuditDashboard() {
     }
   }
 
-  async function runGitHubScan(repoUrl: string, branch: string, context = auditContext) {
+  async function runGitHubScan(repoUrl: string, branch: string, context = auditContext, profileMode = auditProfileMode) {
     setScanError(null);
     setUploadError(null);
     setGithubError(null);
@@ -377,6 +390,7 @@ export function AuditDashboard() {
           hasPayments: context.hasPayments,
           hasUserAccounts: context.hasUserAccounts,
           storesUserData: context.storesUserData,
+          profileMode,
         }),
       });
 
@@ -389,7 +403,7 @@ export function AuditDashboard() {
       }
 
       const data = (await response.json()) as ScanApiResponse;
-      applyCompletedScan(data);
+      applyCompletedScan(data, profileMode);
     } catch (error) {
       const message = error instanceof Error ? error.message : "GitHub scan failed";
       setGithubError(message);
@@ -446,7 +460,10 @@ export function AuditDashboard() {
           projectPath={projectPath}
           workspaceProjects={workspaceProjects}
           projectDiscoveryState={projectDiscoveryState}
-          onChange={setAuditContext}
+          onChange={(context) => {
+            setAuditContext(context);
+            setAuditProfileMode("manual");
+          }}
           onProjectPathChange={setProjectPath}
           onRefreshProjects={() => void refreshWorkspaceProjects()}
           onRunScan={(context) => void runScan(context, projectPath)}
@@ -455,6 +472,7 @@ export function AuditDashboard() {
           isScanning={viewState === "loading"}
           onUploadScan={(file, context) => void runUploadScan(file, context)}
           onGitHubScan={(repoUrl, branch, context) => void runGitHubScan(repoUrl, branch, context)}
+          profileMode={auditProfileMode}
         />
         {viewState === "loading" && <LoadingState />}
         {viewState === "empty" && <EmptyState />}
@@ -474,6 +492,7 @@ export function AuditDashboard() {
                 onStatusChange={updateFindingStatus}
                 repository={scanData?.scanSource?.repository}
               />
+              {scanData && comparisonBaseline && <ScanProgress baseline={comparisonBaseline} current={scanData} />}
             </ResultSection>
 
             <ResultSection
@@ -655,6 +674,7 @@ function ContextControls({
   isScanning,
   onUploadScan,
   onGitHubScan,
+  profileMode,
 }: {
   context: AuditContext;
   projectPath: string;
@@ -669,6 +689,7 @@ function ContextControls({
   isScanning: boolean;
   onUploadScan: (file: File, context: AuditContext) => void;
   onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
+  profileMode: AuditProfileMode;
 }) {
   const [sourceMode, setSourceMode] = useState<ProjectSourceMode>("github");
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
@@ -793,9 +814,10 @@ function ContextControls({
       <ScanSafetyNote sourceMode={sourceMode} localScanEnabled={localScanEnabled} />
 
       {sourceMode === "local" && <div className="mt-6">
-        <label className="block">
+        <label className="block" htmlFor="project-path">
           <span className="mono text-[10px] text-[#d9d9d9]">Project path</span>
           <input
+            id="project-path"
             value={projectPath}
             onChange={(event) => onProjectPathChange(event.target.value)}
             className="mt-3 w-full rounded-[18px] border border-[#3d3d3d] bg-black px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#5f5858] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
@@ -881,6 +903,7 @@ function ContextControls({
             <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
               {context.stage} / {context.appType} / login {context.hasUserAccounts ? "yes" : "no"} / payments {context.hasPayments ? "yes" : "no"} / data {context.storesUserData ? "yes" : "no"}
             </p>
+            {profileMode === "manual" && <p className="mt-1 text-xs text-[#fc74dd]">Manual profile — Vibe will use these settings for the next scan.</p>}
           </div>
           <span className="mono rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white transition group-open:bg-white group-open:text-black">
             Edit
@@ -1194,9 +1217,10 @@ function GitHubScanPanel({
 
           {repositories.length > 0 && (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.55fr)_auto] lg:items-end">
-              <label className="block min-w-0">
+              <label className="block min-w-0" htmlFor="github-repository">
                 <span className="mono text-[10px] text-[#d9d9d9]">Repository</span>
                 <select
+                  id="github-repository"
                   value={selectedRepository}
                   onChange={(event) => setSelectedRepository(event.target.value)}
                   className="mt-3 w-full rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm text-white outline-none transition focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
@@ -1208,9 +1232,10 @@ function GitHubScanPanel({
                   ))}
                 </select>
               </label>
-              <label className="block min-w-0">
+              <label className="block min-w-0" htmlFor="github-branch">
                 <span className="mono text-[10px] text-[#d9d9d9]">Branch</span>
                 <select
+                  id="github-branch"
                   value={selectedBranch}
                   onChange={(event) => setSelectedBranch(event.target.value)}
                   disabled={branchState !== "ready" || branches.length === 0}
@@ -1248,9 +1273,10 @@ function GitHubScanPanel({
       )}
 
       <div className="mt-5 grid gap-4 border-t border-[#3d3d3d] pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(180px,0.4fr)_auto] lg:items-end">
-        <label className="block min-w-0">
+        <label className="block min-w-0" htmlFor="github-repository-url">
           <span className="mono text-[10px] text-[#d9d9d9]">Public repository URL</span>
           <input
+            id="github-repository-url"
             value={repoUrl}
             onChange={(event) => setRepoUrl(event.target.value)}
             onKeyDown={(event) => {
@@ -1262,9 +1288,10 @@ function GitHubScanPanel({
             placeholder="https://github.com/owner/repo"
           />
         </label>
-        <label className="block min-w-0">
+        <label className="block min-w-0" htmlFor="github-branch-name">
           <span className="mono text-[10px] text-[#d9d9d9]">Branch (optional)</span>
           <input
+            id="github-branch-name"
             value={manualBranch}
             onChange={(event) => setManualBranch(event.target.value)}
             className="mt-4 w-full rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#5f5858] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
@@ -2354,6 +2381,60 @@ function ReportView({
   );
 }
 
+function ScanProgress({ baseline, current }: { baseline: ScanApiResponse; current: ScanApiResponse }) {
+  const comparison = compareScans(baseline, current);
+  const scoreChange = comparison.scoreChange > 0 ? `+${comparison.scoreChange}` : comparison.scoreChange.toString();
+  const scoreClass = comparison.scoreChange > 0 ? "text-[#a7f35b]" : comparison.scoreChange < 0 ? "text-[#ff8f8f]" : "text-[#d9d9d9]";
+  const baselineFindings = new Map(baseline.checklist.findings.map((finding) => [finding.id, finding]));
+  const currentFindings = new Map(current.checklist.findings.map((finding) => [finding.id, finding]));
+  const resolvedTitles = comparison.resolvedFindingIds.map((id) => baselineFindings.get(id)?.title).filter(Boolean);
+  const newTitles = comparison.newFindingIds.map((id) => currentFindings.get(id)?.title).filter(Boolean);
+
+  return (
+    <section className="rounded-[30px] border border-[#315f46] bg-[#07130d] p-5 sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-2xl">
+          <p className="mono text-[10px] text-[#a7f35b]">Re-scan progress</p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">What changed since the previous comparable scan.</h2>
+          <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">Same source and readiness profile · {formatScannedAt(baseline.scannedAt)} → {formatScannedAt(current.scannedAt)}</p>
+        </div>
+        <span className={`mono text-3xl font-semibold ${scoreClass}`}>{scoreChange} points</span>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <ProgressMetric label="Resolved" value={comparison.resolvedFindingIds.length} className="text-[#a7f35b]" />
+        <ProgressMetric label="New" value={comparison.newFindingIds.length} className="text-[#ff8f8f]" />
+        <ProgressMetric label="Still open" value={comparison.unchangedFindingIds.length} className="text-white" />
+      </div>
+
+      {(resolvedTitles.length > 0 || newTitles.length > 0) && (
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {resolvedTitles.length > 0 && <ProgressFindingList label="Resolved evidence" titles={resolvedTitles} className="text-[#a7f35b]" />}
+          {newTitles.length > 0 && <ProgressFindingList label="New evidence" titles={newTitles} className="text-[#ff8f8f]" />}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ProgressMetric({ label, value, className }: { label: string; value: number; className: string }) {
+  return (
+    <div className="rounded-[20px] bg-black/40 p-4">
+      <p className="mono text-[9px] text-[#9b9696]">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${className}`}>{value}</p>
+    </div>
+  );
+}
+
+function ProgressFindingList({ label, titles, className }: { label: string; titles: Array<string | undefined>; className: string }) {
+  return (
+    <div className="rounded-[20px] border border-[#315f46] p-4">
+      <p className={`mono text-[9px] ${className}`}>{label}</p>
+      <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">{titles.slice(0, 2).join(" · ")}{titles.length > 2 ? ` · +${titles.length - 2} more` : ""}</p>
+    </div>
+  );
+}
+
 function ScorePanel({ report, criticalCount }: { report: AuditReport; criticalCount: number }) {
   const scoreBreakdown = buildScoreBreakdown(report.findings);
 
@@ -2599,6 +2680,9 @@ function FindingsList({
                   </div>
                   <h3 className="text-xl font-semibold tracking-[-0.02em]">{finding.title}</h3>
                   <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d9d9d9]">{finding.impact}</p>
+                  <p className="mt-3 line-clamp-2 border-t border-[#2b2929] pt-3 text-xs leading-5 text-[#9b9696]">
+                    <span className="mono text-[9px] text-[#fc74dd]">Evidence</span> · {finding.evidence}
+                  </p>
                   {finding.status === "ignored" && finding.statusReason && (
                     <p className="mt-3 rounded-[16px] border border-[#3d3d3d] px-3 py-2 text-xs leading-5 text-[#b8b3b3]">
                       Not relevant: {finding.statusReason}

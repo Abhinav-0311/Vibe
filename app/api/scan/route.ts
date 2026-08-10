@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readAuditContext } from "@/lib/audit-context";
+import { readAuditContext, readAuditProfileMode } from "@/lib/audit-context";
 import { createScanResponse } from "@/lib/scan-response";
 import { resolveWorkspaceProjectPath } from "@/lib/workspace-paths";
 
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   }
 
   const context = readAuditContext(searchParams);
-  const response = await createScanResponse(resolvedProject.projectPath, context);
+  const response = await createScanResponse(resolvedProject.projectPath, context, undefined, undefined, readAuditProfileMode(searchParams));
 
   return NextResponse.json(response);
 }
