@@ -9,7 +9,7 @@ export type ScanComparison = {
   unchangedFindingIds: string[];
 };
 
-function comparisonKey(scan: ScanApiResponse) {
+export function scanComparisonKey(scan: ScanApiResponse) {
   const repository = scan.scanSource?.repository;
   const source = repository
     ? `${scan.scanSource?.type}:${repository.owner}/${repository.repo}:${repository.branch}`
@@ -21,8 +21,8 @@ function comparisonKey(scan: ScanApiResponse) {
 }
 
 export function findPreviousComparableScan(history: ScanHistoryItem[], scan: ScanApiResponse) {
-  const key = comparisonKey(scan);
-  return history.find((item) => item.scan.scannedAt !== scan.scannedAt && comparisonKey(item.scan) === key)?.scan ?? null;
+  const key = scanComparisonKey(scan);
+  return history.find((item) => item.scan.scannedAt !== scan.scannedAt && scanComparisonKey(item.scan) === key)?.scan ?? null;
 }
 
 export function compareScans(baseline: ScanApiResponse, current: ScanApiResponse): ScanComparison {

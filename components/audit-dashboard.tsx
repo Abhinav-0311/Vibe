@@ -26,7 +26,7 @@ import type { AuditContext } from "@/lib/checklist/types";
 import { auditReport, emptyReport, type ActionPriority, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import { buildScoreBreakdown } from "@/lib/score-breakdown";
-import { compareScans, findPreviousComparableScan } from "@/lib/scan-comparison";
+import { compareScans, findPreviousComparableScan, scanComparisonKey } from "@/lib/scan-comparison";
 import type {
   SavedScanDetailApiResponse,
   SavedScansApiResponse,
@@ -40,6 +40,9 @@ import type {
 } from "@/lib/scan-api";
 import { addScanToHistory, parseScanHistory, scanHistoryStorageKey, type ScanHistoryItem } from "@/lib/scan-history";
 import type { SetupArtifact, SetupPack } from "@/lib/setup-pack/types";
+import { createPullRequestBrief } from "@/lib/github/pull-request-brief";
+import { getNextJsGuidance } from "@/lib/nextjs-guidance";
+import type { ReadinessTrendPoint } from "@/lib/db/scan-records";
 
 type ViewState = "report" | "loading" | "empty" | "error";
 type SeverityFilter = "all" | Severity;
@@ -538,6 +541,7 @@ export function AuditDashboard() {
                 restoreError={restoreError}
                 onRestore={(recordId) => void restoreSavedScan(recordId)}
               />
+              {scanData && <ReadinessTrend scan={scanData} trend={savedScans?.trend ?? []} />}
               <ScannerFactsPreview scan={scanData} />
               <ArchitectureStressPanel scan={scanData} />
             </EvidenceDisclosure>
@@ -2111,6 +2115,31 @@ function DatabaseArchive({
   );
 }
 
+function ReadinessTrend({ scan, trend }: { scan: ScanApiResponse; trend: ReadinessTrendPoint[] }) {
+  const key = scanComparisonKey(scan);
+  const points = trend.filter((point) => point.comparisonKey === key);
+  if (points.length < 2) return null;
+  const first = points[0];
+  const latest = points.at(-1)!;
+  const delta = latest.score - first.score;
+
+  return (
+    <section className="rounded-[30px] border border-[#315f46] bg-[#07130d] p-5 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mono text-[10px] text-[#a7f35b]">Readiness trend</p>
+          <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">Durable progress for this exact scan context.</h2>
+        </div>
+        <p className={`mono text-xl ${delta >= 0 ? "text-[#a7f35b]" : "text-[#ff8f8f]"}`}>{delta >= 0 ? "+" : ""}{delta} points</p>
+      </div>
+      <div className="mt-6 flex h-28 items-end gap-2" aria-label={`${points.length} saved scans, from ${first.score} to ${latest.score}`}>
+        {points.map((point) => <div key={point.id} title={`${formatScannedAt(point.scannedAt)}: ${point.score}/100`} className="min-w-4 flex-1 rounded-t bg-[#a7f35b]" style={{ height: `${Math.max(8, point.score)}%` }} />)}
+      </div>
+      <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">{points.length} saved scans · latest: {latest.score}/100 · {latest.findingCount} findings</p>
+    </section>
+  );
+}
+
 function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
   const [copied, setCopied] = useState(false);
   const [copiedRequired, setCopiedRequired] = useState(false);
@@ -2162,6 +2191,7 @@ ${finding.prompt}`,
   }
 
   const generation = scan.report.generation;
+  const nextJsGuidance = getNextJsGuidance(scan.facts);
   const isAiEnhanced = generation?.mode === "openai";
   const fallbackMessage =
     generation?.fallbackReason && !["disabled", "missing_api_key"].includes(generation.fallbackReason)
@@ -2251,6 +2281,14 @@ ${finding.prompt}`,
           </div>
 
           <p className="mono text-[10px] text-[#9b9696]">{scan.report.promptQueueSummary}</p>
+          {nextJsGuidance.length > 0 && (
+            <div className="rounded-[24px] border border-[#2f2a2a] bg-black p-5">
+              <p className="mono text-[10px] text-[#fc74dd]">Next.js engineering brief</p>
+              <div className="mt-4 grid gap-3">
+                {nextJsGuidance.map((item) => <div key={item.title} className="border-t border-[#2f2a2a] pt-3 first:border-0 first:pt-0"><p className="text-sm font-semibold text-white">{item.title}</p><p className="mt-1 text-xs text-[#9b9696]">{item.evidence}</p><p className="mt-2 text-sm leading-6 text-[#d9d9d9]">{item.recommendation}</p></div>)}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -2809,6 +2847,7 @@ function FindingDetail({
   const [issueError, setIssueError] = useState<string | null>(null);
   const [issueUrl, setIssueUrl] = useState<string | null>(null);
   const [notRelevantReason, setNotRelevantReason] = useState("");
+  const [prBriefCopied, setPrBriefCopied] = useState(false);
 
   useEffect(() => {
     setIssueState("idle");
@@ -3023,6 +3062,17 @@ function FindingDetail({
                   {issueState === "creating" ? "Creating issue" : "Create GitHub issue"}
                 </button>
               )}
+              <button
+                onClick={async () => {
+                  await navigator.clipboard?.writeText(createPullRequestBrief(`${repository.owner}/${repository.repo}`, finding));
+                  setPrBriefCopied(true);
+                  window.setTimeout(() => setPrBriefCopied(false), 1600);
+                }}
+                className="mono inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#3d3d3d] px-5 py-3 text-[10px] text-white transition hover:border-white"
+              >
+                <Clipboard className="h-4 w-4" aria-hidden="true" />
+                {prBriefCopied ? "Copied PR brief" : "Copy PR brief"}
+              </button>
             </div>
             {issueState === "error" && issueError && (
               <p className="mt-4 text-sm leading-6 text-[#ff8f8f]">{issueError}</p>

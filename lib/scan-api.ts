@@ -1,6 +1,6 @@
 import type { ChecklistResult } from "@/lib/checklist/types";
 import type { AuditProfileInference } from "@/lib/checklist/context-inference";
-import type { SavedScanDetail, SavedScanRecord, ScanPersistenceResult } from "@/lib/db/scan-records";
+import type { ReadinessTrendPoint, SavedScanDetail, SavedScanRecord, ScanPersistenceResult } from "@/lib/db/scan-records";
 import type { GeneratedReport } from "@/lib/report/types";
 import type { ScannerFacts } from "@/lib/scanner/types";
 import type { SetupPack } from "@/lib/setup-pack/types";
@@ -52,6 +52,7 @@ export type GitHubBranchesApiResponse = {
 export type SavedScansApiResponse = {
   databaseConfigured: boolean;
   records: SavedScanRecord[];
+  trend?: ReadinessTrendPoint[];
   error?: "database_error";
 };
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listSavedScanRecords } from "@/lib/db/scan-records";
+import { listReadinessTrend, listSavedScanRecords } from "@/lib/db/scan-records";
 import { isDatabaseConfigured } from "@/lib/prisma";
 import { reportServerError } from "@/lib/observability/server";
 import { getBetaUser } from "@/lib/auth";
@@ -18,11 +18,15 @@ export async function GET() {
   }
 
   try {
-    const records = await listSavedScanRecords(betaUser.id);
+    const [records, trend] = await Promise.all([
+      listSavedScanRecords(betaUser.id),
+      listReadinessTrend(betaUser.id),
+    ]);
 
     return NextResponse.json({
       databaseConfigured: true,
       records,
+      trend,
     });
   } catch {
     reportServerError("saved_scan_read_failed");

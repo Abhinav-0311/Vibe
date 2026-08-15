@@ -4,6 +4,7 @@ import type { ScanApiResponse } from "@/lib/scan-api";
 import { createScanHash } from "@/lib/scan-fingerprint";
 import { scanRetentionCutoff } from "@/lib/data-retention";
 import { reportServerError } from "@/lib/observability/server";
+import { scanComparisonKey } from "@/lib/scan-comparison";
 
 export type ScanPersistenceResult = {
   attempted: boolean;
@@ -27,6 +28,15 @@ export type SavedScanRecord = {
 
 export type SavedScanDetail = SavedScanRecord & {
   scan: ScanApiResponse;
+};
+
+export type ReadinessTrendPoint = {
+  id: string;
+  projectName: string;
+  score: number;
+  findingCount: number;
+  scannedAt: string;
+  comparisonKey: string;
 };
 
 function toSavedScanRecord(record: {
@@ -190,4 +200,25 @@ export async function getSavedScanRecord(id: string, userId: string): Promise<Sa
     ...toSavedScanRecord(record),
     scan: record.payload as unknown as ScanApiResponse,
   };
+}
+
+export async function listReadinessTrend(userId: string, limit = 12): Promise<ReadinessTrendPoint[]> {
+  const prisma = getPrisma();
+  if (!prisma || !isDatabaseConfigured()) return [];
+
+  const records = await prisma.scanRecord.findMany({
+    where: { userId },
+    orderBy: [{ scannedAt: "desc" }, { id: "desc" }],
+    take: limit,
+    select: { id: true, projectName: true, score: true, findingCount: true, scannedAt: true, payload: true },
+  });
+
+  return records.reverse().map((record) => ({
+    id: record.id,
+    projectName: record.projectName,
+    score: record.score,
+    findingCount: record.findingCount,
+    scannedAt: record.scannedAt.toISOString(),
+    comparisonKey: scanComparisonKey(record.payload as unknown as ScanApiResponse),
+  }));
 }

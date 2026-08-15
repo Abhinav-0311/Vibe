@@ -13,8 +13,10 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 - Evidence-backed findings with learning notes and copyable prompts
 - AI workspace setup-pack preview and ZIP export
 - PostgreSQL scan archive, deduplication, restore, and health visibility
+- Google private-beta sign-in, invite gating, per-user scan ownership, and quotas
+- Comparable re-scan progress, durable readiness trends, and PR-ready handoff briefs
 - Optional OpenAI report enhancement with deterministic fallback
-- README, QA report, deployment notes, portfolio case study, and demo script
+- README, QA report, deployment notes, portfolio case study, and private-beta runbook
 
 ## Publication Polish
 
@@ -26,9 +28,7 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 
 ## Hosted Product Work
 
-- User authentication
-- Tenant isolation and team workspaces
-- Hosted scan quotas and abuse controls
+- Team workspaces and role boundaries
 - Billing and plan limits
 - Background scan jobs for large repositories
 - Durable object storage for uploaded archives if async processing is added
