@@ -41,9 +41,32 @@ select {
 }
 
 button:focus-visible,
-a:focus-visible {
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
   outline: 2px solid var(--neon);
   outline-offset: 4px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 1rem;
+  left: 1rem;
+  transform: translateY(-180%);
+  border-radius: 999px;
+  background: var(--bone);
+  padding: 0.75rem 1rem;
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  transition: transform 160ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 ::selection {

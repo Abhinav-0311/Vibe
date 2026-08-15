@@ -19,7 +19,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { AuditProfileMode } from "@/lib/audit-context";
 import type { AuditContext } from "@/lib/checklist/types";
@@ -49,6 +49,7 @@ type SavedScansState = "loading" | "ready" | "error";
 type HealthState = "loading" | "ready" | "error";
 type ProjectDiscoveryState = "loading" | "ready" | "error";
 type ProjectSourceMode = "local" | "github" | "upload";
+type ScanProgressSource = ProjectSourceMode | null;
 
 const defaultAuditContext: AuditContext = {
   appType: "content-site",
@@ -155,6 +156,8 @@ export function AuditDashboard() {
   const [projectDiscoveryState, setProjectDiscoveryState] = useState<ProjectDiscoveryState>("loading");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, FindingStatus>>({});
   const [statusReasonOverrides, setStatusReasonOverrides] = useState<Record<string, string>>({});
+  const [scanProgressSource, setScanProgressSource] = useState<ScanProgressSource>(null);
+  const [scanSuccess, setScanSuccess] = useState<string | null>(null);
 
   const report = useMemo(() => createReportFromScan(scanData), [scanData]);
   const reportWithStatuses = useMemo(
@@ -184,6 +187,7 @@ export function AuditDashboard() {
     saveScanToHistory(scan);
     void refreshSavedScans();
     void refreshHealth();
+    setScanSuccess(`Scan complete. ${scan.checklist.findings.length} findings and a readiness score of ${scan.checklist.score}.`);
     setViewState("report");
   }
 
@@ -309,6 +313,8 @@ export function AuditDashboard() {
   async function runScan(context = auditContext, targetPath = projectPath, profileMode = auditProfileMode) {
     setScanError(null);
     setGithubError(null);
+    setScanSuccess(null);
+    setScanProgressSource("local");
     setViewState("loading");
 
     try {
@@ -339,6 +345,8 @@ export function AuditDashboard() {
     setScanError(null);
     setUploadError(null);
     setGithubError(null);
+    setScanSuccess(null);
+    setScanProgressSource("upload");
     setViewState("loading");
 
     try {
@@ -374,6 +382,8 @@ export function AuditDashboard() {
     setScanError(null);
     setUploadError(null);
     setGithubError(null);
+    setScanSuccess(null);
+    setScanProgressSource("github");
     setViewState("loading");
 
     try {
@@ -451,7 +461,9 @@ export function AuditDashboard() {
   }, [scanHistory]);
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main id="vibe-main-content" className="min-h-screen bg-black text-white" tabIndex={-1}>
+      <a className="skip-link mono" href="#scan-controls">Skip to scan controls</a>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">{scanSuccess}</div>
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-5 sm:px-8 lg:px-10">
         <TopBar />
         <Hero />
@@ -474,12 +486,14 @@ export function AuditDashboard() {
           onGitHubScan={(repoUrl, branch, context) => void runGitHubScan(repoUrl, branch, context)}
           profileMode={auditProfileMode}
         />
-        {viewState === "loading" && <LoadingState />}
+        {viewState === "loading" && <LoadingState source={scanProgressSource} />}
         {viewState === "empty" && <EmptyState />}
         {viewState === "error" && <ErrorState message={scanError} onRetry={runScan} />}
         {viewState === "report" && (
           <>
+            {scanSuccess && <ScanSuccessNotice message={scanSuccess} />}
             <ResultSection
+              id="findings"
               eyebrow="Fix this first"
               title="Start with the highest-risk misses."
               description="This is the main product surface: score, prioritized findings, evidence, and the next prompt to give your coding agent."
@@ -535,18 +549,20 @@ export function AuditDashboard() {
 }
 
 function ResultSection({
+  id,
   eyebrow,
   title,
   description,
   children,
 }: {
+  id?: string;
   eyebrow: string;
   title: string;
   description: string;
   children: ReactNode;
 }) {
   return (
-    <section className="grid gap-5">
+    <section id={id} className="grid gap-5">
       <div className="flex flex-col gap-3 border-t border-[#1d1a1a] pt-7 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <p className="mono text-[11px] text-[#fc74dd]">{eyebrow}</p>
@@ -751,7 +767,7 @@ function ContextControls({
   }, [localScanEnabled, sourceMode]);
 
   return (
-    <section className="rounded-[30px] bg-[#1d1a1a] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-7">
+    <section id="scan-controls" className="rounded-[30px] bg-[#1d1a1a] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-7">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
           <p className="mono text-[11px] text-[#fc74dd]">Audit context</p>
@@ -1062,6 +1078,9 @@ function GitHubScanPanel({
   const [repositoryState, setRepositoryState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [branchState, setBranchState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [panelError, setPanelError] = useState<string | null>(null);
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+  const [disconnectState, setDisconnectState] = useState<"idle" | "working" | "error">("idle");
+  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
 
   async function readError(response: Response, fallback: string) {
     const body = (await response.json().catch(() => null)) as { error?: string; retryAt?: string } | null;
@@ -1147,14 +1166,25 @@ function GitHubScanPanel({
   }, [repositories, selectedRepository, status?.connected]);
 
   async function disconnect() {
-    await fetch("/api/github/disconnect", { method: "POST" });
-    setStatus((current) => ({ configured: current?.configured ?? true, connected: false }));
-    setRepositories([]);
-    setBranches([]);
-    setSelectedRepository("");
-    setSelectedBranch("");
-    setRepositoryState("idle");
-    setBranchState("idle");
+    setDisconnectState("working");
+    setPanelError(null);
+
+    try {
+      const response = await fetch("/api/github/disconnect", { method: "POST" });
+      if (!response.ok) throw new Error("GitHub could not be disconnected.");
+      setStatus((current) => ({ configured: current?.configured ?? true, connected: false }));
+      setRepositories([]);
+      setBranches([]);
+      setSelectedRepository("");
+      setSelectedBranch("");
+      setRepositoryState("idle");
+      setBranchState("idle");
+      setConnectionMessage("GitHub disconnected. You can reconnect whenever you need private repository access.");
+      setShowDisconnectConfirm(false);
+    } catch (error) {
+      setDisconnectState("error");
+      setPanelError(error instanceof Error ? error.message : "GitHub could not be disconnected.");
+    }
   }
 
   function submitGitHubScan() {
@@ -1188,7 +1218,7 @@ function GitHubScanPanel({
           </span>
         ) : status?.connected ? (
           <button
-            onClick={() => void disconnect()}
+            onClick={() => setShowDisconnectConfirm(true)}
             className="mono rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
           >
             Disconnect
@@ -1313,6 +1343,23 @@ function GitHubScanPanel({
           {panelError ?? githubError ?? "Could not read the GitHub connection."}
         </p>
       )}
+      {connectionMessage && (
+        <p className="mt-4 rounded-[18px] border border-[#5c833d] bg-[#0d160a] px-4 py-3 text-sm leading-6 text-[#c5f7a9]" role="status">
+          {connectionMessage}
+        </p>
+      )}
+      <ConfirmationDialog
+        open={showDisconnectConfirm}
+        title="Disconnect GitHub?"
+        description="Vibe will remove this browser's encrypted GitHub connection. Your Vibe scans and GitHub repositories will not be changed."
+        confirmLabel="Disconnect GitHub"
+        isConfirming={disconnectState === "working"}
+        onCancel={() => {
+          setShowDisconnectConfirm(false);
+          setDisconnectState("idle");
+        }}
+        onConfirm={() => void disconnect()}
+      />
     </div>
   );
 }
@@ -1817,6 +1864,8 @@ function ScanHistory({
   onSelect: (item: ScanHistoryItem) => void;
   onClear: () => void;
 }) {
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
   return (
     <section className="rounded-[30px] bg-[#111212] p-5 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -1832,7 +1881,7 @@ function ScanHistory({
         <div className="flex items-center gap-3">
           <History className="h-6 w-6 text-[#fc74dd]" aria-hidden="true" />
           <button
-            onClick={onClear}
+            onClick={() => setShowClearConfirm(true)}
             disabled={history.length === 0}
             className="mono inline-flex items-center gap-2 rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -1892,6 +1941,18 @@ function ScanHistory({
           })}
         </div>
       )}
+      <ConfirmationDialog
+        open={showClearConfirm}
+        title="Clear local scan history?"
+        description="This removes the six browser-only snapshots from this device. Server-saved scan records will remain available."
+        confirmLabel="Clear history"
+        isConfirming={false}
+        onCancel={() => setShowClearConfirm(false)}
+        onConfirm={() => {
+          onClear();
+          setShowClearConfirm(false);
+        }}
+      />
     </section>
   );
 }
@@ -2023,7 +2084,7 @@ function DatabaseArchive({
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="mono text-[10px] text-[#d9d9d9]">{formatScannedAt(record.scannedAt)}</p>
+                    <p className="mono text-[10px] text-[#d9d9d9]">Saved {formatScannedAt(record.createdAt)}</p>
                     <p className="mt-2 text-lg font-semibold tracking-[-0.03em] text-white">
                       {restoringRecordId === record.id ? "Restoring scan" : record.readinessLabel}
                     </p>
@@ -2982,11 +3043,104 @@ function DetailBlock({ title, body, compact = false }: { title: string; body: st
   );
 }
 
-function LoadingState() {
-  const steps = ["Reading files", "Scoring launch risk", "Preparing fix prompts"];
+function ScanSuccessNotice({ message }: { message: string }) {
+  return (
+    <section className="flex flex-col gap-4 rounded-[24px] border border-[#5c833d] bg-[#0d160a] p-5 sm:flex-row sm:items-center sm:justify-between" role="status">
+      <div className="flex items-start gap-3">
+        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#a7f35b]" aria-hidden="true" />
+        <div>
+          <p className="mono text-[10px] text-[#a7f35b]">Scan complete</p>
+          <p className="mt-2 text-sm leading-6 text-[#e4f8d5]">{message}</p>
+        </div>
+      </div>
+      <a href="#findings" className="mono w-fit rounded-full border border-[#5c833d] px-4 py-2 text-[10px] text-[#e4f8d5] transition hover:border-[#a7f35b] hover:text-white">
+        Review findings
+      </a>
+    </section>
+  );
+}
+
+function ConfirmationDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  isConfirming,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  isConfirming: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    const firstControl = dialog?.querySelector<HTMLElement>("button");
+    firstControl?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (!isConfirming) onCancel();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialog) return;
+      const controls = Array.from(dialog.querySelectorAll<HTMLElement>("button:not([disabled])"));
+      if (controls.length === 0) return;
+      const first = controls[0];
+      const last = controls.at(-1)!;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isConfirming, onCancel, open]);
+
+  if (!open) return null;
 
   return (
-    <section className="grid min-h-[420px] place-items-center rounded-[30px] bg-[#1d1a1a] p-8 text-center">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-5" role="presentation">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title" aria-describedby="confirm-dialog-description" className="w-full max-w-md rounded-[28px] border border-[#3d3d3d] bg-[#111212] p-6 shadow-2xl">
+        <p className="mono text-[10px] text-[#fc74dd]">Confirm action</p>
+        <h2 id="confirm-dialog-title" className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">{title}</h2>
+        <p id="confirm-dialog-description" className="mt-4 text-sm leading-6 text-[#d9d9d9]">{description}</p>
+        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button onClick={onCancel} disabled={isConfirming} className="mono rounded-full border border-[#3d3d3d] px-5 py-3 text-[10px] text-white transition hover:border-white disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={isConfirming} className="mono rounded-full bg-[#fc74dd] px-5 py-3 text-[10px] text-black transition hover:brightness-95 disabled:cursor-wait disabled:bg-[#3d3d3d] disabled:text-[#9b9696]">
+            {isConfirming ? "Disconnecting" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoadingState({ source }: { source: ScanProgressSource }) {
+  const steps = source === "github"
+    ? ["Downloading archive", "Reading evidence", "Preparing fix prompts"]
+    : source === "upload"
+      ? ["Checking ZIP safety", "Reading evidence", "Preparing fix prompts"]
+      : ["Reading files", "Scoring launch risk", "Preparing fix prompts"];
+
+  return (
+    <section className="grid min-h-[420px] place-items-center rounded-[30px] bg-[#1d1a1a] p-8 text-center" role="status" aria-live="polite">
       <div className="max-w-xl">
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#fc74dd]" aria-hidden="true" />
         <p className="mono mt-8 text-[11px] text-[#fc74dd]">Scanning project</p>
