@@ -6,6 +6,8 @@ import { getGitHubAccessToken } from "@/lib/github/github-session";
 import { createScanResponse } from "@/lib/scan-response";
 import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
 import { extractProjectZipBuffer } from "@/lib/upload/zip-project";
+import { reportServerError } from "@/lib/observability/server";
+import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,10 @@ export async function POST(request: Request) {
   let uploadedProject: Awaited<ReturnType<typeof extractProjectZipBuffer>> | null = null;
 
   try {
+    const betaUser = await getBetaUser();
+    if (!betaUser) return NextResponse.json({ error: "Private beta access is required." }, { status: 401 });
+    const quota = await enforceBetaScanQuota(betaUser.id);
+    if (!quota.allowed) return NextResponse.json({ error: "Daily beta scan limit reached. Try again later." }, { status: 429, headers: { "Retry-After": quota.retryAfterSeconds.toString() } });
     const rateLimit = await enforcePublicScanRateLimit(request, "github");
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -59,7 +65,7 @@ export async function POST(request: Request) {
         ...archive.repository,
         branch: archive.branch,
       },
-    }, archive.name, readAuditProfileMode(params));
+    }, archive.name, readAuditProfileMode(params), betaUser.id);
 
     return NextResponse.json({
       ...response,
@@ -67,6 +73,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const payload = githubErrorPayload(error);
+    if (payload.status >= 500) reportServerError("github_scan_failed", { status: payload.status });
     return NextResponse.json(payload.body, { status: payload.status });
   } finally {
     await uploadedProject?.cleanup();

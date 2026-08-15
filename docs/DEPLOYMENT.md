@@ -4,6 +4,12 @@
 
 Vibe is currently a single-user MVP. A public deployment may scan uploaded ZIP archives and public GitHub repositories. Private GitHub access and OpenAI enhancement should be enabled only for a trusted deployment because multi-user authorization, tenant isolation, quotas, and billing are post-MVP.
 
+## Scan data retention and monitoring
+
+- Saved scan payloads expire automatically after 30 days by default. Set `VIBE_SCAN_RETENTION_DAYS` to a positive number of days when a shorter policy is required.
+- There is no public delete-by-ID endpoint because the MVP has no user ownership boundary. Expiry is the safe deletion mechanism until Phase 4 accounts exist.
+- Core scan and persistence failures emit redacted structured events to Vercel runtime logs. Configure a Vercel log alert or connect an error tracker before inviting beta users.
+
 ## Required Services
 
 - Node.js 22 runtime

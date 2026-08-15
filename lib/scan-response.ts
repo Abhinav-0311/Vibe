@@ -21,6 +21,7 @@ export async function createScanResponse(
   },
   projectName = path.basename(projectPath),
   profileMode: AuditProfileMode = "auto",
+  userId?: string,
 ): Promise<ScanApiResponse> {
   const facts = await scanProject(projectPath);
   const profileInference = profileMode === "manual" ? selectedAuditProfile(context) : inferAuditProfile(facts, context);
@@ -50,7 +51,9 @@ export async function createScanResponse(
     setupPack,
     architectureStress,
   };
-  const persistence = await saveScanRecord(response);
+  const persistence = userId
+    ? await saveScanRecord(response, userId)
+    : { attempted: false, saved: false, reason: "missing_database_url" as const };
 
   return {
     ...response,

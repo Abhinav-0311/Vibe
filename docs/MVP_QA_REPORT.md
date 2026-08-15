@@ -1,11 +1,11 @@
 # MVP QA Report
 
-Date: 2026-07-05
+Date: 2026-08-11
 
 ## Automated Gates
 
 - ESLint 9: passed with no warnings or errors
-- Vitest: 88 tests across 17 files passed
+- Vitest: 101 tests across 19 files passed
 - Next.js production build: passed
 - TypeScript validation: passed through the production build
 - Secret-pattern scan: no committed GitHub or OpenAI token pattern detected
@@ -38,16 +38,27 @@ Environment: local Next.js server at `http://localhost:3005`.
 
 Environment: Vercel production deployment at `https://vibe-seven-snowy.vercel.app`.
 
-- Production deployment is ready on commit `1ded341`.
+- Production deployment is ready on commit `cdce3c9`.
 - `/api/health` returned application `ok` and database `ok`.
 - Production database migrations were applied to Neon PostgreSQL.
 - Hosted deployment uses GitHub and ZIP scanning; local workspace scanning is disabled for Vercel.
+- Security headers are active: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and `Cross-Origin-Opener-Policy`.
+- Public GitHub and ZIP scans are limited to four requests per minute per visitor with durable PostgreSQL-backed enforcement.
+
+## Phase 4 Browser QA
+
+Environment: Vercel production deployment, verified with Playwright browser automation.
+
+- Desktop visual smoke check completed at 1440px with no console warnings or errors.
+- Responsive DOM checks at 375px, 768px, and 1440px found no horizontal overflow.
+- All visible primary controls met a 42px or greater touch-target height; primary scan actions are 48px or greater.
+- A real public scan of `Abhinav-0311/Vibe` completed successfully, rendered the score breakdown, empty finding state, report handoff, and AI workspace setup-pack preview.
+- The self-scan returned 100/100 for the selected prototype/content-site context with no browser-console errors.
 
 ## Known Environment Limits
 
-- Live private-repository OAuth and GitHub issue creation require the deployment owner's GitHub OAuth credentials and were not mutated during automated QA.
 - OpenAI enhancement remained disabled; deterministic fallback behavior is covered by mocked tests.
-- Playwright MCP browser automation was not available in this Codex desktop session, so the latest visual smoke check used HTTP checks and automated unit/build gates rather than screenshots.
+- Live private-repository OAuth and GitHub issue creation still require a configured GitHub OAuth app and were not mutated during browser QA.
 
 ## Release Verdict
 

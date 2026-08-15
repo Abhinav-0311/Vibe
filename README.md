@@ -4,6 +4,8 @@ Vibe is a launch-readiness auditor for AI-built apps. It scans a project, finds 
 
 Live deployment: [vibe-seven-snowy.vercel.app](https://vibe-seven-snowy.vercel.app)
 
+Production status: deployed from `main` with PostgreSQL-backed scan history and durable public-scan rate limiting. Check [`/api/health`](https://vibe-seven-snowy.vercel.app/api/health) for the current application and database status.
+
 It helps new coders, indie builders, and vibe coders answer one practical question:
 
 > My app runs locally. Is it ready for real users?
@@ -25,7 +27,7 @@ Vibe is a static repository scanner. It reads files and metadata, but it does no
 
 ## Publication Links
 
-- [Demo script](./docs/DEMO_SCRIPT.md)
+- [Phase 4 publication QA](./docs/PHASE_4_PUBLICATION_QA.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)
 - [Future roadmap](./docs/FUTURE_ROADMAP.md)
@@ -448,7 +450,6 @@ Planned:
 - [Product blueprint](./docs/planning/PRODUCT_BLUEPRINT.md)
 - [MVP execution plan](./docs/planning/MVP_EXECUTION_PLAN.md)
 - [Technical architecture](./docs/planning/TECHNICAL_ARCHITECTURE.md)
-- [Demo script](./docs/DEMO_SCRIPT.md)
 - [Deployment and recovery](./docs/DEPLOYMENT.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)

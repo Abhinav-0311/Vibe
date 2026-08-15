@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { runChecklist } from "@/lib/checklist/checklist-engine";
 import type { AuditContext } from "@/lib/checklist/types";
 import type { ScannerFacts } from "@/lib/scanner/types";
+import { scannerRegressionCases } from "@/tests/fixtures/scanner-regression-cases";
 
 const baseFacts: ScannerFacts = {
   projectRoot: "E:\\College\\Project\\Vibe",
@@ -62,13 +63,7 @@ const prototypeContext: AuditContext = {
   storesUserData: false,
 };
 
-const portfolioContext: AuditContext = {
-  appType: "content-site",
-  stage: "prototype",
-  hasPayments: false,
-  hasUserAccounts: false,
-  storesUserData: false,
-};
+const portfolioContext: AuditContext = scannerRegressionCases[0].context;
 
 const launchContext: AuditContext = {
   appType: "saas",
@@ -94,7 +89,8 @@ describe("runChecklist", () => {
   });
 
   it("keeps simple portfolio scans focused on public-site readiness", () => {
-    const result = runChecklist(baseFacts, portfolioContext);
+    const fixture = scannerRegressionCases[0];
+    const result = runChecklist(baseFacts, fixture.context);
     const findingIds = result.findings.map((finding) => finding.id);
     const severityById = new Map(result.findings.map((finding) => [finding.id, finding.severity]));
     const priorityById = new Map(result.findings.map((finding) => [finding.id, finding.actionPriority]));
@@ -108,8 +104,7 @@ describe("runChecklist", () => {
     expect(priorityById.get("missing-env-example")).toBe("optional");
     expect(priorityById.get("missing-tests")).toBe("recommended");
     expect(priorityById.get("missing-ai-rules")).toBe("recommended");
-    expect(findingIds).not.toContain("missing-auth");
-    expect(findingIds).not.toContain("missing-stripe");
+    for (const findingId of fixture.expectedAbsentFindingIds) expect(findingIds).not.toContain(findingId);
     expect(findingIds).not.toContain("missing-analytics");
     expect(findingIds).not.toContain("missing-error-tracking");
   });
@@ -297,7 +292,7 @@ describe("runChecklist", () => {
   it("raises wildcard CORS severity for apps handling user data", () => {
     const corsFacts: ScannerFacts = {
       ...baseFacts,
-      securityEvidence: { wildcardCorsFiles: ["app/api/data/route.ts"] },
+      securityEvidence: { wildcardCorsFiles: ["app/api/data/route.ts"], insecureSessionCookieFiles: [] },
       signals: {
         ...baseFacts.signals,
         hasWildcardCors: true,

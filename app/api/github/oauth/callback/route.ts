@@ -7,6 +7,7 @@ import {
   githubOauthVerifierCookie,
   githubTokenCookie,
 } from "@/lib/github/github-oauth";
+import { getBetaUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,8 @@ function appRedirect(status: "connected" | "denied" | "failed") {
 }
 
 export async function GET(request: Request) {
+  const betaUser = await getBetaUser();
+  if (!betaUser) return appRedirect("failed");
   const params = new URL(request.url).searchParams;
   if (params.get("error")) return appRedirect("denied");
 
@@ -50,7 +53,7 @@ export async function GET(request: Request) {
     const tokenBody = (await tokenResponse.json()) as { access_token?: string; error?: string };
     if (!tokenResponse.ok || !tokenBody.access_token) return appRedirect("failed");
 
-    cookieStore.set(githubTokenCookie, encryptGitHubToken(tokenBody.access_token), {
+    cookieStore.set(githubTokenCookie, encryptGitHubToken(tokenBody.access_token, betaUser.id), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",

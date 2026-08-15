@@ -48,25 +48,29 @@ export function createOAuthChallenge() {
   return { state, verifier, challenge };
 }
 
-export function encryptGitHubToken(token: string) {
+export function encryptGitHubToken(token: string, userId?: string) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+  const payload = userId ? JSON.stringify({ token, userId }) : token;
+  const encrypted = Buffer.concat([cipher.update(payload, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return [base64Url(iv), base64Url(tag), base64Url(encrypted)].join(".");
 }
 
-export function decryptGitHubToken(value: string) {
+export function decryptGitHubToken(value: string, expectedUserId?: string) {
   try {
     const [ivValue, tagValue, encryptedValue] = value.split(".");
     if (!ivValue || !tagValue || !encryptedValue) return null;
 
     const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivValue, "base64url"));
     decipher.setAuthTag(Buffer.from(tagValue, "base64url"));
-    return Buffer.concat([
+    const decrypted = Buffer.concat([
       decipher.update(Buffer.from(encryptedValue, "base64url")),
       decipher.final(),
     ]).toString("utf8");
+    if (!expectedUserId) return decrypted;
+    const payload = JSON.parse(decrypted) as { token?: unknown; userId?: unknown };
+    return payload.userId === expectedUserId && typeof payload.token === "string" ? payload.token : null;
   } catch {
     return null;
   }

@@ -6,10 +6,12 @@ import {
   githubOauthStateCookie,
   githubOauthVerifierCookie,
 } from "@/lib/github/github-oauth";
+import { getBetaUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (!(await getBetaUser())) return NextResponse.json({ error: "Private beta access is required." }, { status: 401 });
   try {
     const config = getGitHubOAuthConfig();
     const challenge = createOAuthChallenge();

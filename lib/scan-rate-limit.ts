@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { rateLimitRetentionCutoff } from "@/lib/data-retention";
 
 const windowMs = 60_000;
 const maxRequestsPerWindow = 4;
@@ -50,6 +51,7 @@ async function consumeDatabaseRateLimit(key: string, now: Date): Promise<RateLim
   if (!prisma) return null;
 
   try {
+    await prisma.scanRateLimit.deleteMany({ where: { updatedAt: { lt: rateLimitRetentionCutoff(now) } } });
     const windowStart = new Date(now.getTime() - windowMs);
     const rows = await prisma.$queryRaw<Array<{ count: number; windowStart: Date }>>(Prisma.sql`
       INSERT INTO "ScanRateLimit" ("key", "windowStart", "count", "updatedAt")

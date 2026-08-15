@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import type { WorkspaceProject, WorkspaceProjectsApiResponse } from "@/lib/scan-api";
 import { allowedWorkspaceRoot, isLocalWorkspaceScanEnabled } from "@/lib/workspace-paths";
+import { getBetaUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ async function pathExists(targetPath: string) {
 }
 
 export async function GET() {
+  if (!(await getBetaUser())) return NextResponse.json({ error: "Private beta access is required." }, { status: 401 });
   if (!isLocalWorkspaceScanEnabled()) {
     return NextResponse.json({
       workspaceRoot: "",

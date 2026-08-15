@@ -55,7 +55,6 @@ flowchart LR
 4. Export the AI workspace setup pack.
 5. Show saved scan history and PostgreSQL archive.
 
-For a timed walkthrough, use [DEMO_SCRIPT.md](./DEMO_SCRIPT.md).
 
 ## Engineering Value Demonstrated
 

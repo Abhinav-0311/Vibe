@@ -33,7 +33,7 @@ const facts = {
     hasNextConfig: true,
     hasAppRouter: true,
   },
-} as ScannerFacts;
+} as unknown as ScannerFacts;
 
 const checklist: ChecklistResult = {
   score: 64,

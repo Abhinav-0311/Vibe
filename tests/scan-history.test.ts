@@ -133,7 +133,7 @@ describe("scan history", () => {
   });
 
   it("keeps only the six newest scans", () => {
-    const history = Array.from({ length: 8 }).reduce(
+    const history = Array.from({ length: 8 }).reduce<ReturnType<typeof addScanToHistory>>(
       (currentHistory, _, index) =>
         addScanToHistory(currentHistory, createScan(`2026-06-13T00:0${index}:00.000Z`, 100 - index)),
       [] as ReturnType<typeof addScanToHistory>,
@@ -143,7 +143,7 @@ describe("scan history", () => {
     expect(history[0].scan.scannedAt).toBe("2026-06-13T00:07:00.000Z");
   });
 
-  it("compares only the same source and readiness profile", () => {
+  it("proves a user can fix one finding and verify it through a comparable re-scan", () => {
     const baseline = createScan("2026-06-13T00:00:00.000Z", 72, ["missing-tests", "missing-env-example"]);
     const current = createScan("2026-06-13T00:05:00.000Z", 86, ["missing-env-example", "missing-rate-limiting"]);
     const comparison = compareScans(baseline, current);

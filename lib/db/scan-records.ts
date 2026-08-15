@@ -2,6 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { getPrisma, isDatabaseConfigured } from "@/lib/prisma";
 import type { ScanApiResponse } from "@/lib/scan-api";
 import { createScanHash } from "@/lib/scan-fingerprint";
+import { scanRetentionCutoff } from "@/lib/data-retention";
+import { reportServerError } from "@/lib/observability/server";
 
 export type ScanPersistenceResult = {
   attempted: boolean;
@@ -78,7 +80,7 @@ function dedupeSavedScanRows<T extends { id: string; payload: Prisma.JsonValue }
   return deduped;
 }
 
-export async function saveScanRecord(scan: ScanApiResponse): Promise<ScanPersistenceResult> {
+export async function saveScanRecord(scan: ScanApiResponse, userId: string): Promise<ScanPersistenceResult> {
   const prisma = getPrisma();
 
   if (!prisma) {
@@ -90,16 +92,18 @@ export async function saveScanRecord(scan: ScanApiResponse): Promise<ScanPersist
   }
 
   try {
+    await prisma.scanRecord.deleteMany({ where: { updatedAt: { lt: scanRetentionCutoff() } } });
     const scanHash = createScanHash(scan);
     const existingRecord = await prisma.scanRecord.findUnique({
-      where: { scanHash },
+      where: { userId_scanHash: { userId, scanHash } },
       select: { id: true },
     });
 
     await prisma.scanRecord.upsert({
-      where: { scanHash },
+      where: { userId_scanHash: { userId, scanHash } },
       create: {
         scanHash,
+        userId,
         projectName: scan.scannedProject,
         appType: scan.checklist.context.appType,
         stage: scan.checklist.context.stage,
@@ -124,8 +128,8 @@ export async function saveScanRecord(scan: ScanApiResponse): Promise<ScanPersist
       saved: true,
       deduplicated: Boolean(existingRecord),
     };
-  } catch (error) {
-    console.error("Failed to save scan record", error);
+  } catch {
+    reportServerError("scan_persistence_failed");
 
     return {
       attempted: true,
@@ -135,12 +139,13 @@ export async function saveScanRecord(scan: ScanApiResponse): Promise<ScanPersist
   }
 }
 
-export async function listSavedScanRecords(limit = 6): Promise<SavedScanRecord[]> {
+export async function listSavedScanRecords(userId: string, limit = 6): Promise<SavedScanRecord[]> {
   const prisma = getPrisma();
 
   if (!prisma || !isDatabaseConfigured()) return [];
 
   const records = await prisma.scanRecord.findMany({
+    where: { userId },
     orderBy: [{ scannedAt: "desc" }, { id: "desc" }],
     take: limit * 4,
     select: {
@@ -159,13 +164,13 @@ export async function listSavedScanRecords(limit = 6): Promise<SavedScanRecord[]
   return dedupeSavedScanRows(records).slice(0, limit).map(toSavedScanRecord);
 }
 
-export async function getSavedScanRecord(id: string): Promise<SavedScanDetail | null> {
+export async function getSavedScanRecord(id: string, userId: string): Promise<SavedScanDetail | null> {
   const prisma = getPrisma();
 
   if (!prisma || !isDatabaseConfigured()) return null;
 
-  const record = await prisma.scanRecord.findUnique({
-    where: { id },
+  const record = await prisma.scanRecord.findFirst({
+    where: { id, userId },
     select: {
       id: true,
       projectName: true,

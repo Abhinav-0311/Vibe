@@ -3,6 +3,8 @@ import { readAuditContext, readAuditProfileMode } from "@/lib/audit-context";
 import { createScanResponse } from "@/lib/scan-response";
 import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
 import { extractUploadedProject, UploadValidationError } from "@/lib/upload/zip-project";
+import { reportServerError } from "@/lib/observability/server";
+import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,10 @@ export async function POST(request: Request) {
   let uploadedProject: Awaited<ReturnType<typeof extractUploadedProject>> | null = null;
 
   try {
+    const betaUser = await getBetaUser();
+    if (!betaUser) return NextResponse.json({ error: "Private beta access is required." }, { status: 401 });
+    const quota = await enforceBetaScanQuota(betaUser.id);
+    if (!quota.allowed) return NextResponse.json({ error: "Daily beta scan limit reached. Try again later." }, { status: 429, headers: { "Retry-After": quota.retryAfterSeconds.toString() } });
     const rateLimit = await enforcePublicScanRateLimit(request, "upload");
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -42,13 +48,14 @@ export async function POST(request: Request) {
       type: "upload",
       label: "ZIP upload",
       detail: formatUploadDetail(file.name, uploadedProject.relativeProjectRoot),
-    }, projectName, readAuditProfileMode(searchParams));
+    }, projectName, readAuditProfileMode(searchParams), betaUser.id);
 
     return NextResponse.json({
       ...response,
       scannedProject: projectName,
     });
   } catch (error) {
+    if (!(error instanceof UploadValidationError)) reportServerError("upload_scan_failed", { status: 500 });
     return NextResponse.json(
       { error: error instanceof UploadValidationError ? error.message : "Vibe could not safely inspect this upload. Try a different ZIP." },
       { status: error instanceof UploadValidationError ? 400 : 500 },
