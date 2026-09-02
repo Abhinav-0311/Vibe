@@ -25,7 +25,7 @@ export function resolveWorkspaceProjectPath(value: string | null): ProjectPathRe
   }
 
   const requestedPath = value?.trim() || process.cwd();
-  const resolvedPath = path.resolve(requestedPath);
+  const resolvedPath = path.resolve(/* turbopackIgnore: true */ requestedPath);
   const relativePath = path.relative(allowedWorkspaceRoot, resolvedPath);
   const isInsideWorkspace =
     relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
@@ -36,7 +36,7 @@ export function resolveWorkspaceProjectPath(value: string | null): ProjectPathRe
     };
   }
 
-  if (!existsSync(resolvedPath)) {
+  if (!existsSync(/* turbopackIgnore: true */ resolvedPath)) {
     return {
       error: "Project path does not exist.",
     };

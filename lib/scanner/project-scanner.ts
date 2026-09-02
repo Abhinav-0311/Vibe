@@ -213,7 +213,7 @@ async function detectFiles(projectRoot: string): Promise<DetectedFile[]> {
   return Promise.all(
     relativePaths.map(async (relativePath) => ({
       path: relativePath,
-      exists: await pathExists(path.join(projectRoot, relativePath)),
+      exists: await pathExists(path.join(/* turbopackIgnore: true */ projectRoot, relativePath)),
     })),
   );
 }
@@ -230,7 +230,9 @@ async function detectTests(projectRoot: string) {
     "playwright.config.ts",
   ];
 
-  const results = await Promise.all(likelyTestPaths.map((testPath) => pathExists(path.join(projectRoot, testPath))));
+  const results = await Promise.all(
+    likelyTestPaths.map((testPath) => pathExists(path.join(/* turbopackIgnore: true */ projectRoot, testPath))),
+  );
   return results.some(Boolean);
 }
 
@@ -284,7 +286,7 @@ async function collectRouteFiles(root: string, matcher: RegExp) {
 }
 
 async function collectUiSourceFiles(projectRoot: string) {
-  const roots = ["app", "pages", "components", "src"].map((root) => path.join(projectRoot, root));
+  const roots = ["app", "pages", "components", "src"].map((root) => path.join(/* turbopackIgnore: true */ projectRoot, root));
   const files: string[] = [];
 
   async function visit(directory: string, depth: number) {
