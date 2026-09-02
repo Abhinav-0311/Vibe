@@ -15,7 +15,8 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 - PostgreSQL scan archive, deduplication, restore, and health visibility
 - Google private-beta sign-in, invite gating, per-user scan ownership, and quotas
 - Comparable re-scan progress, durable readiness trends, and PR-ready handoff briefs
-- Optional OpenAI report enhancement with deterministic fallback
+- Optional evidence-grounded OpenAI FixPlans with strict schema validation, deterministic fallback, token/cost metadata, and regression coverage
+- Versioned Next.js guidance with official source links, verification routes, and private-beta feedback
 - README, QA report, deployment notes, portfolio case study, and private-beta runbook
 
 ## Publication Polish
@@ -47,9 +48,8 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 
 - Workspace-specific remediation templates
 - Safer multi-step fix planning with user approval checkpoints
-- Optional model comparison for prompt quality
-- Evaluation harness for generated prompts and setup-pack quality
-- More explicit cost and token reporting for AI-enhanced reports
+- Optional model comparison for prompt quality once a real evaluation corpus exists
+- Evaluation harness for generated prompts and setup-pack quality after beta users provide feedback
 
 ## Enterprise Readiness
 

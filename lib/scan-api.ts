@@ -19,6 +19,10 @@ export type ScanApiResponse = {
     };
   };
   scannedAt: string;
+  timing?: {
+    /** Scan processing only; persistence happens after this response is assembled. */
+    processingMs: number;
+  };
   facts: ScannerFacts;
   profileInference?: AuditProfileInference;
   checklist: ChecklistResult;

@@ -1,14 +1,16 @@
 # MVP QA Report
 
-Date: 2026-08-11
+Date: 2026-09-02
 
 ## Automated Gates
 
 - ESLint 9: passed with no warnings or errors
-- Vitest: 101 tests across 19 files passed
+- Vitest: 116 tests across 21 executed test files passed
 - Next.js production build: passed
 - TypeScript validation: passed through the production build
 - Secret-pattern scan: no committed GitHub or OpenAI token pattern detected
+
+This validation reflects the local checkout, including the Phase 6 FixPlan reliability layer and Phase 7 trusted-guidance implementation. The pending `GuidanceFeedback` production migration must be applied before feedback persistence is available in Vercel.
 
 Latest local commands:
 

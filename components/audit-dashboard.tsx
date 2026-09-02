@@ -41,7 +41,7 @@ import type {
 import { addScanToHistory, parseScanHistory, scanHistoryStorageKey, type ScanHistoryItem } from "@/lib/scan-history";
 import type { SetupArtifact, SetupPack } from "@/lib/setup-pack/types";
 import { createPullRequestBrief } from "@/lib/github/pull-request-brief";
-import { getNextJsGuidance } from "@/lib/nextjs-guidance";
+import { getNextJsGuidance, type NextJsGuidance } from "@/lib/nextjs-guidance";
 import type { ReadinessTrendPoint } from "@/lib/db/scan-records";
 
 type ViewState = "report" | "loading" | "empty" | "error";
@@ -2143,6 +2143,10 @@ function ReadinessTrend({ scan, trend }: { scan: ScanApiResponse; trend: Readine
 function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
   const [copied, setCopied] = useState(false);
   const [copiedRequired, setCopiedRequired] = useState(false);
+  const [guidanceFeedback, setGuidanceFeedback] = useState<Record<string, boolean>>({});
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [savingGuidanceId, setSavingGuidanceId] = useState<string | null>(null);
+  const nextJsGuidance = useMemo(() => getNextJsGuidance(scan.facts), [scan.facts]);
   const markdownReport = useMemo(
     () =>
       formatMarkdownReport({
@@ -2190,8 +2194,61 @@ ${finding.prompt}`,
     window.setTimeout(() => setCopiedRequired(false), 1600);
   }
 
+  useEffect(() => {
+    if (nextJsGuidance.length === 0) return;
+    let active = true;
+
+    void fetch("/api/guidance-feedback")
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return (await response.json()) as { feedback?: Array<{ guidanceId: string; catalogVersion: string; helpful: boolean }> };
+      })
+      .then((body) => {
+        if (!active || !body?.feedback) return;
+        const visibleIds = new Set(nextJsGuidance.map((item) => `${item.catalogVersion}:${item.id}`));
+        setGuidanceFeedback(
+          Object.fromEntries(
+            body.feedback
+              .filter((item) => visibleIds.has(`${item.catalogVersion}:${item.guidanceId}`))
+              .map((item) => [`${item.catalogVersion}:${item.guidanceId}`, item.helpful]),
+          ),
+        );
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [nextJsGuidance]);
+
+  async function submitGuidanceFeedback(item: NextJsGuidance, helpful: boolean) {
+    const feedbackKey = `${item.catalogVersion}:${item.id}`;
+    const previous = guidanceFeedback[feedbackKey];
+    setFeedbackError(null);
+    setGuidanceFeedback((current) => ({ ...current, [feedbackKey]: helpful }));
+    setSavingGuidanceId(item.id);
+
+    try {
+      const response = await fetch("/api/guidance-feedback", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guidanceId: item.id, catalogVersion: item.catalogVersion, helpful }),
+      });
+      if (!response.ok) throw new Error("Feedback could not be saved.");
+    } catch {
+      setGuidanceFeedback((current) => {
+        const next = { ...current };
+        if (previous === undefined) delete next[feedbackKey];
+        else next[feedbackKey] = previous;
+        return next;
+      });
+      setFeedbackError("Feedback was not saved. Your scan result is unchanged.");
+    } finally {
+      setSavingGuidanceId(null);
+    }
+  }
+
   const generation = scan.report.generation;
-  const nextJsGuidance = getNextJsGuidance(scan.facts);
   const isAiEnhanced = generation?.mode === "openai";
   const fallbackMessage =
     generation?.fallbackReason && !["disabled", "missing_api_key"].includes(generation.fallbackReason)
@@ -2209,7 +2266,7 @@ ${finding.prompt}`,
           <div className="flex flex-wrap items-center gap-3">
             <p className="mono text-[11px] text-[#fc74dd]">Generated report</p>
             <span className={`mono rounded-full px-3 py-1 text-[9px] ${isAiEnhanced ? "bg-[#fc74dd] text-black" : "bg-black text-[#d9d9d9]"}`}>
-              {isAiEnhanced ? `AI enhanced / ${generation?.model}` : "Evidence generated"}
+              {isAiEnhanced ? `AI fix plans / ${generation?.model}` : "Evidence generated"}
             </span>
           </div>
           {isAiEnhanced && generation && (
@@ -2218,7 +2275,16 @@ ${finding.prompt}`,
               {generation.usage
                 ? ` / ${generation.usage.inputTokens} input tokens / ${generation.usage.outputTokens} output tokens`
                 : ""}
+              {generation.reliability
+                ? ` / ${generation.reliability.groundedFindingPlans}/${generation.reliability.totalFindingPlans} evidence-linked plans`
+                : ""}
+              {generation.reliability?.estimatedCostUsd !== undefined
+                ? ` / $${generation.reliability.estimatedCostUsd.toFixed(4)} estimate`
+                : ""}
             </p>
+          )}
+          {scan.timing && (
+            <p className="mono mt-2 text-[9px] text-[#777171]">Scan processed in {(scan.timing.processingMs / 1000).toFixed(1)}s</p>
           )}
           {fallbackMessage && <p className="mt-3 text-xs leading-5 text-[#ffd166]">{fallbackMessage}</p>}
           <h2 className="mt-4 max-w-xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
@@ -2283,10 +2349,34 @@ ${finding.prompt}`,
           <p className="mono text-[10px] text-[#9b9696]">{scan.report.promptQueueSummary}</p>
           {nextJsGuidance.length > 0 && (
             <div className="rounded-[24px] border border-[#2f2a2a] bg-black p-5">
-              <p className="mono text-[10px] text-[#fc74dd]">Next.js engineering brief</p>
-              <div className="mt-4 grid gap-3">
-                {nextJsGuidance.map((item) => <div key={item.title} className="border-t border-[#2f2a2a] pt-3 first:border-0 first:pt-0"><p className="text-sm font-semibold text-white">{item.title}</p><p className="mt-1 text-xs text-[#9b9696]">{item.evidence}</p><p className="mt-2 text-sm leading-6 text-[#d9d9d9]">{item.recommendation}</p></div>)}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="mono text-[10px] text-[#fc74dd]">Trusted Next.js guidance</p>
+                <p className="mono text-[9px] text-[#777171]">Reviewed catalog · {nextJsGuidance[0]?.catalogVersion}</p>
               </div>
+              <div className="mt-4 grid gap-3">
+                {nextJsGuidance.map((item) => {
+                  const feedbackKey = `${item.catalogVersion}:${item.id}`;
+                  const feedback = guidanceFeedback[feedbackKey];
+                  const isSaving = savingGuidanceId === item.id;
+                  return (
+                    <div key={item.id} className="border-t border-[#2f2a2a] pt-4 first:border-0 first:pt-0">
+                      <p className="text-sm font-semibold text-white">{item.title}</p>
+                      <p className="mt-1 text-xs text-[#9b9696]">Why this: {item.evidence}</p>
+                      <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">{item.recommendation}</p>
+                      <p className="mt-3 text-xs leading-5 text-[#b7b1b1]">Verify: {item.verification}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <a href={item.source.url} target="_blank" rel="noreferrer" className="mono text-[9px] text-[#fc74dd] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]">
+                          {item.source.label} ↗
+                        </a>
+                        <span className="mono text-[9px] text-[#777171]">Useful?</span>
+                        <button onClick={() => void submitGuidanceFeedback(item, true)} disabled={isSaving} aria-pressed={feedback === true} className={`mono rounded-full border px-3 py-1 text-[9px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:opacity-50 ${feedback === true ? "border-[#a7f35b] bg-[#07130d] text-[#a7f35b]" : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white"}`}>Yes</button>
+                        <button onClick={() => void submitGuidanceFeedback(item, false)} disabled={isSaving} aria-pressed={feedback === false} className={`mono rounded-full border px-3 py-1 text-[9px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:opacity-50 ${feedback === false ? "border-[#ffd166] bg-[#211d10] text-[#ffd166]" : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white"}`}>Not yet</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {feedbackError && <p role="alert" className="mt-4 text-xs leading-5 text-[#ffd166]">{feedbackError}</p>}
             </div>
           )}
         </div>

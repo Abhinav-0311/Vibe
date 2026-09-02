@@ -39,6 +39,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   scans         ScanRecord[]
+  guidanceFeedback GuidanceFeedback[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -94,4 +95,19 @@ model ScanRateLimit {
   updatedAt   DateTime @updatedAt
 
   @@index([updatedAt])
+}
+
+model GuidanceFeedback {
+  id             String   @id @default(cuid())
+  userId         String
+  guidanceId     String
+  catalogVersion String
+  helpful        Boolean
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, guidanceId, catalogVersion])
+  @@index([userId, updatedAt])
 }

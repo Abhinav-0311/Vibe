@@ -8,6 +8,8 @@ const originalEnvironment = {
   enabled: process.env.OPENAI_REPORT_ENABLED,
   apiKey: process.env.OPENAI_API_KEY,
   model: process.env.OPENAI_REPORT_MODEL,
+  inputPrice: process.env.OPENAI_REPORT_INPUT_COST_PER_MILLION_USD,
+  outputPrice: process.env.OPENAI_REPORT_OUTPUT_COST_PER_MILLION_USD,
 };
 
 afterEach(() => {
@@ -18,6 +20,10 @@ afterEach(() => {
   else process.env.OPENAI_API_KEY = originalEnvironment.apiKey;
   if (originalEnvironment.model === undefined) delete process.env.OPENAI_REPORT_MODEL;
   else process.env.OPENAI_REPORT_MODEL = originalEnvironment.model;
+  if (originalEnvironment.inputPrice === undefined) delete process.env.OPENAI_REPORT_INPUT_COST_PER_MILLION_USD;
+  else process.env.OPENAI_REPORT_INPUT_COST_PER_MILLION_USD = originalEnvironment.inputPrice;
+  if (originalEnvironment.outputPrice === undefined) delete process.env.OPENAI_REPORT_OUTPUT_COST_PER_MILLION_USD;
+  else process.env.OPENAI_REPORT_OUTPUT_COST_PER_MILLION_USD = originalEnvironment.outputPrice;
 });
 
 const facts = {
@@ -78,7 +84,7 @@ function enableOpenAI() {
 }
 
 describe("enhanceReportWithOpenAI", () => {
-  it("merges validated narrative and prompts without changing deterministic findings", async () => {
+  it("merges a grounded FixPlan without changing deterministic findings or summary", async () => {
     enableOpenAI();
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
@@ -90,15 +96,13 @@ describe("enhanceReportWithOpenAI", () => {
                 {
                   type: "output_text",
                   text: JSON.stringify({
-                    executiveSummary:
-                      "This launch-prep SaaS has one evidence-backed critical security blocker in its login flow.",
-                    interpretation:
-                      "Keep the current score and resolve the detected login throttling gap before onboarding users.",
-                    findingPrompts: [
+                    findingPlans: [
                       {
                         id: "auth-rate-limit",
+                        evidence: "Found app/api/login/route.ts without limiter evidence.",
                         implementationPrompt:
                           "Inspect app/api/login/route.ts and add a tested rate limiter using existing project patterns. Cover repeated failures and recovery behavior.",
+                        verification: [],
                       },
                     ],
                   }),
@@ -126,6 +130,13 @@ describe("enhanceReportWithOpenAI", () => {
       evidence: checklist.findings[0].evidence,
     });
     expect(result.checklist.findings[0].prompt).toContain("tested rate limiter");
+    expect(result.report.executiveSummary).toBe(report.executiveSummary);
+    expect(result.report.generation?.reliability).toEqual({
+      promptVersion: "fix-plan-v1",
+      schemaValidated: true,
+      groundedFindingPlans: 1,
+      totalFindingPlans: 1,
+    });
 
     const request = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as {
       store: boolean;
@@ -150,9 +161,14 @@ describe("enhanceReportWithOpenAI", () => {
                 {
                   type: "output_text",
                   text: JSON.stringify({
-                    executiveSummary: "A sufficiently long but invalid model-generated summary for this report.",
-                    interpretation: "A sufficiently long interpretation that must still be rejected.",
-                    findingPrompts: [{ id: "invented-finding", implementationPrompt: "This prompt is long enough but belongs to an invented finding ID." }],
+                    findingPlans: [
+                      {
+                        id: "invented-finding",
+                        evidence: "Invented evidence.",
+                        implementationPrompt: "This prompt is long enough but belongs to an invented finding ID.",
+                        verification: [],
+                      },
+                    ],
                   }),
                 },
               ],
@@ -167,6 +183,80 @@ describe("enhanceReportWithOpenAI", () => {
 
     expect(result.report.generation).toMatchObject({ mode: "deterministic", fallbackReason: "invalid_output" });
     expect(result.checklist).toEqual(checklist);
+  });
+
+  it("rejects a plan whose evidence does not exactly match the deterministic finding", async () => {
+    enableOpenAI();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: "message",
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    findingPlans: [
+                      {
+                        id: "auth-rate-limit",
+                        evidence: "The model replaced the scanner evidence with an unsupported claim.",
+                        implementationPrompt: "Inspect the login route and add rate limiting with focused tests for repeated attempts.",
+                        verification: [],
+                      },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await enhanceReportWithOpenAI({ projectName: "Vibe", facts, checklist, report }, fetchMock);
+
+    expect(result.report.generation).toMatchObject({ mode: "deterministic", fallbackReason: "invalid_output" });
+    expect(result.checklist).toEqual(checklist);
+  });
+
+  it("records a cost estimate only when current input and output prices are configured", async () => {
+    enableOpenAI();
+    process.env.OPENAI_REPORT_INPUT_COST_PER_MILLION_USD = "2";
+    process.env.OPENAI_REPORT_OUTPUT_COST_PER_MILLION_USD = "10";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: "message",
+              content: [
+                {
+                  type: "output_text",
+                  text: JSON.stringify({
+                    findingPlans: [
+                      {
+                        id: "auth-rate-limit",
+                        evidence: "Found app/api/login/route.ts without limiter evidence.",
+                        implementationPrompt: "Inspect app/api/login/route.ts and add a focused, tested rate limiter for repeated attempts.",
+                        verification: [],
+                      },
+                    ],
+                  }),
+                },
+              ],
+            },
+          ],
+          usage: { input_tokens: 400, output_tokens: 120 },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await enhanceReportWithOpenAI({ projectName: "Vibe", facts, checklist, report }, fetchMock);
+
+    expect(result.report.generation?.reliability?.estimatedCostUsd).toBe(0.002);
   });
 
   it("does not call OpenAI when enhancement is disabled", async () => {

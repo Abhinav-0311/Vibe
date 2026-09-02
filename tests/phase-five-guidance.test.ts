@@ -11,9 +11,11 @@ const facts: ScannerFacts = {
 
 const finding: AuditFinding = { id: "env", title: "Missing environment docs", category: "Security", severity: "high", status: "open", evidence: "No .env.example", severityReason: "Secrets", impact: "Deployments can fail.", fix: "Add .env.example.", verification: ["Run build"], prompt: "Create environment docs.", actionPriority: "required" };
 
-describe("phase five guidance", () => {
-  it("gives only evidence-backed Next.js guidance", () => {
-    expect(getNextJsGuidance(facts).map((item) => item.title)).toEqual(["Define route boundaries", "Keep route handlers narrow", "Document runtime configuration"]);
+describe("trusted guidance", () => {
+  it("gives only versioned, evidence-backed Next.js guidance with verification routes", () => {
+    const guidance = getNextJsGuidance(facts);
+    expect(guidance.map((item) => item.id)).toEqual(["nextjs-route-recovery", "nextjs-route-handler-boundaries", "nextjs-environment-boundaries"]);
+    expect(guidance.every((item) => item.catalogVersion === "2026.08" && item.source.url.startsWith("https://nextjs.org/") && item.verification.length > 20)).toBe(true);
   });
 
   it("creates a reviewable PR handoff without changing a repository", () => {

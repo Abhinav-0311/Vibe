@@ -25,5 +25,12 @@ export type GeneratedReport = {
       inputTokens: number;
       outputTokens: number;
     };
+    reliability?: {
+      promptVersion: "fix-plan-v1";
+      schemaValidated: true;
+      groundedFindingPlans: number;
+      totalFindingPlans: number;
+      estimatedCostUsd?: number;
+    };
   };
 };

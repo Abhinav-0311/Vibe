@@ -29,6 +29,7 @@ Vibe is a static repository scanner. It reads files and metadata, but it does no
 
 - [Phase 4 publication QA](./docs/PHASE_4_PUBLICATION_QA.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
+- [90-second portfolio demo script](./docs/PORTFOLIO_DEMO.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)
 - [Future roadmap](./docs/FUTURE_ROADMAP.md)
 - [Limitations](./docs/LIMITATIONS.md)
@@ -78,6 +79,8 @@ Vibe is a static repository scanner. It reads files and metadata, but it does no
 - Generates a project-specific AI workspace setup pack without inventing unknown business facts.
 - Exports `AGENTS.md`, product, decision, roadmap, and user-profile memory, a session-start checklist, and an MCP/API wiring checklist as a ZIP.
 - Optionally improves report narrative and implementation prompts through evidence-constrained OpenAI structured output.
+- Provides a small versioned Next.js guidance catalog with scanner-specific evidence, official documentation links, verification routes, and owner-scoped helpfulness feedback.
+- Provides a small versioned Next.js guidance catalog with scanner-specific evidence, official documentation links, verification routes, and owner-scoped helpfulness feedback.
 - Runs a deterministic six-lens architecture stress test covering schema evolution, security, portability, cost, recovery, and stability.
 - Exposes dependency-aware service health at `/api/health`.
 - Enforces tests and the production build through GitHub Actions.
@@ -288,7 +291,10 @@ To enable it:
 1. Add a real server-side `OPENAI_API_KEY` in `.env`.
 2. Set `OPENAI_REPORT_ENABLED=true`.
 3. Keep `OPENAI_REPORT_MODEL` configurable for model availability and cost control.
-4. Restart the development server.
+4. Optionally set `OPENAI_REPORT_INPUT_COST_PER_MILLION_USD` and `OPENAI_REPORT_OUTPUT_COST_PER_MILLION_USD` using the current price for the selected model. Vibe records an estimate only when both values are set.
+5. Restart the development server.
+
+AI output is deliberately bounded: Vibe keeps the deterministic readiness score, findings, evidence, and report wording intact. The optional model returns one FixPlan per finding; each plan must preserve the finding ID, copy its scanner evidence and verification route exactly, and pass schema validation. Failed validation falls back to the deterministic report.
 
 Vibe sends normalized framework metadata, dependency names, route metadata, context, and findings. It does not send repository source code, environment values, package-script bodies, or the local project path. Requests use the Responses API with strict structured output and `store: false`. A timeout, API failure, or invalid response preserves the deterministic report.
 
@@ -437,6 +443,7 @@ Built:
 - deterministic architecture stress test
 - `/api/health`, GitHub Actions verification, and deployment/rollback runbook
 - portfolio case study and architecture diagram
+- recording-ready portfolio demo script with claim boundaries
 
 Planned:
 
@@ -452,6 +459,7 @@ Planned:
 - [Technical architecture](./docs/planning/TECHNICAL_ARCHITECTURE.md)
 - [Deployment and recovery](./docs/DEPLOYMENT.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
+- [Portfolio demo script](./docs/PORTFOLIO_DEMO.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)
 - [Future roadmap](./docs/FUTURE_ROADMAP.md)
 - [Limitations](./docs/LIMITATIONS.md)

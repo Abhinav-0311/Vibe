@@ -104,7 +104,7 @@ describe("runChecklist", () => {
     expect(priorityById.get("missing-env-example")).toBe("optional");
     expect(priorityById.get("missing-tests")).toBe("recommended");
     expect(priorityById.get("missing-ai-rules")).toBe("recommended");
-    for (const findingId of fixture.expectedAbsentFindingIds) expect(findingIds).not.toContain(findingId);
+    for (const findingId of fixture.expectedAbsentFindingIds ?? []) expect(findingIds).not.toContain(findingId);
     expect(findingIds).not.toContain("missing-analytics");
     expect(findingIds).not.toContain("missing-error-tracking");
   });
@@ -121,6 +121,18 @@ describe("runChecklist", () => {
     expect(result.findings.find((finding) => finding.id === "missing-auth")?.actionPriority).toBe("required");
     expect(result.findings.find((finding) => finding.id === "missing-tests")?.actionPriority).toBe("required");
     expect(findingIds).not.toContain("missing-middleware");
+  });
+
+  it.each(scannerRegressionCases)("keeps the regression fixture stable: $name", (fixture) => {
+    const facts: ScannerFacts = {
+      ...baseFacts,
+      ...fixture.factOverrides,
+      signals: { ...baseFacts.signals, ...fixture.factOverrides?.signals },
+    };
+    const findingIds = runChecklist(facts, fixture.context).findings.map((finding) => finding.id);
+
+    for (const findingId of fixture.expectedFindingIds ?? []) expect(findingIds).toContain(findingId);
+    for (const findingId of fixture.expectedAbsentFindingIds ?? []) expect(findingIds).not.toContain(findingId);
   });
 
   it("does not report missing systems when scanner facts show those systems exist", () => {

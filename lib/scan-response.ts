@@ -23,6 +23,7 @@ export async function createScanResponse(
   profileMode: AuditProfileMode = "auto",
   userId?: string,
 ): Promise<ScanApiResponse> {
+  const startedAt = Date.now();
   const facts = await scanProject(projectPath);
   const profileInference = profileMode === "manual" ? selectedAuditProfile(context) : inferAuditProfile(facts, context);
   const deterministicChecklist = runChecklist(facts, profileInference.applied);
@@ -44,6 +45,7 @@ export async function createScanResponse(
     scannedProject,
     scanSource: source,
     scannedAt,
+    timing: { processingMs: Date.now() - startedAt },
     facts,
     profileInference,
     checklist,
