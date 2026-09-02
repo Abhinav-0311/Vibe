@@ -1,6 +1,6 @@
 # Vibe
 
-Vibe is a launch-readiness auditor for AI-built apps. It scans a project, finds the production systems a builder likely missed, and turns each finding into evidence, teaching, and a coding-agent handoff.
+Vibe is a launch-readiness auditor for AI-built apps. It scans a project, finds the production systems a builder likely missed, and turns each finding into evidence, teaching, and an implementation handoff.
 
 Live deployment: [vibe-seven-snowy.vercel.app](https://vibe-seven-snowy.vercel.app)
 
@@ -29,7 +29,6 @@ Vibe is a static repository scanner. It reads files and metadata, but it does no
 
 - [Phase 4 publication QA](./docs/PHASE_4_PUBLICATION_QA.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
-- [90-second portfolio demo script](./docs/PORTFOLIO_DEMO.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)
 - [Future roadmap](./docs/FUTURE_ROADMAP.md)
 - [Limitations](./docs/LIMITATIONS.md)
@@ -443,7 +442,6 @@ Built:
 - deterministic architecture stress test
 - `/api/health`, GitHub Actions verification, and deployment/rollback runbook
 - portfolio case study and architecture diagram
-- recording-ready portfolio demo script with claim boundaries
 
 Planned:
 
@@ -459,7 +457,6 @@ Planned:
 - [Technical architecture](./docs/planning/TECHNICAL_ARCHITECTURE.md)
 - [Deployment and recovery](./docs/DEPLOYMENT.md)
 - [Portfolio case study](./docs/PORTFOLIO_CASE_STUDY.md)
-- [Portfolio demo script](./docs/PORTFOLIO_DEMO.md)
 - [MVP QA report](./docs/MVP_QA_REPORT.md)
 - [Future roadmap](./docs/FUTURE_ROADMAP.md)
 - [Limitations](./docs/LIMITATIONS.md)

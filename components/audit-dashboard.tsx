@@ -499,7 +499,7 @@ export function AuditDashboard() {
               id="findings"
               eyebrow="Fix this first"
               title="Start with the highest-risk misses."
-              description="This is the main product surface: score, prioritized findings, evidence, and the next prompt to give your coding agent."
+              description="This is the main product surface: score, prioritized findings, evidence, and the next implementation prompt."
             >
               <ReportView
                 report={reportWithStatuses}
@@ -645,8 +645,8 @@ function Hero() {
         <SignalPill
           icon={Clipboard}
           label="Fix"
-          value="Agent prompts"
-          detail="Turns each issue into evidence-backed prompts you can hand to a coding agent."
+          value="Fix prompts"
+          detail="Turns each issue into an evidence-backed implementation prompt."
         />
       </div>
     </section>
@@ -2466,7 +2466,7 @@ function SetupPackWorkspace({ setupPack }: { setupPack?: SetupPack }) {
         <div className="max-w-3xl">
           <p className="mono text-[11px] text-[#fc74dd]">AI workspace setup pack</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
-            Give coding agents durable project context.
+            Keep product context durable across implementation work.
           </h2>
           <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">{setupPack.summary}</p>
           <p className="mt-2 text-xs leading-5 text-[#9b9696]">
@@ -3323,7 +3323,7 @@ function EmptyState({ compact = false }: { compact?: boolean }) {
             No scan selected.
           </h2>
           <p className="mt-5 text-sm leading-6 text-[#d9d9d9]">
-            Paste a GitHub repository, upload a ZIP, or choose a local project above. Vibe will return a score, the highest-risk misses, and prompts you can hand to your coding agent.
+            Paste a GitHub repository, upload a ZIP, or choose a local project above. Vibe will return a score, the highest-risk misses, and copyable implementation prompts.
           </p>
         </div>
         <div className="grid gap-3">

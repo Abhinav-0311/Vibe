@@ -77,7 +77,7 @@ describe("generateReport", () => {
     expect(report.executiveSummary).toContain("20/100");
     expect(report.topRisks[0]?.severity).toBe("critical");
     expect(report.nextActions[0]).toContain("Then re-run the scan");
-    expect(report.promptQueueSummary).toContain("implementation prompts queued");
+    expect(report.promptQueueSummary).toContain("implementation prompts ready for handoff");
   });
 
   it("returns maintenance guidance when no findings exist", () => {

@@ -56,7 +56,7 @@ Tasks:
 - Parse `package.json`.
 - Detect Next.js routes and app structure.
 - Detect auth, Stripe, analytics, error tracking, tests, env files, middleware, and policy routes.
-- Detect AI workspace files such as `AGENTS.md`, `.cursor/rules`, `.cursorrules`, Claude/Codex notes, and project memory docs.
+- Detect project instruction files and project memory docs.
 - Return structured scanner facts.
 
 Verification:

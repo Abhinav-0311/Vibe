@@ -14,13 +14,13 @@ Primary users:
 - New developers building portfolio or startup projects
 - Indie hackers shipping quickly
 - Bootcamp students
-- Small business operators trying to configure AI coding or business agents
+- Small business operators trying to configure AI-assisted coding or business workflows
 
 Secondary users:
 
 - Agencies doing pre-handoff audits
 - Coding schools using readiness scores as a grading layer
-- AI automation consultants setting up Claude Code, Codex, Cursor, or MCP-based workflows
+- AI automation consultants setting up MCP-based workflows
 
 ## Core Promise
 
@@ -95,7 +95,7 @@ Status: complete for the current single-user product scope.
 
 Current behavior:
 
-- Copy-paste prompts for Cursor, Codex, Replit, or Copilot
+- Copy-paste implementation prompts
 - Deterministic Markdown implementation plans ordered by finding severity
 - GitHub issue creation after explicit user approval
 - Dedicated GitHub fix-branch creation after explicit user approval
@@ -124,7 +124,7 @@ This module is based on the idea that installing an AI coding tool is not enough
 
 MVP version:
 
-- Detect project instruction files such as `AGENTS.md`, `.cursor/rules`, `.cursorrules`, Claude/Codex notes, README setup sections, and automation checklists.
+- Detect project instruction files, README setup sections, and automation checklists.
 - Flag missing AI context files.
 - Recommend a minimal rules file.
 - Recommend memory file structure.
@@ -132,7 +132,7 @@ MVP version:
 
 Later version:
 
-- Generate full agent setup checklist.
+- Generate a complete implementation-workflow setup checklist.
 - Validate MCP configuration.
 - Validate API integration plan.
 - Produce a business automation readiness report.
@@ -149,7 +149,7 @@ Later version:
    - Do users pay?
    - Is user data stored?
    - Where will this be deployed?
-   - Is this project assisted by Cursor, Codex, Claude Code, or another AI coding tool?
+   - Does this project need durable implementation guidance or automation context?
 5. Vibe runs scanner jobs.
 6. Vibe checks app readiness and AI-workspace readiness.
 7. User sees a readiness report.

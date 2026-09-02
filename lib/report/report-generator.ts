@@ -120,7 +120,7 @@ function getPromptQueueSummary(checklist: ChecklistResult) {
   const criticalCount = checklist.findings.filter((finding) => finding.severity === "critical").length;
   const highCount = checklist.findings.filter((finding) => finding.severity === "high").length;
 
-  return `${checklist.findings.length} implementation prompt${checklist.findings.length === 1 ? "" : "s"} queued for the coding agent: ${criticalCount} critical, ${highCount} high, and ${checklist.findings.length - criticalCount - highCount} medium.`;
+  return `${checklist.findings.length} implementation prompt${checklist.findings.length === 1 ? "" : "s"} ready for handoff: ${criticalCount} critical, ${highCount} high, and ${checklist.findings.length - criticalCount - highCount} medium.`;
 }
 
 export function generateReport({ facts, checklist, scannedAt }: GenerateReportInput): GeneratedReport {

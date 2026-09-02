@@ -288,8 +288,8 @@ function learningFor(finding: AuditFinding): NonNullable<AuditFinding["learning"
       goodFix: "Document environment variables, commit lockfiles, keep build checks enabled, and verify a production build.",
     },
     "AI Workspace": {
-      explanation: "AI workspace readiness gives coding agents durable project context across sessions.",
-      commonMistake: "The agent is expected to remember product rules, brand voice, and boundaries from chat history alone.",
+      explanation: "AI workspace readiness keeps project context durable across implementation sessions.",
+      commonMistake: "Implementation work depends on product rules, brand voice, and boundaries that exist only in chat history.",
       goodFix: "Store product purpose, constraints, stack, safety rules, and mentoring expectations in a project rules file.",
     },
   };

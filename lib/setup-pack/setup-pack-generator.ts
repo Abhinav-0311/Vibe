@@ -53,7 +53,7 @@ function createRulesArtifact(input: GenerateSetupPackInput): SetupArtifact {
     id: "agents-rules",
     path: "AGENTS.md",
     title: "AI operating rules",
-    description: "Durable product, engineering, safety, and mentoring constraints for coding agents.",
+    description: "Durable product, engineering, safety, and mentoring constraints for implementation work.",
     kind: "rules",
     content: `# AGENTS.md
 
@@ -175,7 +175,7 @@ function createDecisionMemoryArtifact(): SetupArtifact {
     kind: "memory",
     content: `# Decision Log
 
-Record decisions that future contributors and coding agents must not silently reverse.
+Record decisions that future contributors must not silently reverse.
 
 ## Entry Template
 
@@ -229,7 +229,7 @@ ${
 
 ## Update Rule
 
-Move work between Now, Next, and Later only after the product owner confirms the priority. A coding agent must not promote an idea into active scope by itself.
+Move work between Now, Next, and Later only after the product owner confirms the priority. Do not promote an idea into active scope without that confirmation.
 `,
   };
 }
@@ -290,7 +290,7 @@ function createSessionArtifact(input: GenerateSetupPackInput): SetupArtifact {
     id: "session-start",
     path: "memory/session-start.md",
     title: "Session-start checklist",
-    description: "A repeatable startup sequence that restores context before an agent changes code.",
+    description: "A repeatable startup sequence that restores context before implementation work begins.",
     kind: "session",
     content: `# Session-Start Checklist
 
