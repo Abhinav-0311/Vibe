@@ -1,6 +1,6 @@
 import type { ScannerFacts } from "@/lib/scanner/types";
 
-export const nextJsGuidanceCatalogVersion = "2026.08";
+export const nextJsGuidanceCatalogVersion = "2026.09";
 
 export type NextJsGuidance = {
   id: string;
@@ -12,13 +12,15 @@ export type NextJsGuidance = {
   catalogVersion: typeof nextJsGuidanceCatalogVersion;
 };
 
+export type FrameworkGuidance = NextJsGuidance;
+
 function guidance(item: Omit<NextJsGuidance, "catalogVersion">): NextJsGuidance {
   return { ...item, catalogVersion: nextJsGuidanceCatalogVersion };
 }
 
 /** A small reviewed catalog selected only from scanner facts. */
 export function getNextJsGuidance(facts: ScannerFacts): NextJsGuidance[] {
-  if (facts.framework.name !== "Next.js") return [];
+  if (facts.framework.name !== "Next.js") return getViteGuidance(facts);
 
   const guidanceItems: NextJsGuidance[] = [];
   if (facts.signals.hasAppRouter && (!facts.uiEvidence?.hasLoadingState || !facts.uiEvidence?.hasErrorState)) {
@@ -63,4 +65,46 @@ export function getNextJsGuidance(facts: ScannerFacts): NextJsGuidance[] {
   }
 
   return guidanceItems.slice(0, 3);
+}
+
+function getViteGuidance(facts: ScannerFacts): FrameworkGuidance[] {
+  if (facts.framework.name !== "Vite" && facts.framework.name !== "Vite React") return [];
+
+  const guidanceItems: FrameworkGuidance[] = [];
+  if (facts.signals.hasEnvironmentVariableUsage && !facts.signals.hasEnvExample) {
+    guidanceItems.push(guidance({
+      id: "vite-environment-boundaries",
+      title: "Document Vite environment boundaries",
+      evidence: "Vite environment usage was detected, but no .env.example file was found.",
+      recommendation: "Document required variables without values. Treat VITE_ variables as browser-visible and never place secrets, database credentials, or private API keys behind that prefix.",
+      verification: "Build the app with safe placeholder values and verify that browser-visible variables contain no secrets while server-only values are handled by a backend boundary.",
+      source: { label: "Vite environment variables", url: "https://vite.dev/guide/env-and-mode" },
+    }));
+  }
+  if (!facts.signals.hasTests) {
+    guidanceItems.push(guidance({
+      id: "vite-verification-baseline",
+      title: "Add a focused Vite verification baseline",
+      evidence: "Vite project detected; no test setup signal was found.",
+      recommendation: "Start with component or domain tests around the highest-value workflow, then add a small browser smoke test for the production build.",
+      verification: "Add one repeatable test command and demonstrate that it fails when the primary workflow is deliberately broken.",
+      source: { label: "Vite guide", url: "https://vite.dev/guide/" },
+    }));
+  }
+  if (!facts.signals.hasBuildScript) {
+    guidanceItems.push(guidance({
+      id: "vite-production-build",
+      title: "Define a production build command",
+      evidence: "Vite project detected; no build script was found in package.json.",
+      recommendation: "Add a production build script and validate its output in a clean environment before deployment.",
+      verification: "Run the documented production build command and serve the generated output through the intended host or preview flow.",
+      source: { label: "Vite build guide", url: "https://vite.dev/guide/build" },
+    }));
+  }
+
+  return guidanceItems.slice(0, 3);
+}
+
+export function getFrameworkGuidance(facts: ScannerFacts): FrameworkGuidance[] {
+  return getNextJsGuidance(facts);
 }

@@ -41,7 +41,7 @@ import type {
 import { addScanToHistory, parseScanHistory, scanHistoryStorageKey, type ScanHistoryItem } from "@/lib/scan-history";
 import type { SetupArtifact, SetupPack } from "@/lib/setup-pack/types";
 import { createPullRequestBrief } from "@/lib/github/pull-request-brief";
-import { getNextJsGuidance, type NextJsGuidance } from "@/lib/nextjs-guidance";
+import { getFrameworkGuidance, type FrameworkGuidance } from "@/lib/nextjs-guidance";
 import type { ReadinessTrendPoint } from "@/lib/db/scan-records";
 
 type ViewState = "report" | "loading" | "empty" | "error";
@@ -2146,7 +2146,7 @@ function ReportNarrative({ scan }: { scan: ScanApiResponse }) {
   const [guidanceFeedback, setGuidanceFeedback] = useState<Record<string, boolean>>({});
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [savingGuidanceId, setSavingGuidanceId] = useState<string | null>(null);
-  const nextJsGuidance = useMemo(() => getNextJsGuidance(scan.facts), [scan.facts]);
+  const frameworkGuidance = useMemo(() => getFrameworkGuidance(scan.facts), [scan.facts]);
   const markdownReport = useMemo(
     () =>
       formatMarkdownReport({
@@ -2195,7 +2195,7 @@ ${finding.prompt}`,
   }
 
   useEffect(() => {
-    if (nextJsGuidance.length === 0) return;
+    if (frameworkGuidance.length === 0) return;
     let active = true;
 
     void fetch("/api/guidance-feedback")
@@ -2205,7 +2205,7 @@ ${finding.prompt}`,
       })
       .then((body) => {
         if (!active || !body?.feedback) return;
-        const visibleIds = new Set(nextJsGuidance.map((item) => `${item.catalogVersion}:${item.id}`));
+        const visibleIds = new Set(frameworkGuidance.map((item) => `${item.catalogVersion}:${item.id}`));
         setGuidanceFeedback(
           Object.fromEntries(
             body.feedback
@@ -2219,9 +2219,9 @@ ${finding.prompt}`,
     return () => {
       active = false;
     };
-  }, [nextJsGuidance]);
+  }, [frameworkGuidance]);
 
-  async function submitGuidanceFeedback(item: NextJsGuidance, helpful: boolean) {
+  async function submitGuidanceFeedback(item: FrameworkGuidance, helpful: boolean) {
     const feedbackKey = `${item.catalogVersion}:${item.id}`;
     const previous = guidanceFeedback[feedbackKey];
     setFeedbackError(null);
@@ -2347,14 +2347,14 @@ ${finding.prompt}`,
           </div>
 
           <p className="mono text-[10px] text-[#9b9696]">{scan.report.promptQueueSummary}</p>
-          {nextJsGuidance.length > 0 && (
+          {frameworkGuidance.length > 0 && (
             <div className="rounded-[24px] border border-[#2f2a2a] bg-black p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="mono text-[10px] text-[#fc74dd]">Trusted Next.js guidance</p>
-                <p className="mono text-[9px] text-[#777171]">Reviewed catalog · {nextJsGuidance[0]?.catalogVersion}</p>
+                <p className="mono text-[10px] text-[#fc74dd]">Trusted {scan.facts.framework.name} guidance</p>
+                <p className="mono text-[9px] text-[#777171]">Reviewed catalog · {frameworkGuidance[0]?.catalogVersion}</p>
               </div>
               <div className="mt-4 grid gap-3">
-                {nextJsGuidance.map((item) => {
+                {frameworkGuidance.map((item) => {
                   const feedbackKey = `${item.catalogVersion}:${item.id}`;
                   const feedback = guidanceFeedback[feedbackKey];
                   const isSaving = savingGuidanceId === item.id;
@@ -2938,13 +2938,52 @@ function FindingDetail({
   const [issueUrl, setIssueUrl] = useState<string | null>(null);
   const [notRelevantReason, setNotRelevantReason] = useState("");
   const [prBriefCopied, setPrBriefCopied] = useState(false);
+  const [findingFeedback, setFindingFeedback] = useState<boolean | undefined>(undefined);
+  const [findingFeedbackState, setFindingFeedbackState] = useState<"idle" | "saving" | "error">("idle");
+  const selectedFindingId = finding?.id;
 
   useEffect(() => {
     setIssueState("idle");
     setIssueError(null);
     setIssueUrl(null);
     setNotRelevantReason(finding?.statusReason ?? "");
+    setFindingFeedback(undefined);
+    setFindingFeedbackState("idle");
   }, [finding?.id, finding?.statusReason]);
+
+  useEffect(() => {
+    if (!selectedFindingId) return;
+    let active = true;
+    void fetch("/api/finding-feedback")
+      .then(async (response) => (response.ok ? (await response.json()) as { feedback?: Array<{ findingId: string; helpful: boolean }> } : null))
+      .then((body) => {
+        if (!active) return;
+        setFindingFeedback(body?.feedback?.find((item) => item.findingId === selectedFindingId)?.helpful);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [selectedFindingId]);
+
+  async function submitFindingFeedback(helpful: boolean) {
+    if (!finding) return;
+    const previous = findingFeedback;
+    setFindingFeedback(helpful);
+    setFindingFeedbackState("saving");
+    try {
+      const response = await fetch("/api/finding-feedback", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ findingId: finding.id, helpful }),
+      });
+      if (!response.ok) throw new Error("Feedback could not be saved.");
+      setFindingFeedbackState("idle");
+    } catch {
+      setFindingFeedback(previous);
+      setFindingFeedbackState("error");
+    }
+  }
 
   async function createGitHubIssue() {
     if (!finding || !repository) return;
@@ -2994,6 +3033,27 @@ function FindingDetail({
         <DetailBlock title="Evidence" body={finding.evidence} />
         <DetailBlock title="Impact" body={finding.impact} />
         <DetailBlock title="Suggested fix" body={finding.fix} />
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-3 rounded-[20px] border border-[#2f2a2a] bg-black px-5 py-4">
+        <p className="text-sm text-[#d9d9d9]">Was this finding useful for this project?</p>
+        <button
+          onClick={() => void submitFindingFeedback(true)}
+          disabled={findingFeedbackState === "saving"}
+          aria-pressed={findingFeedback === true}
+          className={`mono rounded-full border px-3 py-1 text-[9px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:opacity-50 ${findingFeedback === true ? "border-[#a7f35b] bg-[#07130d] text-[#a7f35b]" : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white"}`}
+        >
+          Yes
+        </button>
+        <button
+          onClick={() => void submitFindingFeedback(false)}
+          disabled={findingFeedbackState === "saving"}
+          aria-pressed={findingFeedback === false}
+          className={`mono rounded-full border px-3 py-1 text-[9px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd] disabled:opacity-50 ${findingFeedback === false ? "border-[#ffd166] bg-[#211d10] text-[#ffd166]" : "border-[#3d3d3d] text-[#d9d9d9] hover:border-white"}`}
+        >
+          Not really
+        </button>
+        {findingFeedbackState === "error" && <p role="alert" className="text-xs text-[#ffd166]">Feedback was not saved. Your scan is unchanged.</p>}
       </div>
 
       <div className="mt-8 rounded-[24px] border border-[#2f2a2a] bg-black p-5">

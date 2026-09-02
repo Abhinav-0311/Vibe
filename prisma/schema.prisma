@@ -40,6 +40,7 @@ model User {
   sessions      Session[]
   scans         ScanRecord[]
   guidanceFeedback GuidanceFeedback[]
+  findingFeedback FindingFeedback[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -109,5 +110,19 @@ model GuidanceFeedback {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, guidanceId, catalogVersion])
+  @@index([userId, updatedAt])
+}
+
+model FindingFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  findingId String
+  helpful   Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, findingId])
   @@index([userId, updatedAt])
 }

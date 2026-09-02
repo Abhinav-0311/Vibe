@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPullRequestBrief } from "@/lib/github/pull-request-brief";
-import { getNextJsGuidance } from "@/lib/nextjs-guidance";
+import { getFrameworkGuidance, getNextJsGuidance } from "@/lib/nextjs-guidance";
 import type { AuditFinding } from "@/lib/mock-audit";
 import type { ScannerFacts } from "@/lib/scanner/types";
 
@@ -15,7 +15,19 @@ describe("trusted guidance", () => {
   it("gives only versioned, evidence-backed Next.js guidance with verification routes", () => {
     const guidance = getNextJsGuidance(facts);
     expect(guidance.map((item) => item.id)).toEqual(["nextjs-route-recovery", "nextjs-route-handler-boundaries", "nextjs-environment-boundaries"]);
-    expect(guidance.every((item) => item.catalogVersion === "2026.08" && item.source.url.startsWith("https://nextjs.org/") && item.verification.length > 20)).toBe(true);
+    expect(guidance.every((item) => item.catalogVersion === "2026.09" && item.source.url.startsWith("https://nextjs.org/") && item.verification.length > 20)).toBe(true);
+  });
+
+  it("gives Vite-specific guidance only when Vite facts support it", () => {
+    const viteFacts: ScannerFacts = {
+      ...facts,
+      framework: { name: "Vite React", confidence: "high" },
+      signals: { ...facts.signals, hasEnvironmentVariableUsage: true, hasTests: false, hasBuildScript: true },
+    };
+
+    const guidance = getFrameworkGuidance(viteFacts);
+    expect(guidance.map((item) => item.id)).toEqual(["vite-environment-boundaries", "vite-verification-baseline"]);
+    expect(guidance.every((item) => item.source.url.startsWith("https://vite.dev/") && item.verification.length > 20)).toBe(true);
   });
 
   it("creates a reviewable PR handoff without changing a repository", () => {

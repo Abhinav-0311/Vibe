@@ -4,7 +4,9 @@ type ServerErrorEvent =
   | "github_scan_failed"
   | "upload_scan_failed"
   | "guidance_feedback_read_failed"
-  | "guidance_feedback_write_failed";
+  | "guidance_feedback_write_failed"
+  | "finding_feedback_read_failed"
+  | "finding_feedback_write_failed";
 
 export function reportServerError(event: ServerErrorEvent, details: Record<string, string | number | boolean> = {}) {
   // Structured Vercel runtime logs are the production monitoring surface for the

@@ -25,7 +25,7 @@ flowchart LR
   D --> E[Evidence-backed report]
   E --> F[Fix plan and verification route]
   D --> G[Architecture stress test]
-  D --> H[Trusted Next.js guidance]
+  D --> H[Trusted framework guidance]
 ```
 
 The deterministic scanner and checklist remain the source of truth. Optional OpenAI enhancement can produce a structured FixPlan, but it cannot change the score, severity, category, finding ID, or scanner evidence. Invalid output falls back to the deterministic report.
@@ -43,11 +43,12 @@ The deterministic scanner and checklist remain the source of truth. Optional Ope
 ## What Vibe covers
 
 - Safe GitHub, ZIP, and trusted local-project scanning; scanned repository code is never executed.
-- Context-aware readiness scoring for prototypes, launch-prep products, SaaS, internal tools, content sites, and APIs.
+- Context-aware readiness scoring for prototypes, launch-prep products, SaaS, internal tools, content sites, portfolios, and APIs.
 - Static evidence for routes, authentication, payments, webhooks, CORS, rate limiting, environment files, tests, lockfiles, build scripts, analytics, and observability.
 - PostgreSQL-backed scan history, deterministic deduplication, report restore, and a dependency-aware health endpoint.
 - GitHub OAuth with PKCE, branch selection, and explicit-only issue creation.
-- Versioned Next.js guidance with official sources, verification routes, and owner-scoped feedback.
+- Versioned Next.js and Vite guidance with official sources, verification routes, and owner-scoped feedback.
+- Per-finding relevance and usefulness feedback, stored only for the signed-in beta user.
 - Optional structured OpenAI FixPlans with strict grounding and deterministic fallback.
 
 ## Trust boundaries
@@ -63,7 +64,7 @@ The deterministic scanner and checklist remain the source of truth. Optional Ope
 | Area | Current evidence |
 | --- | --- |
 | Readiness engine | 30 deterministic rules across 8 regression contexts |
-| Automated checks | 116 Vitest cases across 21 test files |
+| Automated checks | 120 Vitest cases across 21 test files |
 | Delivery gate | ESLint, Prisma validation, and a Next.js production build |
 | Data layer | PostgreSQL + Prisma migrations + scan deduplication |
 | Hosted access | Vercel private beta with Google sign-in and invite gating |
@@ -107,7 +108,7 @@ npx.cmd prisma validate
 
 ## Project status
 
-Vibe is a deployed, single-user private beta. The next meaningful work is calibration against more real projects and beta-user feedback—not adding features without evidence of need.
+Vibe is a deployed private beta. The next meaningful work is calibration against more real projects and collecting beta-user feedback—not adding features without evidence of need.
 
 ## Further reading
 
