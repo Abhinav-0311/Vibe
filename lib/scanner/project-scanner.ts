@@ -375,6 +375,7 @@ async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile
   const resumePattern = /(?:resume|résumé|cv|curriculum\s+vitae)(?:\.(?:pdf|docx?))?/i;
   const socialLinkPattern = /(?:github\.com|linkedin\.com|x\.com|twitter\.com|dribbble\.com|behance\.net)/i;
   const projectDetailPattern = /(?:case\s+study|projects?|selected\s+work|built\s+with|tech\s+stack|github\.com|live\s+demo)/i;
+  const authLikeUiPattern = /(?:\b(?:login|log\s*in|sign\s*in|signup|sign\s*up|register|create\s+account)\b)/i;
 
   return {
     filesScanned: readableSamples.map((item) => item.relativeFile),
@@ -407,7 +408,18 @@ async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile
     portfolioProjectDetailFiles: readableSamples
       .filter(({ sample }) => projectDetailPattern.test(sample))
       .map(({ relativeFile }) => relativeFile),
+    authLikeUiFiles: readableSamples
+      .filter(({ relativeFile, sample }) => authLikeUiPattern.test(relativeFile) || authLikeUiPattern.test(sample))
+      .map(({ relativeFile }) => relativeFile),
   };
+}
+
+async function detectEnvironmentVariableUsage(projectRoot: string, uiFiles: string[], apiRoutes: DetectedApiRoute[]) {
+  const sourceFiles = Array.from(
+    new Set([...uiFiles, ...apiRoutes.map((route) => path.join(/* turbopackIgnore: true */ projectRoot, route.file))]),
+  );
+  const samples = await Promise.all(sourceFiles.map(readSecuritySample));
+  return samples.some((sample) => Boolean(sample && /(?:process\.env\b|import\.meta\.env\b|Deno\.env\b)/.test(sample)));
 }
 
 function createDetectedRoute(projectRoot: string, file: string, route: string): DetectedApiRoute {
@@ -594,6 +606,8 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
   const insecureSessionCookieFiles = await detectInsecureSessionCookies(projectRoot, apiRoutes);
   const ignoredBuildChecks = await detectIgnoredBuildChecks(projectRoot, detectedFiles);
   const uiEvidence = await detectUiEvidence(projectRoot, detectedFiles);
+  const uiFiles = await collectUiSourceFiles(projectRoot);
+  const hasEnvironmentVariableUsage = await detectEnvironmentVariableUsage(projectRoot, uiFiles, apiRoutes);
   const startCommand = scripts.start?.trim();
   const hasDevelopmentStartScript = Boolean(
     startCommand && /(?:\bnext\s+dev\b|\bvite\s+dev\b|\bnodemon\b|\btsx\s+watch\b)/i.test(startCommand),
@@ -631,6 +645,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasAppRouter,
       hasPagesRouter,
       hasEnvExample: detectedFiles.some((file) => file.path === ".env.example" && file.exists),
+      hasEnvironmentVariableUsage,
       hasTests: await detectTests(projectRoot),
       hasMiddleware,
       hasAuthDependency: hasAnyDependency(dependencies, authPackages),

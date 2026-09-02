@@ -48,6 +48,7 @@ export function inferAuditProfile(facts: ScannerFacts, requestedContext: AuditCo
   const inferred: AuditContext = { ...requestedContext };
   const hasAccounts = facts.signals.hasAuthDependency || facts.signals.hasAuthRoute;
   const hasPayments = facts.signals.hasStripeDependency || facts.signals.hasPaymentRoute;
+  const authLikeUiFiles = facts.uiEvidence?.authLikeUiFiles ?? [];
   const reasons: string[] = [];
 
   if (hasAccounts) {
@@ -78,6 +79,12 @@ export function inferAuditProfile(facts: ScannerFacts, requestedContext: AuditCo
     reasons.push("Because SaaS account/payment signals exist, Vibe moved the scan from prototype to launch-prep.");
   }
 
+  if (!requestedContext.hasUserAccounts && !hasAccounts && authLikeUiFiles.length > 0) {
+    reasons.push(
+      `Login or signup UI was detected in ${authLikeUiFiles.slice(0, 2).join(", ")}, but no auth dependency or server auth route was found. Vibe kept accounts disabled because UI alone does not prove authentication works.`,
+    );
+  }
+
   if (reasons.length === 0) {
     reasons.push("Vibe used the selected readiness profile without adjustment.");
   }
@@ -90,12 +97,22 @@ export function inferAuditProfile(facts: ScannerFacts, requestedContext: AuditCo
   };
 }
 
-export function selectedAuditProfile(requestedContext: AuditContext): AuditProfileInference {
+export function selectedAuditProfile(requestedContext: AuditContext, facts?: ScannerFacts): AuditProfileInference {
+  const authLikeUiFiles = facts?.uiEvidence?.authLikeUiFiles ?? [];
+  const hasVerifiedAccounts = facts?.signals.hasAuthDependency || facts?.signals.hasAuthRoute;
+  const reasons = ["Vibe used the readiness profile you selected."];
+
+  if (!requestedContext.hasUserAccounts && !hasVerifiedAccounts && authLikeUiFiles.length > 0) {
+    reasons.push(
+      `Login or signup UI was detected in ${authLikeUiFiles.slice(0, 2).join(", ")}, but no auth dependency or server auth route was found. The selected profile still controls scoring; UI alone does not prove authentication works.`,
+    );
+  }
+
   return {
     requested: requestedContext,
     applied: requestedContext,
     adjusted: false,
-    reasons: ["Vibe used the readiness profile you selected."],
+    reasons,
   };
 }
 

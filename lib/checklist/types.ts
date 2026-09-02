@@ -9,7 +9,7 @@ export type ChecklistRule = {
 };
 
 export type AuditContext = {
-  appType: "saas" | "marketplace" | "internal-tool" | "content-site" | "api" | "unknown";
+  appType: "saas" | "marketplace" | "internal-tool" | "content-site" | "portfolio" | "api" | "unknown";
   stage: "prototype" | "launch-prep" | "production";
   hasPayments: boolean;
   hasUserAccounts: boolean;

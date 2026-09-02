@@ -25,7 +25,7 @@ export async function createScanResponse(
 ): Promise<ScanApiResponse> {
   const startedAt = Date.now();
   const facts = await scanProject(projectPath);
-  const profileInference = profileMode === "manual" ? selectedAuditProfile(context) : inferAuditProfile(facts, context);
+  const profileInference = profileMode === "manual" ? selectedAuditProfile(context, facts) : inferAuditProfile(facts, context);
   const deterministicChecklist = runChecklist(facts, profileInference.applied);
   const scannedAt = new Date().toISOString();
   const deterministicReport = generateReport({ facts, checklist: deterministicChecklist, scannedAt });

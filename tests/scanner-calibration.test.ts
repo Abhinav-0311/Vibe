@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { inferAuditProfile } from "@/lib/checklist/context-inference";
+import { inferAuditProfile, selectedAuditProfile } from "@/lib/checklist/context-inference";
 import { runChecklist } from "@/lib/checklist/checklist-engine";
 import type { AuditContext } from "@/lib/checklist/types";
 import { scanProject } from "@/lib/scanner/project-scanner";
@@ -58,6 +58,41 @@ describe("scanner calibration matrix", () => {
 
     expect(facts.signals.hasAuthRoute).toBe(false);
     expect(profile.applied).toEqual(contentProfile);
+  });
+
+  it("flags auth-like UI as profile context without treating it as verified authentication", async () => {
+    const projectRoot = await createProject({ dependencies: { vite: "6.0.0", react: "19.0.0" } });
+    await writeFile(projectRoot, "src/pages/LoginPage.tsx", "export default function LoginPage() { return <button>Log in</button>; }\n");
+
+    const facts = await scanProject(projectRoot);
+    const profile = selectedAuditProfile({ ...contentProfile, stage: "launch-prep", appType: "saas" }, facts);
+
+    expect(facts.uiEvidence?.authLikeUiFiles).toContain("src/pages/LoginPage.tsx");
+    expect(profile.applied.hasUserAccounts).toBe(false);
+    expect(profile.reasons.join(" ")).toContain("UI alone does not prove authentication works");
+  });
+
+  it("requires source-level environment usage before reporting a missing env example", async () => {
+    const projectRoot = await createProject({ dependencies: { vite: "6.0.0", react: "19.0.0" } });
+    await writeFile(projectRoot, "src/App.tsx", "export default function App() { return <main>Static page</main>; }\n");
+
+    const facts = await scanProject(projectRoot);
+    const findingIds = runChecklist(facts, { ...contentProfile, stage: "launch-prep", appType: "saas" }).findings.map((finding) => finding.id);
+
+    expect(facts.signals.hasEnvironmentVariableUsage).toBe(false);
+    expect(findingIds).not.toContain("missing-env-example");
+  });
+
+  it("keeps missing error tracking below high severity for a frontend-only SaaS profile", async () => {
+    const projectRoot = await createProject({ dependencies: { vite: "6.0.0", react: "19.0.0" } });
+    await writeFile(projectRoot, "src/App.tsx", "export default function App() { return <main>App</main>; }\n");
+
+    const facts = await scanProject(projectRoot);
+    const finding = runChecklist(facts, { ...contentProfile, stage: "launch-prep", appType: "saas" }).findings.find(
+      (item) => item.id === "missing-error-tracking",
+    );
+
+    expect(finding?.severity).toBe("medium");
   });
 
   it("promotes a credential-auth SaaS app and retains the auth evidence", async () => {

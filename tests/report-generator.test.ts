@@ -74,7 +74,7 @@ describe("generateReport", () => {
     });
 
     expect(report.readinessLabel).toBe("Launch blocked");
-    expect(report.executiveSummary).toContain("20/100");
+    expect(report.executiveSummary).toContain("44/100");
     expect(report.topRisks[0]?.severity).toBe("critical");
     expect(report.nextActions[0]).toContain("Then re-run the scan");
     expect(report.promptQueueSummary).toContain("implementation prompts ready for handoff");
@@ -164,7 +164,7 @@ describe("generateReport", () => {
     });
 
     expect(markdown).toContain("# Vibe Workspace Readiness Report");
-    expect(markdown).toContain("Score: 20/100");
+    expect(markdown).toContain("Score: 44/100");
     expect(markdown).toContain("- Stage: launch-prep");
     expect(markdown).toContain("## Top Risks");
     expect(markdown).toContain("## Required Findings");

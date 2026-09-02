@@ -713,7 +713,7 @@ function ContextControls({
 }) {
   const [sourceMode, setSourceMode] = useState<ProjectSourceMode>("github");
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
-  const appTypes: AuditContext["appType"][] = ["saas", "internal-tool", "content-site", "api"];
+  const appTypes: AuditContext["appType"][] = ["saas", "internal-tool", "content-site", "portfolio", "api"];
   const localScanEnabled = workspaceProjects?.localScanEnabled === true;
   const sourceOptions: Array<{
     value: ProjectSourceMode;

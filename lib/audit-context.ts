@@ -16,6 +16,7 @@ export function readAuditContext(searchParams: URLSearchParams): AuditContext {
       appType === "marketplace" ||
       appType === "internal-tool" ||
       appType === "content-site" ||
+      appType === "portfolio" ||
       appType === "api" ||
       appType === "unknown"
         ? appType

@@ -49,20 +49,24 @@ function formatProjectSignals(facts: ScannerFacts) {
   return `${facts.framework.name} (${facts.framework.confidence} confidence), ${facts.packageManager}, ${routes}, ${dependencyCount}.`;
 }
 
-function isSimpleContentProject(context: AuditContext) {
+function isLowComplexityPublicSite(context: AuditContext) {
   return (
-    context.appType === "content-site" &&
+    (context.appType === "content-site" || context.appType === "portfolio") &&
     !context.hasUserAccounts &&
     !context.hasPayments &&
     !context.storesUserData
   );
 }
 
+function isPortfolioProject(context: AuditContext) {
+  return context.appType === "portfolio" && !context.hasUserAccounts && !context.hasPayments && !context.storesUserData;
+}
+
 function severityReasonFor(finding: AuditFinding, context: AuditContext) {
   const severityLabel = finding.severity.charAt(0).toUpperCase() + finding.severity.slice(1);
   const contextPrefix = `${severityLabel} because this ${context.stage} ${context.appType}`;
 
-  if (isSimpleContentProject(context)) {
+  if (isLowComplexityPublicSite(context)) {
     return `${severityLabel} because this is a public content or portfolio site, so Vibe focuses on deployability, accessibility, clear UI states, and basic maintainability instead of SaaS-only systems.`;
   }
 
@@ -346,7 +350,8 @@ const rules: ChecklistRule[] = [
     severity: "high",
     evaluate: (facts, context) => {
       if (facts.signals.hasEnvExample) return null;
-      const simpleContent = isSimpleContentProject(context);
+      if (!facts.signals.hasEnvironmentVariableUsage) return null;
+      const simpleContent = isLowComplexityPublicSite(context);
 
       return finding({
         id: "missing-env-example",
@@ -469,7 +474,7 @@ const rules: ChecklistRule[] = [
     severity: "high",
     evaluate: (facts, context) => {
       if (facts.signals.hasTests) return null;
-      const simpleContent = isSimpleContentProject(context);
+      const simpleContent = isLowComplexityPublicSite(context);
 
       const frameworkName =
         facts.framework.name === "Unknown" ? "detected JavaScript or TypeScript" : facts.framework.name;
@@ -499,7 +504,7 @@ const rules: ChecklistRule[] = [
     severity: "medium",
     evaluate: (facts, context) => {
       if (!facts.uiEvidence || facts.uiEvidence.hasLoadingState) return null;
-      const simpleContent = isSimpleContentProject(context);
+      const simpleContent = isLowComplexityPublicSite(context);
 
       return finding({
         id: "missing-ui-loading-state",
@@ -524,7 +529,7 @@ const rules: ChecklistRule[] = [
     severity: "high",
     evaluate: (facts, context) => {
       if (!facts.uiEvidence || facts.uiEvidence.hasErrorState) return null;
-      const simpleContent = isSimpleContentProject(context);
+      const simpleContent = isLowComplexityPublicSite(context);
 
       return finding({
         id: "missing-ui-error-state",
@@ -614,7 +619,7 @@ const rules: ChecklistRule[] = [
     category: "Portfolio",
     severity: "medium",
     evaluate: (facts, context) => {
-      if (!isSimpleContentProject(context)) return null;
+      if (!isPortfolioProject(context)) return null;
       if (!facts.uiEvidence) return null;
       if ((facts.uiEvidence?.portfolioContactFiles ?? []).length > 0) return null;
 
@@ -638,7 +643,7 @@ const rules: ChecklistRule[] = [
     category: "Portfolio",
     severity: "low",
     evaluate: (facts, context) => {
-      if (!isSimpleContentProject(context)) return null;
+      if (!isPortfolioProject(context)) return null;
       if (!facts.uiEvidence) return null;
       if ((facts.uiEvidence?.portfolioResumeFiles ?? []).length > 0) return null;
 
@@ -661,7 +666,7 @@ const rules: ChecklistRule[] = [
     category: "Portfolio",
     severity: "low",
     evaluate: (facts, context) => {
-      if (!isSimpleContentProject(context)) return null;
+      if (!isPortfolioProject(context)) return null;
       if (!facts.uiEvidence) return null;
       if ((facts.uiEvidence?.portfolioSocialLinkFiles ?? []).length > 0) return null;
 
@@ -685,7 +690,7 @@ const rules: ChecklistRule[] = [
     category: "Portfolio",
     severity: "medium",
     evaluate: (facts, context) => {
-      if (!isSimpleContentProject(context)) return null;
+      if (!isPortfolioProject(context)) return null;
       if (!facts.uiEvidence) return null;
       if ((facts.uiEvidence?.portfolioProjectDetailFiles ?? []).length > 0) return null;
 
@@ -972,9 +977,9 @@ const rules: ChecklistRule[] = [
     severity: "medium",
     evaluate: (facts, context) => {
       if (facts.signals.hasAnalyticsDependency) return null;
-      if (isSimpleContentProject(context) && context.stage === "prototype") return null;
+      if (isLowComplexityPublicSite(context) && context.stage === "prototype") return null;
       if (context.stage === "prototype" && facts.signals.hasAnalyticsPlan) return null;
-      const simpleContent = isSimpleContentProject(context);
+      const simpleContent = isLowComplexityPublicSite(context);
 
       return finding({
         id: "missing-analytics",
@@ -1001,7 +1006,7 @@ const rules: ChecklistRule[] = [
     severity: "high",
     evaluate: (facts, context) => {
       if (facts.signals.hasErrorTrackingDependency) return null;
-      if (isSimpleContentProject(context) && context.stage === "prototype") return null;
+      if (isLowComplexityPublicSite(context) && context.stage === "prototype") return null;
       if (context.stage === "prototype" && facts.signals.hasObservabilityPlan) return null;
 
       if (context.stage === "prototype") {
@@ -1023,16 +1028,16 @@ const rules: ChecklistRule[] = [
         id: "missing-error-tracking",
         title: "No error tracking detected",
         category: "Reliability",
-        severity: isSimpleContentProject(context) ? "low" : "high",
+        severity: facts.apiRoutes.length > 0 || context.hasUserAccounts || context.hasPayments || context.storesUserData ? "high" : "medium",
         evidence: "No Sentry, Highlight, Bugsnag, or equivalent error tracking dependency was detected.",
-        impact: isSimpleContentProject(context)
+        impact: isLowComplexityPublicSite(context)
           ? "For a static portfolio, hosting build checks and browser testing are usually more important than full error tracking."
           : "Scanner failures, API errors, and report generation issues can happen silently in production.",
-        fix: isSimpleContentProject(context)
+        fix: isLowComplexityPublicSite(context)
           ? "Use lightweight monitoring only if the site has forms, dynamic routes, or client-side integrations."
           : "Add error tracking before real users run scans.",
         prompt:
-          isSimpleContentProject(context)
+          isLowComplexityPublicSite(context)
             ? "Review whether this portfolio has forms, dynamic routes, or client-side integrations that can fail. If yes, recommend lightweight monitoring and document required environment variables. If no, rely on build checks and manual browser verification."
             : "Add production error tracking to this Next.js app. Capture API route errors, scanner failures, and client rendering errors. Keep the setup minimal and document required environment variables in .env.example.",
       });
@@ -1044,13 +1049,13 @@ const rules: ChecklistRule[] = [
     severity: "high",
     evaluate: (facts, context) => {
       if (facts.signals.hasAiRules) return null;
-      const simpleContent = isSimpleContentProject(context);
+      const simpleContent = isLowComplexityPublicSite(context);
 
       return finding({
         id: "missing-ai-rules",
         title: "No durable AI rules file detected",
         category: "AI Workspace",
-        severity: simpleContent ? "medium" : "high",
+        severity: "low",
         evidence: "No AGENTS.md, .cursor/rules, or .cursorrules file was detected in the project root.",
         impact: simpleContent
           ? "For a portfolio, AI rules mainly protect visual taste, content tone, responsive behavior, and what should not be overbuilt."
@@ -1082,13 +1087,19 @@ function severityPenalty(severity: Severity, context: AuditContext) {
   return Math.round(3 * stageMultiplier);
 }
 
+function contributesToReadinessScore(finding: AuditFinding) {
+  return finding.category !== "AI Workspace";
+}
+
 export function runChecklist(facts: ScannerFacts, context: AuditContext = defaultContext): ChecklistResult {
   const findings = rules.flatMap((rule) => {
     const result = rule.evaluate(facts, context);
     return result ? [result] : [];
   }).map((item) => enrichFinding(item, facts, context));
 
-  const totalPenalty = findings.reduce((sum, item) => sum + severityPenalty(item.severity, context), 0);
+  const totalPenalty = findings
+    .filter(contributesToReadinessScore)
+    .reduce((sum, item) => sum + severityPenalty(item.severity, context), 0);
   const score = Math.max(0, 100 - totalPenalty);
 
   return {

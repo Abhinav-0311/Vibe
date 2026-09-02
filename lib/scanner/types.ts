@@ -52,6 +52,8 @@ export type ScannerFacts = {
     portfolioResumeFiles: string[];
     portfolioSocialLinkFiles: string[];
     portfolioProjectDetailFiles: string[];
+    /** Login or signup UI is intent evidence only; it does not prove durable authentication exists. */
+    authLikeUiFiles?: string[];
   };
   signals: {
     hasPackageJson: boolean;
@@ -59,6 +61,7 @@ export type ScannerFacts = {
     hasAppRouter: boolean;
     hasPagesRouter: boolean;
     hasEnvExample: boolean;
+    hasEnvironmentVariableUsage?: boolean;
     hasTests: boolean;
     hasMiddleware: boolean;
     hasAuthDependency: boolean;

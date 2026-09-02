@@ -24,6 +24,7 @@ const baseFacts: ScannerFacts = {
     hasAppRouter: true,
     hasPagesRouter: false,
     hasEnvExample: false,
+    hasEnvironmentVariableUsage: true,
     hasTests: false,
     hasMiddleware: false,
     hasAuthDependency: false,
@@ -79,7 +80,7 @@ describe("runChecklist", () => {
     const findingIds = result.findings.map((finding) => finding.id);
 
     expect(result.context.stage).toBe("prototype");
-    expect(result.score).toBe(66);
+    expect(result.score).toBe(74);
     expect(findingIds).toContain("missing-env-example");
     expect(findingIds).toContain("missing-tests");
     expect(findingIds).toContain("missing-ai-rules");
@@ -95,15 +96,15 @@ describe("runChecklist", () => {
     const severityById = new Map(result.findings.map((finding) => [finding.id, finding.severity]));
     const priorityById = new Map(result.findings.map((finding) => [finding.id, finding.actionPriority]));
 
-    expect(result.context.appType).toBe("content-site");
-    expect(result.score).toBe(88);
+    expect(result.context.appType).toBe("portfolio");
+    expect(result.score).toBe(93);
     expect(findingIds).toEqual(["missing-env-example", "missing-tests", "missing-ai-rules"]);
     expect(severityById.get("missing-env-example")).toBe("low");
     expect(severityById.get("missing-tests")).toBe("medium");
-    expect(severityById.get("missing-ai-rules")).toBe("medium");
+    expect(severityById.get("missing-ai-rules")).toBe("low");
     expect(priorityById.get("missing-env-example")).toBe("optional");
     expect(priorityById.get("missing-tests")).toBe("recommended");
-    expect(priorityById.get("missing-ai-rules")).toBe("recommended");
+    expect(priorityById.get("missing-ai-rules")).toBe("optional");
     for (const findingId of fixture.expectedAbsentFindingIds ?? []) expect(findingIds).not.toContain(findingId);
     expect(findingIds).not.toContain("missing-analytics");
     expect(findingIds).not.toContain("missing-error-tracking");
@@ -114,7 +115,7 @@ describe("runChecklist", () => {
     const findingIds = result.findings.map((finding) => finding.id);
 
     expect(result.context.stage).toBe("launch-prep");
-    expect(result.score).toBe(20);
+    expect(result.score).toBe(32);
     expect(result.summary.critical).toBe(1);
     expect(findingIds).toContain("missing-auth");
     expect(findingIds).toContain("missing-stripe");
@@ -129,10 +130,13 @@ describe("runChecklist", () => {
       ...fixture.factOverrides,
       signals: { ...baseFacts.signals, ...fixture.factOverrides?.signals },
     };
-    const findingIds = runChecklist(facts, fixture.context).findings.map((finding) => finding.id);
+    const findings = runChecklist(facts, fixture.context).findings;
+    const findingIds = findings.map((finding) => finding.id);
+    const highFindingIds = findings.filter((finding) => finding.severity === "high").map((finding) => finding.id).sort();
 
     for (const findingId of fixture.expectedFindingIds ?? []) expect(findingIds).toContain(findingId);
     for (const findingId of fixture.expectedAbsentFindingIds ?? []) expect(findingIds).not.toContain(findingId);
+    expect(highFindingIds).toEqual([...(fixture.expectedHighFindingIds ?? [])].sort());
   });
 
   it("does not report missing systems when scanner facts show those systems exist", () => {
