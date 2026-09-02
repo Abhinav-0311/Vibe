@@ -23,6 +23,7 @@ function scanHistorySignature(scan: ScanApiResponse) {
     source,
     project: scan.scannedProject,
     context: scan.checklist.context,
+    rulesetVersion: scan.checklist.rulesetVersion ?? "legacy",
     score: scan.checklist.score,
     findings,
   });

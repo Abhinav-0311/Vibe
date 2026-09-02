@@ -72,6 +72,7 @@ function createScan(scannedAt: string, score: number, findingIds: string[] = [])
       },
     },
     checklist: {
+      rulesetVersion: "2026.09.2",
       score,
       context: {
         appType: "saas",
@@ -159,5 +160,15 @@ describe("scan history", () => {
       checklist: { ...current.checklist, context: { ...current.checklist.context, appType: "content-site" as const } },
     };
     expect(findPreviousComparableScan([createScanHistoryItem(baseline)], differentProfile)).toBeNull();
+  });
+
+  it("does not call rule calibration a project fix", () => {
+    const baseline = createScan("2026-06-13T00:00:00.000Z", 72, ["missing-env-example"]);
+    const current = createScan("2026-06-13T00:05:00.000Z", 87);
+    current.checklist.rulesetVersion = "2026.10.0";
+
+    const comparison = compareScans(baseline, current);
+    expect(comparison.isComparable).toBe(false);
+    expect(comparison.resolvedFindingIds).toEqual([]);
   });
 });

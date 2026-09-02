@@ -3,6 +3,8 @@ import type { ScanHistoryItem } from "@/lib/scan-history";
 
 export type ScanComparison = {
   baseline: ScanApiResponse;
+  isComparable: boolean;
+  reason?: string;
   scoreChange: number;
   resolvedFindingIds: string[];
   newFindingIds: string[];
@@ -26,11 +28,25 @@ export function findPreviousComparableScan(history: ScanHistoryItem[], scan: Sca
 }
 
 export function compareScans(baseline: ScanApiResponse, current: ScanApiResponse): ScanComparison {
+  const baselineRulesetVersion = baseline.checklist.rulesetVersion;
+  const currentRulesetVersion = current.checklist.rulesetVersion;
+  if (!baselineRulesetVersion || !currentRulesetVersion || baselineRulesetVersion !== currentRulesetVersion) {
+    return {
+      baseline,
+      isComparable: false,
+      reason: "Vibe’s readiness rules changed between these scans, so score and finding changes are not treated as project fixes.",
+      scoreChange: 0,
+      resolvedFindingIds: [],
+      newFindingIds: [],
+      unchangedFindingIds: [],
+    };
+  }
   const baselineFindingIds = new Set(baseline.checklist.findings.map((finding) => finding.id));
   const currentFindingIds = new Set(current.checklist.findings.map((finding) => finding.id));
 
   return {
     baseline,
+    isComparable: true,
     scoreChange: current.checklist.score - baseline.checklist.score,
     resolvedFindingIds: [...baselineFindingIds].filter((id) => !currentFindingIds.has(id)),
     newFindingIds: [...currentFindingIds].filter((id) => !baselineFindingIds.has(id)),

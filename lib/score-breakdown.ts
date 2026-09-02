@@ -11,7 +11,7 @@ export type ScoreBreakdownItem = {
   };
 };
 
-const defaultCategories = ["Security", "Reliability", "Launch Basics", "AI Workspace", "UI/UX"];
+const defaultCategories = ["Security", "Reliability", "Launch Basics", "UI/UX"];
 
 const severityPenalty: Record<Severity, number> = {
   critical: 45,
@@ -35,10 +35,11 @@ function scoreStatus(score: number): ScoreBreakdownItem["status"] {
 }
 
 export function buildScoreBreakdown(findings: AuditFinding[]): ScoreBreakdownItem[] {
-  const categories = Array.from(new Set([...defaultCategories, ...findings.map((finding) => finding.category)]));
+  const readinessFindings = findings.filter((finding) => finding.category !== "AI Workspace");
+  const categories = Array.from(new Set([...defaultCategories, ...readinessFindings.map((finding) => finding.category)]));
 
   return categories.map((category) => {
-    const categoryFindings = findings.filter((finding) => finding.category === category);
+    const categoryFindings = readinessFindings.filter((finding) => finding.category === category);
     const penalty = categoryFindings.reduce((total, finding) => total + severityPenalty[finding.severity], 0);
     const score = Math.max(0, 100 - penalty);
     const topFinding = categoryFindings

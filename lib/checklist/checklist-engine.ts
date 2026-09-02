@@ -2,6 +2,8 @@ import type { ActionPriority, AuditFinding, Severity } from "@/lib/mock-audit";
 import type { ScannerFacts } from "@/lib/scanner/types";
 import type { AuditContext, ChecklistResult, ChecklistRule } from "./types";
 
+export const readinessRulesetVersion = "2026.09.2";
+
 function finding({
   id,
   title,
@@ -1103,6 +1105,7 @@ export function runChecklist(facts: ScannerFacts, context: AuditContext = defaul
   const score = Math.max(0, 100 - totalPenalty);
 
   return {
+    rulesetVersion: readinessRulesetVersion,
     score,
     context,
     findings,

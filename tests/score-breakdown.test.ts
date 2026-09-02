@@ -41,4 +41,9 @@ describe("score breakdown", () => {
       },
     });
   });
+
+  it("keeps AI workspace advice out of the app-readiness score breakdown", () => {
+    const breakdown = buildScoreBreakdown([{ ...auditReport.findings[2], category: "AI Workspace", severity: "high" }]);
+    expect(breakdown.find((item) => item.category === "AI Workspace")).toBeUndefined();
+  });
 });

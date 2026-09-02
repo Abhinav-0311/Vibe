@@ -2572,6 +2572,15 @@ function ReportView({
 
 function ScanProgress({ baseline, current }: { baseline: ScanApiResponse; current: ScanApiResponse }) {
   const comparison = compareScans(baseline, current);
+  if (!comparison.isComparable) {
+    return (
+      <section className="rounded-[30px] border border-[#4d3c20] bg-[#161109] p-5 sm:p-6">
+        <p className="mono text-[10px] text-[#ffd166]">Re-scan comparison paused</p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">This scan uses a different readiness ruleset.</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[#d9d9d9]">{comparison.reason} Re-scan this same project again after this result to start a trustworthy before-and-after comparison.</p>
+      </section>
+    );
+  }
   const scoreChange = comparison.scoreChange > 0 ? `+${comparison.scoreChange}` : comparison.scoreChange.toString();
   const scoreClass = comparison.scoreChange > 0 ? "text-[#a7f35b]" : comparison.scoreChange < 0 ? "text-[#ff8f8f]" : "text-[#d9d9d9]";
   const baselineFindings = new Map(baseline.checklist.findings.map((finding) => [finding.id, finding]));
@@ -2626,6 +2635,7 @@ function ProgressFindingList({ label, titles, className }: { label: string; titl
 
 function ScorePanel({ report, criticalCount }: { report: AuditReport; criticalCount: number }) {
   const scoreBreakdown = buildScoreBreakdown(report.findings);
+  const aiWorkspaceFindingCount = report.findings.filter((finding) => finding.category === "AI Workspace").length;
 
   return (
     <aside className="rounded-[30px] bg-[#1d1a1a] p-6 sm:p-8">
@@ -2637,10 +2647,15 @@ function ScorePanel({ report, criticalCount }: { report: AuditReport; criticalCo
         <FileSearch className="h-6 w-6 text-[#fc74dd]" aria-hidden="true" />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4">
         <ScoreRow label="App readiness" score={report.appScore} />
-        <ScoreRow label="AI workspace" score={report.aiWorkspaceScore} />
       </div>
+
+      {aiWorkspaceFindingCount > 0 && (
+        <p className="mt-4 text-xs leading-5 text-[#9b9696]">
+          AI workspace advice is optional and does not affect App Readiness. {aiWorkspaceFindingCount} advisory item{aiWorkspaceFindingCount === 1 ? "" : "s"} appear{aiWorkspaceFindingCount === 1 ? "s" : ""} in the findings list.
+        </p>
+      )}
 
       <ScoreBreakdown items={scoreBreakdown} />
 

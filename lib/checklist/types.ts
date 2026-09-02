@@ -17,6 +17,8 @@ export type AuditContext = {
 };
 
 export type ChecklistResult = {
+  /** Changes whenever finding applicability or scoring rules change. */
+  rulesetVersion?: string;
   score: number;
   context: AuditContext;
   findings: AuditFinding[];
