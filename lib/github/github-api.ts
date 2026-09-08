@@ -5,6 +5,7 @@ export type GitHubErrorCode =
   | "rate_limited"
   | "issues_disabled"
   | "archive_too_large"
+  | "request_timeout"
   | "invalid_branch"
   | "validation_failed"
   | "github_error";
@@ -23,6 +24,7 @@ export class GitHubApiError extends Error {
 
 // ponytail: per-instance cooldown; use shared rate-limit storage only after hosted users have identities and quotas.
 let publicRetryAt = 0;
+const githubRequestTimeoutMs = 12_000;
 
 function readRetryAt(response: Response) {
   const retryAfter = response.headers.get("retry-after");
@@ -91,6 +93,8 @@ export async function githubFetch(
   }
 
   let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), githubRequestTimeoutMs);
 
   try {
     response = await fetch(`https://api.github.com${path}`, {
@@ -105,13 +109,23 @@ export async function githubFetch(
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),
       redirect: "follow",
       cache: "no-store",
+      signal: controller.signal,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new GitHubApiError(
+        "GitHub did not respond in time. Try again.",
+        504,
+        "request_timeout",
+      );
+    }
     throw new GitHubApiError(
       "Vibe could not reach GitHub. Check the internet connection and try again.",
       502,
       "github_error",
     );
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (!response.ok) {

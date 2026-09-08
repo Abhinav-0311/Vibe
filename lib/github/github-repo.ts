@@ -38,6 +38,7 @@ export function parseGitHubRepoUrl(value: string): GitHubRepoRef {
 }
 
 const maxArchiveBytes = 25 * 1024 * 1024;
+const archiveReadTimeoutMs = 15_000;
 type GitHubArchive = {
   name: string;
   buffer: Buffer;
@@ -47,6 +48,26 @@ type GitHubArchive = {
 
 // ponytail: dedupes only concurrent requests within one server instance; add durable caching after tenant ownership exists.
 const publicDownloads = new Map<string, Promise<GitHubArchive>>();
+
+async function readArchiveBuffer(response: Response) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    const archive = await Promise.race([
+      response.arrayBuffer(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          void response.body?.cancel();
+          reject(new GitHubApiError("GitHub archive download timed out. Try again.", 504, "request_timeout"));
+        }, archiveReadTimeoutMs);
+      }),
+    ]);
+
+    return Buffer.from(archive);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 export async function downloadGitHubRepoZip(
   repoUrl: string,
@@ -107,7 +128,7 @@ async function downloadGitHubRepoZipFromRepo(
     );
   }
 
-  const buffer = Buffer.from(await archiveResponse.arrayBuffer());
+  const buffer = await readArchiveBuffer(archiveResponse);
   if (buffer.byteLength > maxArchiveBytes) {
     throw new GitHubApiError(
       "This repository archive is larger than Vibe's 25 MB scan limit.",

@@ -22,9 +22,10 @@ export async function createScanResponse(
   projectName = path.basename(projectPath),
   profileMode: AuditProfileMode = "auto",
   userId?: string,
+  repositoryRoot?: string,
 ): Promise<ScanApiResponse> {
   const startedAt = Date.now();
-  const facts = await scanProject(projectPath);
+  const facts = await scanProject(projectPath, repositoryRoot);
   const profileInference = profileMode === "manual" ? selectedAuditProfile(context, facts) : inferAuditProfile(facts, context);
   const deterministicChecklist = runChecklist(facts, profileInference.applied);
   const scannedAt = new Date().toISOString();

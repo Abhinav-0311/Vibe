@@ -22,9 +22,9 @@ export function getPrisma() {
       log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
     });
 
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = prisma;
-  }
+  // Serverless route handlers can share a runtime between requests. Reusing
+  // the client prevents each handler invocation from opening another pool.
+  globalForPrisma.prisma = prisma;
 
   return prisma;
 }

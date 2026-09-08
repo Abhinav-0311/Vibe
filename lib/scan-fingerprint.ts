@@ -19,9 +19,13 @@ function stableStringify(value: unknown): string {
 }
 
 export function createScanHash(scan: ScanApiResponse) {
+  const { projectRoot: _projectRoot, ...portableFacts } = scan.facts;
+  void _projectRoot;
   const fingerprint = {
     scannedProject: scan.scannedProject,
-    facts: scan.facts,
+    // Upload and GitHub scans use a new temporary directory each time. It is
+    // execution detail, not project content, and must not defeat deduplication.
+    facts: portableFacts,
     checklist: {
       score: scan.checklist.score,
       context: scan.checklist.context,

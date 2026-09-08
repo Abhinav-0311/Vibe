@@ -2,12 +2,13 @@
 
 ## Release Contract
 
-Vibe is currently a single-user MVP. A public deployment may scan uploaded ZIP archives and public GitHub repositories. Private GitHub access and OpenAI enhancement should be enabled only for a trusted deployment because multi-user authorization, tenant isolation, quotas, and billing are post-MVP.
+Vibe is a private beta. Access requires Google sign-in and an active beta invite; saved scans and feedback are scoped to the signed-in user. Keep it invite-only until real beta usage validates the operating limits.
 
 ## Scan data retention and monitoring
 
 - Saved scan payloads expire automatically after 30 days by default. Set `VIBE_SCAN_RETENTION_DAYS` to a positive number of days when a shorter policy is required.
-- There is no public delete-by-ID endpoint because the MVP has no user ownership boundary. Expiry is the safe deletion mechanism until Phase 4 accounts exist.
+- Expired scans are filtered from every read and are also purged during scan saves and saved-scan reads.
+- Daily scan quota counters are retained for 48 hours, then deleted during the next quota check.
 - Core scan and persistence failures emit redacted structured events to Vercel runtime logs. Configure a Vercel log alert or connect an error tracker before inviting beta users.
 
 ## Required Services
@@ -26,6 +27,7 @@ Vibe is currently a single-user MVP. A public deployment may scan uploaded ZIP a
 - `OPENAI_API_KEY`: required only when AI enhancement is enabled
 - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: required for private repositories
 - `GITHUB_TOKEN_ENCRYPTION_KEY`: random secret containing at least 32 characters
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `NEXTAUTH_SECRET`: required for private-beta sign-in
 - `VIBE_ENABLE_LOCAL_SCAN`: optional. Keep unset or `false` on Vercel. Use `true` only for trusted local/self-hosted environments.
 
 ## Vercel Readiness
@@ -46,7 +48,7 @@ Recommended Vercel setup:
 4. Keep `VIBE_ENABLE_LOCAL_SCAN` unset or set it to `false`.
 5. Keep `OPENAI_REPORT_ENABLED=false` unless the deployment is authenticated and trusted.
 6. Configure GitHub OAuth only if private repository scanning or GitHub issue creation is needed.
-7. Set `VIBE_RATE_LIMIT_SECRET` and run `npm.cmd run db:deploy` against the managed database before relying on saved scans or shared public scan limits.
+7. Set `VIBE_RATE_LIMIT_SECRET`, Google OAuth values, and `NEXTAUTH_SECRET`; then run `npm.cmd run db:deploy` against the managed database before relying on saved scans, quotas, or feedback.
 
 ## Deployment Sequence
 

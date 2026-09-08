@@ -11,15 +11,30 @@ export type ScanComparison = {
   unchangedFindingIds: string[];
 };
 
-export function scanComparisonKey(scan: ScanApiResponse) {
-  const repository = scan.scanSource?.repository;
-  const source = repository
-    ? `${scan.scanSource?.type}:${repository.owner}/${repository.repo}:${repository.branch}`
-    : scan.scanSource?.type === "upload"
-      ? `upload:${scan.scanSource.detail ?? scan.scannedProject}`
-      : `local:${scan.facts.projectRoot}`;
+function normalizedRepositoryPart(value: string) {
+  return value.trim().toLowerCase();
+}
 
-  return JSON.stringify({ source, project: scan.scannedProject, context: scan.checklist.context });
+function normalizedProjectSource(scan: ScanApiResponse) {
+  const repository = scan.scanSource?.repository;
+  if (repository) {
+    // GitHub owner/repository names are case-insensitive; Git refs are not.
+    return `github:${normalizedRepositoryPart(repository.owner)}/${normalizedRepositoryPart(repository.repo)}:${repository.branch.trim()}`;
+  }
+
+  if (scan.scanSource?.type === "upload") {
+    return `upload:${(scan.scanSource.detail ?? scan.scannedProject).trim()}`;
+  }
+
+  return `local:${scan.facts.projectRoot}`;
+}
+
+export function scanComparisonKey(scan: ScanApiResponse) {
+  return JSON.stringify({
+    source: normalizedProjectSource(scan),
+    project: scan.scannedProject,
+    context: scan.checklist.context,
+  });
 }
 
 export function findPreviousComparableScan(history: ScanHistoryItem[], scan: ScanApiResponse) {

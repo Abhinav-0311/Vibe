@@ -3,6 +3,7 @@ import { downloadGitHubRepoZip, parseGitHubRepoUrl } from "@/lib/github/github-r
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("parseGitHubRepoUrl", () => {
@@ -146,5 +147,30 @@ describe("downloadGitHubRepoZip", () => {
       code: "archive_too_large",
       status: 413,
     });
+  });
+
+  it("stops waiting for an archive body that never finishes downloading", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    const stalledArchive = {
+      ok: true,
+      headers: new Headers(),
+      arrayBuffer: () => new Promise<ArrayBuffer>(() => undefined),
+      body: { cancel },
+    } as unknown as Response;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), { status: 200 }))
+        .mockResolvedValueOnce(stalledArchive),
+    );
+
+    const download = downloadGitHubRepoZip("https://github.com/owner/project");
+    const expectedTimeout = expect(download).rejects.toMatchObject({ code: "request_timeout", status: 504 });
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await expectedTimeout;
+    expect(cancel).toHaveBeenCalledOnce();
   });
 });

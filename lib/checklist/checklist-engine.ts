@@ -420,15 +420,12 @@ const rules: ChecklistRule[] = [
     evaluate: (facts, context) => {
       if (context.stage === "prototype" || !facts.signals.hasDevelopmentStartScript) return null;
 
-      const command = facts.deploymentEvidence?.startCommand;
-      const commandEvidence = command ? ` The current command is ${JSON.stringify(command)}.` : "";
-
       return finding({
         id: "development-start-script",
         title: "Start script launches a development server",
         category: "Deployment",
         severity: "high",
-        evidence: `The package.json start script contains a development or watch command.${commandEvidence}`,
+        evidence: "The package.json start script contains a development or watch command.",
         impact:
           "Development servers are not optimized or hardened for production traffic and may expose debugging behavior.",
         fix: "Use the framework's production server command after a successful production build.",
@@ -742,19 +739,24 @@ const rules: ChecklistRule[] = [
     category: "Security",
     severity: "high",
     evaluate: (facts, context) => {
-      if (context.stage === "prototype" || facts.signals.hasRateLimitImplementation) return null;
+      if (context.stage === "prototype") return null;
 
-      const protectsAuth = context.hasUserAccounts && facts.signals.hasAuthRoute;
-      const protectsApi = context.appType === "api" && facts.apiRoutes.length > 0;
-      if (!protectsAuth && !protectsApi) return null;
+      const sensitiveRoutes = facts.apiRoutes.filter((route) =>
+        (context.hasUserAccounts && route.signals.includes("auth")) ||
+        (context.appType === "api" && !route.signals.includes("webhook")),
+      );
+      if (sensitiveRoutes.length === 0) return null;
+
+      const rateLimitedFiles = new Set(facts.securityEvidence?.rateLimitedRouteFiles ?? []);
+      const uncoveredRoutes = sensitiveRoutes.filter((route) => !rateLimitedFiles.has(route.file));
+      if (uncoveredRoutes.length === 0) return null;
 
       return finding({
         id: "missing-rate-limiting",
         title: "No rate-limiting evidence on sensitive API routes",
         category: "Security",
         severity: "high",
-        evidence:
-          "Sensitive API routes were detected, but no known rate-limit package, middleware pattern, or HTTP 429 handling was found.",
+        evidence: `Rate-limit evidence was not found in these sensitive route files: ${uncoveredRoutes.map((route) => route.file).join(", ")}.`,
         impact:
           "Attackers can automate login attempts or overwhelm public endpoints, increasing account takeover and availability risk.",
         fix: "Apply IP- and account-aware throttling to sensitive endpoints and return a controlled 429 response.",

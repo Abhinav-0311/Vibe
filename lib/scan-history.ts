@@ -6,7 +6,26 @@ export type ScanHistoryItem = {
 };
 
 export const scanHistoryStorageKey = "vibe:scan-history";
+export const findingStatusStorageKey = "vibe:finding-status-overrides";
+export const findingStatusReasonStorageKey = "vibe:finding-status-reasons";
 const maxHistoryItems = 6;
+
+function encodedUserId(userId: string) {
+  return encodeURIComponent(userId);
+}
+
+/**
+ * Browser state is convenience data, not a source of truth. Keep it separate
+ * for each authenticated account so one person's local triage cannot appear
+ * in another person's session on the same browser.
+ */
+export function storageKeyForUser(userId: string, resource: "scan-history" | "finding-status-overrides" | "finding-status-reasons") {
+  return `vibe:${encodedUserId(userId)}:${resource}`;
+}
+
+export function findingOverrideKey(scanScope: string, findingId: string) {
+  return `${scanScope}:${findingId}`;
+}
 
 function scanHistorySignature(scan: ScanApiResponse) {
   const repository = scan.scanSource?.repository;

@@ -31,6 +31,27 @@ afterEach(async () => {
 });
 
 describe("scanProject API route discovery", () => {
+  it("uses shared repository evidence when a Node.js frontend is part of a monorepo", async () => {
+    const repositoryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vibe-monorepo-test-"));
+    temporaryProjects.push(repositoryRoot);
+    const frontendRoot = path.join(repositoryRoot, "frontend");
+    await createFile(frontendRoot, "package.json", JSON.stringify({ scripts: { build: "next build" }, dependencies: { next: "15.0.0", react: "19.0.0" } }));
+    await createFile(frontendRoot, "src/app/page.tsx", "export default function Page() { return <main />; }");
+    await createFile(repositoryRoot, ".env.example", "NEXT_PUBLIC_API_URL=https://example.test\n");
+    await createFile(repositoryRoot, "backend/tests/test_health.py", "def test_health(): pass\n");
+    await createFile(repositoryRoot, "README.md", "# Multi-service app\n");
+
+    const facts = await scanProject(frontendRoot, repositoryRoot);
+
+    expect(facts.workspace).toEqual({
+      isMonorepo: true,
+      appPath: "frontend",
+      sharedEvidenceFiles: expect.arrayContaining([".env.example", "README.md"]),
+    });
+    expect(facts.signals.hasEnvExample).toBe(true);
+    expect(facts.signals.hasTests).toBe(true);
+  });
+
   it("detects a Vite React frontend", async () => {
     const projectRoot = await createProject();
     await createFile(
@@ -153,6 +174,22 @@ describe("scanProject API route discovery", () => {
     const facts = await scanProject(projectRoot);
 
     expect(facts.signals.hasRateLimitImplementation).toBe(true);
+    expect(facts.securityEvidence?.rateLimitedRouteFiles).toEqual(["app/api/auth/login/route.ts"]);
+  });
+
+  it("does not treat a rate-limit package as proof that every route is protected", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "package.json",
+      JSON.stringify({ dependencies: { "@upstash/ratelimit": "latest" } }),
+    );
+    await createFile(projectRoot, "app/api/auth/login/route.ts");
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasRateLimitImplementation).toBe(false);
+    expect(facts.securityEvidence?.rateLimitedRouteFiles).toEqual([]);
   });
 
   it("records the API route containing a wildcard CORS policy", async () => {
@@ -212,6 +249,23 @@ describe("scanProject API route discovery", () => {
     expect(facts.signals.ignoresEslintBuildErrors).toBe(true);
     expect(facts.deploymentEvidence?.ignoredTypeScriptBuildFiles).toEqual(["next.config.ts"]);
     expect(facts.deploymentEvidence?.ignoredEslintBuildFiles).toEqual(["next.config.ts"]);
+  });
+
+  it("keeps script names but never returns an inline package-script secret", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "package.json",
+      JSON.stringify({
+        scripts: { build: "next build --token=super-secret-value", test: "vitest run" },
+        dependencies: { next: "15.0.0" },
+      }),
+    );
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.scripts).toEqual({ build: "[detected]", test: "[detected]" });
+    expect(JSON.stringify(facts)).not.toContain("super-secret-value");
   });
 
   it("detects basic UI and accessibility readiness signals", async () => {

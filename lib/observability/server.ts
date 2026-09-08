@@ -1,7 +1,9 @@
 type ServerErrorEvent =
   | "scan_persistence_failed"
+  | "scan_retention_cleanup_failed"
   | "saved_scan_read_failed"
   | "github_scan_failed"
+  | "local_scan_failed"
   | "upload_scan_failed"
   | "guidance_feedback_read_failed"
   | "guidance_feedback_write_failed"

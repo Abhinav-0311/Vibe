@@ -89,6 +89,15 @@ describe("createScanHash", () => {
     );
   });
 
+  it("ignores an ephemeral extraction directory", () => {
+    const first = createScan("2026-06-13T00:00:00.000Z");
+    const second = createScan("2026-06-13T00:00:00.000Z");
+    first.facts.projectRoot = "C:\\temp\\vibe-upload-a\\project";
+    second.facts.projectRoot = "C:\\temp\\vibe-upload-b\\project";
+
+    expect(createScanHash(first)).toBe(createScanHash(second));
+  });
+
   it("changes when meaningful scan content changes", () => {
     expect(createScanHash(createScan("2026-06-13T00:00:00.000Z", 100))).not.toBe(
       createScanHash(createScan("2026-06-13T00:00:00.000Z", 80)),

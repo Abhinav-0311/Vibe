@@ -271,6 +271,32 @@ describe("runChecklist", () => {
     expect(result.findings.map((finding) => finding.id)).toContain("missing-middleware");
   });
 
+  it("does not let one protected route clear another sensitive route", () => {
+    const authRouteFacts: ScannerFacts = {
+      ...baseFacts,
+      apiRoutes: [
+        { route: "/api/auth/login", file: "app/api/auth/login/route.ts", signals: ["auth"] },
+        { route: "/api/auth/signup", file: "app/api/auth/signup/route.ts", signals: ["auth"] },
+      ],
+      securityEvidence: {
+        wildcardCorsFiles: [],
+        insecureSessionCookieFiles: [],
+        rateLimitedRouteFiles: ["app/api/auth/login/route.ts"],
+      },
+      signals: {
+        ...baseFacts.signals,
+        hasAuthRoute: true,
+        hasRateLimitImplementation: true,
+      },
+    };
+
+    const result = runChecklist(authRouteFacts, launchContext);
+    const finding = result.findings.find((item) => item.id === "missing-rate-limiting");
+
+    expect(finding?.evidence).toContain("app/api/auth/signup/route.ts");
+    expect(finding?.evidence).not.toContain("app/api/auth/login/route.ts");
+  });
+
   it("does not require deployment artifacts during prototype work", () => {
     const prototypeDeploymentFacts: ScannerFacts = {
       ...baseFacts,
@@ -385,7 +411,6 @@ describe("runChecklist", () => {
       deploymentEvidence: {
         ignoredTypeScriptBuildFiles: ["next.config.ts"],
         ignoredEslintBuildFiles: ["next.config.ts"],
-        startCommand: "next dev",
       },
       signals: {
         ...baseFacts.signals,

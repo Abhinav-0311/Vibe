@@ -1,5 +1,6 @@
 const defaultScanRetentionDays = 30;
 const defaultRateLimitRetentionHours = 24;
+const quotaUsageRetentionHours = 48;
 
 function positiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -16,4 +17,8 @@ export function scanRetentionCutoff(now = new Date()) {
 
 export function rateLimitRetentionCutoff(now = new Date()) {
   return new Date(now.getTime() - defaultRateLimitRetentionHours * 60 * 60 * 1000);
+}
+
+export function quotaUsageRetentionCutoff(now = new Date()) {
+  return new Date(now.getTime() - quotaUsageRetentionHours * 60 * 60 * 1000);
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { rateLimitRetentionCutoff, scanRetentionCutoff, scanRetentionDays } from "@/lib/data-retention";
+import { quotaUsageRetentionCutoff, rateLimitRetentionCutoff, scanRetentionCutoff, scanRetentionDays } from "@/lib/data-retention";
 
 const originalRetentionDays = process.env.VIBE_SCAN_RETENTION_DAYS;
 
@@ -22,5 +22,6 @@ describe("scan data retention", () => {
     const now = new Date("2026-08-11T00:00:00.000Z");
     expect(scanRetentionCutoff(now).toISOString()).toBe("2026-07-12T00:00:00.000Z");
     expect(rateLimitRetentionCutoff(now).toISOString()).toBe("2026-08-10T00:00:00.000Z");
+    expect(quotaUsageRetentionCutoff(now).toISOString()).toBe("2026-08-09T00:00:00.000Z");
   });
 });

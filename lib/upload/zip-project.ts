@@ -18,6 +18,7 @@ export class UploadValidationError extends Error {
 
 export type UploadedProject = {
   projectRoot: string;
+  repositoryRoot: string;
   relativeProjectRoot: string;
   cleanup: () => Promise<void>;
 };
@@ -119,6 +120,19 @@ async function findPackageRoot(root: string): Promise<PackageRootCandidate | nul
   return candidates[0] ?? null;
 }
 
+async function findRepositoryRoot(packageRoot: string, extractRoot: string) {
+  let candidate = packageRoot;
+  while (candidate !== extractRoot) {
+    const parent = path.dirname(candidate);
+    const sharedMarkers = ["README.md", ".gitignore", ".env.example", "backend", "server", "docker-compose.yml"];
+    if ((await Promise.all(sharedMarkers.map((marker) => pathExists(path.join(/* turbopackIgnore: true */ parent, marker))))).some(Boolean)) {
+      return parent;
+    }
+    candidate = parent;
+  }
+  return packageRoot;
+}
+
 function describeUnsupportedArchive(entryNames: string[]) {
   const normalizedEntries = entryNames.map(normalizeArchivePath).map((entry) => entry.toLowerCase());
   const fileNames = new Set(normalizedEntries.map((entry) => entry.split("/").at(-1) ?? entry));
@@ -209,6 +223,7 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
 
     return {
       projectRoot: packageRoot.path,
+      repositoryRoot: await findRepositoryRoot(packageRoot.path, extractRoot),
       relativeProjectRoot: packageRoot.relativePath,
       cleanup: () => fs.rm(tempRoot, { recursive: true, force: true }),
     };

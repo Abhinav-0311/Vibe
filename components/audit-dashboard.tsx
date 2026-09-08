@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { AuditProfileMode } from "@/lib/audit-context";
 import type { AuditContext } from "@/lib/checklist/types";
+import { getAuditProfileWarnings } from "@/lib/checklist/context-inference";
 import { auditReport, emptyReport, type ActionPriority, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import { buildScoreBreakdown } from "@/lib/score-breakdown";
@@ -38,7 +39,16 @@ import type {
   ScanApiResponse,
   WorkspaceProjectsApiResponse,
 } from "@/lib/scan-api";
-import { addScanToHistory, parseScanHistory, scanHistoryStorageKey, type ScanHistoryItem } from "@/lib/scan-history";
+import {
+  addScanToHistory,
+  findingOverrideKey,
+  findingStatusReasonStorageKey,
+  findingStatusStorageKey,
+  parseScanHistory,
+  scanHistoryStorageKey,
+  storageKeyForUser,
+  type ScanHistoryItem,
+} from "@/lib/scan-history";
 import type { SetupArtifact, SetupPack } from "@/lib/setup-pack/types";
 import { createPullRequestBrief } from "@/lib/github/pull-request-brief";
 import { getFrameworkGuidance, type FrameworkGuidance } from "@/lib/nextjs-guidance";
@@ -53,6 +63,7 @@ type HealthState = "loading" | "ready" | "error";
 type ProjectDiscoveryState = "loading" | "ready" | "error";
 type ProjectSourceMode = "local" | "github" | "upload";
 type ScanProgressSource = ProjectSourceMode | null;
+type PreviousScanNotice = { target: string; message: string };
 
 const defaultAuditContext: AuditContext = {
   appType: "content-site",
@@ -62,8 +73,6 @@ const defaultAuditContext: AuditContext = {
   storesUserData: false,
 };
 
-const triageStorageKey = "vibe:finding-status-overrides";
-const triageReasonStorageKey = "vibe:finding-status-reasons";
 const defaultProjectPath = "";
 
 const severityLabel: Record<Severity, string> = {
@@ -138,7 +147,7 @@ function createReportFromScan(scan: ScanApiResponse | null): AuditReport {
   };
 }
 
-export function AuditDashboard() {
+export function AuditDashboard({ userId }: { userId: string }) {
   const [viewState, setViewState] = useState<ViewState>("empty");
   const [scanData, setScanData] = useState<ScanApiResponse | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
@@ -159,20 +168,23 @@ export function AuditDashboard() {
   const [projectDiscoveryState, setProjectDiscoveryState] = useState<ProjectDiscoveryState>("loading");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, FindingStatus>>({});
   const [statusReasonOverrides, setStatusReasonOverrides] = useState<Record<string, string>>({});
+  const [storageHydratedForUser, setStorageHydratedForUser] = useState<string | null>(null);
   const [scanProgressSource, setScanProgressSource] = useState<ScanProgressSource>(null);
   const [scanSuccess, setScanSuccess] = useState<string | null>(null);
+  const [previousScanNotice, setPreviousScanNotice] = useState<PreviousScanNotice | null>(null);
 
   const report = useMemo(() => createReportFromScan(scanData), [scanData]);
+  const activeScanScope = useMemo(() => (scanData ? scanComparisonKey(scanData) : null), [scanData]);
   const reportWithStatuses = useMemo(
     () => ({
       ...report,
       findings: report.findings.map((finding) => ({
         ...finding,
-        status: statusOverrides[finding.id] ?? finding.status,
-        statusReason: statusReasonOverrides[finding.id] ?? finding.statusReason,
+        status: statusOverrides[activeScanScope ? findingOverrideKey(activeScanScope, finding.id) : finding.id] ?? finding.status,
+        statusReason: statusReasonOverrides[activeScanScope ? findingOverrideKey(activeScanScope, finding.id) : finding.id] ?? finding.statusReason,
       })),
     }),
-    [report, statusOverrides, statusReasonOverrides],
+    [activeScanScope, report, statusOverrides, statusReasonOverrides],
   );
   const [selectedId, setSelectedId] = useState(report.findings[0]?.id);
 
@@ -182,6 +194,7 @@ export function AuditDashboard() {
   );
 
   function applyCompletedScan(scan: ScanApiResponse, profileMode: AuditProfileMode) {
+    setPreviousScanNotice(null);
     setComparisonBaseline(findPreviousComparableScan(scanHistory, scan));
     setScanData(scan);
     setAuditContext(scan.checklist.context);
@@ -195,15 +208,16 @@ export function AuditDashboard() {
   }
 
   function updateFindingStatus(findingId: string, status: FindingStatus, reason?: string) {
-    setStatusOverrides((current) => ({ ...current, [findingId]: status }));
+    const overrideKey = activeScanScope ? findingOverrideKey(activeScanScope, findingId) : findingId;
+    setStatusOverrides((current) => ({ ...current, [overrideKey]: status }));
     setStatusReasonOverrides((current) => {
       const next = { ...current };
       const cleanReason = reason?.trim();
 
       if (status === "ignored" && cleanReason) {
-        next[findingId] = cleanReason;
+        next[overrideKey] = cleanReason;
       } else {
-        delete next[findingId];
+        delete next[overrideKey];
       }
 
       return next;
@@ -215,6 +229,7 @@ export function AuditDashboard() {
   }
 
   function selectHistoryItem(item: ScanHistoryItem) {
+    setPreviousScanNotice(null);
     setComparisonBaseline(findPreviousComparableScan(scanHistory, item.scan));
     setScanData(item.scan);
     setAuditContext(item.scan.checklist.context);
@@ -227,7 +242,7 @@ export function AuditDashboard() {
   function clearScanHistory() {
     setScanHistory([]);
     setComparisonBaseline(null);
-    window.localStorage.removeItem(scanHistoryStorageKey);
+    window.localStorage.removeItem(storageKeyForUser(userId, "scan-history"));
   }
 
   async function refreshSavedScans() {
@@ -299,6 +314,7 @@ export function AuditDashboard() {
       }
 
       setScanData(data.record.scan);
+      setPreviousScanNotice(null);
       setComparisonBaseline(findPreviousComparableScan(scanHistory, data.record.scan));
       setAuditContext(data.record.scan.checklist.context);
       setAuditProfileMode("manual");
@@ -318,6 +334,7 @@ export function AuditDashboard() {
     setGithubError(null);
     setScanSuccess(null);
     setScanProgressSource("local");
+    setPreviousScanNotice(null);
     setViewState("loading");
 
     try {
@@ -333,13 +350,15 @@ export function AuditDashboard() {
       const response = await fetch(`/api/scan?${params.toString()}`);
 
       if (!response.ok) {
-        throw new Error(`Scan failed with status ${response.status}`);
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `Scan failed with status ${response.status}`);
       }
 
       const data = (await response.json()) as ScanApiResponse;
       applyCompletedScan(data, profileMode);
     } catch (error) {
       setScanError(error instanceof Error ? error.message : "Unknown scan failure");
+      if (scanData) setPreviousScanNotice({ target: targetPath || "local project", message: error instanceof Error ? error.message : "Local scan failed" });
       setViewState("error");
     }
   }
@@ -350,6 +369,7 @@ export function AuditDashboard() {
     setGithubError(null);
     setScanSuccess(null);
     setScanProgressSource("upload");
+    setPreviousScanNotice(null);
     setViewState("loading");
 
     try {
@@ -377,6 +397,7 @@ export function AuditDashboard() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload scan failed";
       setUploadError(message);
+      if (scanData) setPreviousScanNotice({ target: file.name, message });
       setViewState(scanData ? "report" : "empty");
     }
   }
@@ -387,6 +408,7 @@ export function AuditDashboard() {
     setGithubError(null);
     setScanSuccess(null);
     setScanProgressSource("github");
+    setPreviousScanNotice(null);
     setViewState("loading");
 
     try {
@@ -420,48 +442,69 @@ export function AuditDashboard() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "GitHub scan failed";
       setGithubError(message);
+      if (scanData) setPreviousScanNotice({ target: repoUrl, message });
       setViewState(scanData ? "report" : "empty");
     }
   }
 
   useEffect(() => {
-    const savedStatuses = window.localStorage.getItem(triageStorageKey);
-    const savedStatusReasons = window.localStorage.getItem(triageReasonStorageKey);
-    const savedHistory = window.localStorage.getItem(scanHistoryStorageKey);
+    setStorageHydratedForUser(null);
+    // Versions before account isolation used browser-wide keys. Drop that
+    // unscoped state rather than risking one account inheriting another's data.
+    window.localStorage.removeItem(scanHistoryStorageKey);
+    window.localStorage.removeItem(findingStatusStorageKey);
+    window.localStorage.removeItem(findingStatusReasonStorageKey);
+
+    const statusesKey = storageKeyForUser(userId, "finding-status-overrides");
+    const statusReasonsKey = storageKeyForUser(userId, "finding-status-reasons");
+    const historyKey = storageKeyForUser(userId, "scan-history");
+    const savedStatuses = window.localStorage.getItem(statusesKey);
+    const savedStatusReasons = window.localStorage.getItem(statusReasonsKey);
+    const savedHistory = window.localStorage.getItem(historyKey);
 
     if (savedStatuses) {
       try {
         setStatusOverrides(JSON.parse(savedStatuses) as Record<string, FindingStatus>);
       } catch {
-        window.localStorage.removeItem(triageStorageKey);
+        window.localStorage.removeItem(statusesKey);
+        setStatusOverrides({});
       }
+    } else {
+      setStatusOverrides({});
     }
 
     if (savedStatusReasons) {
       try {
         setStatusReasonOverrides(JSON.parse(savedStatusReasons) as Record<string, string>);
       } catch {
-        window.localStorage.removeItem(triageReasonStorageKey);
+        window.localStorage.removeItem(statusReasonsKey);
+        setStatusReasonOverrides({});
       }
+    } else {
+      setStatusReasonOverrides({});
     }
 
     setScanHistory(parseScanHistory(savedHistory));
+    setStorageHydratedForUser(userId);
     void refreshWorkspaceProjects();
     void refreshSavedScans();
     void refreshHealth();
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    window.localStorage.setItem(triageStorageKey, JSON.stringify(statusOverrides));
-  }, [statusOverrides]);
+    if (storageHydratedForUser !== userId) return;
+    window.localStorage.setItem(storageKeyForUser(userId, "finding-status-overrides"), JSON.stringify(statusOverrides));
+  }, [statusOverrides, storageHydratedForUser, userId]);
 
   useEffect(() => {
-    window.localStorage.setItem(triageReasonStorageKey, JSON.stringify(statusReasonOverrides));
-  }, [statusReasonOverrides]);
+    if (storageHydratedForUser !== userId) return;
+    window.localStorage.setItem(storageKeyForUser(userId, "finding-status-reasons"), JSON.stringify(statusReasonOverrides));
+  }, [statusReasonOverrides, storageHydratedForUser, userId]);
 
   useEffect(() => {
-    window.localStorage.setItem(scanHistoryStorageKey, JSON.stringify(scanHistory));
-  }, [scanHistory]);
+    if (storageHydratedForUser !== userId) return;
+    window.localStorage.setItem(storageKeyForUser(userId, "scan-history"), JSON.stringify(scanHistory));
+  }, [scanHistory, storageHydratedForUser, userId]);
 
   return (
     <main id="vibe-main-content" className="min-h-screen bg-black text-white" tabIndex={-1}>
@@ -495,6 +538,7 @@ export function AuditDashboard() {
         {viewState === "report" && (
           <>
             {scanSuccess && <ScanSuccessNotice message={scanSuccess} />}
+            {previousScanNotice && <PreviousScanNoticeBanner notice={previousScanNotice} previousProject={scanData?.scannedProject ?? "previous project"} />}
             <ResultSection
               id="findings"
               eyebrow="Fix this first"
@@ -507,19 +551,22 @@ export function AuditDashboard() {
                 selectedId={selectedId}
                 onSelect={setSelectedId}
                 onStatusChange={updateFindingStatus}
-                repository={scanData?.scanSource?.repository}
+                repository={previousScanNotice ? undefined : scanData?.scanSource?.repository}
+                projectKey={activeScanScope ?? undefined}
               />
               {scanData && comparisonBaseline && <ScanProgress baseline={comparisonBaseline} current={scanData} />}
             </ResultSection>
 
-            <ResultSection
-              eyebrow="Implementation handoff"
-              title="Turn the scan into work."
-              description="Use this section after you understand the first findings. It exports the report and AI workspace setup pack."
-            >
-              {scanData && <ReportNarrative scan={scanData} />}
-              {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}
-            </ResultSection>
+            {!previousScanNotice && (
+              <ResultSection
+                eyebrow="Implementation handoff"
+                title="Turn the scan into work."
+                description="Use this section after you understand the first findings. It exports the report and AI workspace setup pack."
+              >
+                {scanData && <ReportNarrative scan={scanData} />}
+                {scanData && <SetupPackWorkspace setupPack={scanData.setupPack} />}
+              </ResultSection>
+            )}
 
             <EvidenceDisclosure>
               <ScanHistory
@@ -549,6 +596,17 @@ export function AuditDashboard() {
         )}
       </div>
     </main>
+  );
+}
+
+function PreviousScanNoticeBanner({ notice, previousProject }: { notice: PreviousScanNotice; previousProject: string }) {
+  return (
+    <section className="rounded-[24px] border border-[#6e5231] bg-[#21190f] p-5" role="alert">
+      <p className="mono text-[10px] text-[#ffd166]">New scan failed — previous result only</p>
+      <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
+        Vibe could not scan {notice.target}: {notice.message} The report below belongs to {previousProject}, not the failed target. GitHub actions and implementation handoff are disabled until a new scan succeeds.
+      </p>
+    </section>
   );
 }
 
@@ -714,6 +772,7 @@ function ContextControls({
   const [sourceMode, setSourceMode] = useState<ProjectSourceMode>("github");
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
   const appTypes: AuditContext["appType"][] = ["saas", "internal-tool", "content-site", "portfolio", "api"];
+  const profileWarnings = getAuditProfileWarnings(context);
   const localScanEnabled = workspaceProjects?.localScanEnabled === true;
   const sourceOptions: Array<{
     value: ProjectSourceMode;
@@ -962,6 +1021,34 @@ function ContextControls({
             onChange={(storesUserData) => update({ storesUserData })}
           />
         </div>
+
+        {profileWarnings.length > 0 && (
+          <div className="mt-5 rounded-[18px] border border-[#6e5231] bg-[#21190f] p-4" role="status" aria-live="polite">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#ffd166]" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="mono text-[10px] text-[#ffd166]">Review this profile</p>
+                <p className="mt-2 text-xs leading-5 text-[#d9d9d9]">
+                  These suggestions do not change the readiness score or your selection unless you choose one.
+                </p>
+                <div className="mt-3 grid gap-3">
+                  {profileWarnings.map((warning) => (
+                    <div key={warning.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs leading-5 text-[#d9d9d9]">{warning.message}</p>
+                      <button
+                        type="button"
+                        onClick={() => update(warning.suggestion.changes)}
+                        className="mono shrink-0 rounded-full border border-[#8c7045] px-3 py-2 text-[9px] text-[#ffd166] transition hover:border-[#ffd166] hover:bg-[#2d220f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffd166]"
+                      >
+                        {warning.suggestion.label}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </details>
     </section>
   );
@@ -1463,6 +1550,9 @@ function ScannerFactsPreview({ scan }: { scan: ScanApiResponse | null }) {
       value: scan ? `${scan.checklist.context.appType} / ${scan.checklist.context.stage}` : "Scanning...",
     },
     { label: "API routes", value: scan ? apiRoutes.length.toString() : "Scanning..." },
+    ...(scan?.facts.workspace?.isMonorepo
+      ? [{ label: "Scan scope", value: `${scan.facts.workspace.appPath} + shared repository files` }]
+      : []),
     { label: "Source", value: scan ? formatScanSource(scan) : "Scanning..." },
   ];
   const evidence = scan
@@ -2551,6 +2641,7 @@ function ReportView({
   onSelect,
   onStatusChange,
   repository,
+  projectKey,
 }: {
   report: AuditReport;
   selectedFinding?: AuditFinding;
@@ -2558,6 +2649,7 @@ function ReportView({
   onSelect: (id: string) => void;
   onStatusChange: (findingId: string, status: FindingStatus, reason?: string) => void;
   repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
+  projectKey?: string;
 }) {
   const criticalCount = report.findings.filter((finding) => finding.severity === "critical").length;
 
@@ -2565,7 +2657,7 @@ function ReportView({
     <section className="grid gap-6">
       <ScorePanel report={report} criticalCount={criticalCount} />
       <FindingsList findings={report.findings} selectedId={selectedId} onSelect={onSelect} />
-      <FindingDetail finding={selectedFinding} onStatusChange={onStatusChange} repository={repository} />
+      <FindingDetail finding={selectedFinding} onStatusChange={onStatusChange} repository={repository} projectKey={projectKey} />
     </section>
   );
 }
@@ -2942,10 +3034,12 @@ function FindingDetail({
   finding,
   onStatusChange,
   repository,
+  projectKey,
 }: {
   finding?: AuditFinding;
   onStatusChange: (findingId: string, status: FindingStatus, reason?: string) => void;
   repository?: NonNullable<ScanApiResponse["scanSource"]>["repository"];
+  projectKey?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const [issueState, setIssueState] = useState<"idle" | "creating" | "created" | "error">("idle");
@@ -2967,10 +3061,10 @@ function FindingDetail({
   }, [finding?.id, finding?.statusReason]);
 
   useEffect(() => {
-    if (!selectedFindingId) return;
+    if (!selectedFindingId || !projectKey) return;
     let active = true;
-    void fetch("/api/finding-feedback")
-      .then(async (response) => (response.ok ? (await response.json()) as { feedback?: Array<{ findingId: string; helpful: boolean }> } : null))
+    void fetch(`/api/finding-feedback?${new URLSearchParams({ projectKey }).toString()}`)
+      .then(async (response) => (response.ok ? (await response.json()) as { feedback?: Array<{ projectKey: string; findingId: string; helpful: boolean }> } : null))
       .then((body) => {
         if (!active) return;
         setFindingFeedback(body?.feedback?.find((item) => item.findingId === selectedFindingId)?.helpful);
@@ -2979,10 +3073,10 @@ function FindingDetail({
     return () => {
       active = false;
     };
-  }, [selectedFindingId]);
+  }, [projectKey, selectedFindingId]);
 
   async function submitFindingFeedback(helpful: boolean) {
-    if (!finding) return;
+    if (!finding || !projectKey) return;
     const previous = findingFeedback;
     setFindingFeedback(helpful);
     setFindingFeedbackState("saving");
@@ -2990,7 +3084,7 @@ function FindingDetail({
       const response = await fetch("/api/finding-feedback", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findingId: finding.id, helpful }),
+        body: JSON.stringify({ projectKey, findingId: finding.id, helpful }),
       });
       if (!response.ok) throw new Error("Feedback could not be saved.");
       setFindingFeedbackState("idle");

@@ -66,6 +66,15 @@ describe("githubFetch", () => {
     });
   });
 
+  it("returns a bounded timeout error when GitHub does not respond", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new DOMException("Aborted", "AbortError")));
+
+    await expect(githubFetch("/repos/owner/project")).rejects.toMatchObject({
+      code: "request_timeout",
+      status: 504,
+    });
+  });
+
   it("preserves known GitHub validation errors across module boundaries", () => {
     const payload = githubErrorPayload({
       name: "GitHubApiError",

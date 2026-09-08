@@ -18,7 +18,6 @@ const authPackages = [
 
 const analyticsPackages = ["posthog-js", "@vercel/analytics", "mixpanel-browser", "analytics"];
 const errorTrackingPackages = ["@sentry/nextjs", "@highlight-run/next", "@bugsnag/js"];
-const rateLimitPackages = ["@upstash/ratelimit", "rate-limiter-flexible", "express-rate-limit"];
 const routeFilePattern = /^route\.(?:ts|js|mjs|cjs)$/i;
 const pagesApiFilePattern = /\.(?:ts|tsx|js|jsx|mjs|cjs)$/i;
 const ignoredRouteDirectories = new Set(["node_modules", ".next", ".git"]);
@@ -104,6 +103,19 @@ function hasAnyDependency(dependencies: DependencySignal[], packageNames: string
 
 function hasDependency(dependencies: DependencySignal[], packageName: string) {
   return dependencies.some((dependency) => dependency.name === packageName);
+}
+
+/**
+ * A package script can legally contain an inline credential. Vibe only needs
+ * to know that a named script exists, so never put its command text in scan
+ * results, exports, persistence, or prompts.
+ */
+function publicScriptMetadata(scripts: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(scripts)
+      .filter(([name, command]) => Boolean(name.trim()) && typeof command === "string" && Boolean(command.trim()))
+      .map(([name]) => [name, "[detected]"]),
+  );
 }
 
 function detectFramework(
@@ -218,7 +230,7 @@ async function detectFiles(projectRoot: string): Promise<DetectedFile[]> {
   );
 }
 
-async function detectTests(projectRoot: string) {
+async function detectTests(projectRoot: string, repositoryRoot = projectRoot) {
   const likelyTestPaths = [
     "__tests__",
     "tests",
@@ -230,10 +242,20 @@ async function detectTests(projectRoot: string) {
     "playwright.config.ts",
   ];
 
+  const sharedTestPaths = repositoryRoot === projectRoot
+    ? []
+    : ["tests", "test", "backend/tests", "backend/test", "backend/pytest.ini", "backend/pyproject.toml"];
   const results = await Promise.all(
-    likelyTestPaths.map((testPath) => pathExists(path.join(/* turbopackIgnore: true */ projectRoot, testPath))),
+    [...likelyTestPaths, ...sharedTestPaths].map((testPath) => pathExists(path.join(/* turbopackIgnore: true */ repositoryRoot, testPath))),
   );
   return results.some(Boolean);
+}
+
+async function detectSharedEvidence(projectRoot: string, repositoryRoot: string) {
+  if (projectRoot === repositoryRoot) return [];
+  const candidates = [".env.example", ".gitignore", "AGENTS.md", "README.md", "docker-compose.yml", "docker-compose.yaml"];
+  const exists = await Promise.all(candidates.map((file) => pathExists(path.join(/* turbopackIgnore: true */ repositoryRoot, file))));
+  return candidates.filter((file, index) => exists[index]);
 }
 
 function normalizeRoutePath(value: string) {
@@ -480,19 +502,18 @@ function ignoresEnvironmentFiles(gitignore: string | null, environmentFiles: str
 async function detectRateLimitImplementation(
   projectRoot: string,
   apiRoutes: DetectedApiRoute[],
-  dependencies: DependencySignal[],
 ) {
-  if (hasAnyDependency(dependencies, rateLimitPackages)) return true;
-
-  const sourceFiles = [
-    ...apiRoutes.map((route) => path.join(projectRoot, route.file)),
-    path.join(projectRoot, "middleware.ts"),
-    path.join(projectRoot, "middleware.js"),
-  ];
-  const samples = await Promise.all(sourceFiles.map(readSecuritySample));
   const rateLimitPattern = /(?:rate[-_ ]?limit|ratelimit|slidingWindow|fixedWindow|status\s*[:(]\s*429|too many requests)/i;
+  const evidence = await Promise.all(
+    apiRoutes.map(async (route) => ({
+      file: route.file,
+      sample: await readSecuritySample(path.join(projectRoot, route.file)),
+    })),
+  );
 
-  return samples.some((sample) => sample && rateLimitPattern.test(sample));
+  return evidence
+    .filter(({ sample }) => sample && rateLimitPattern.test(sample))
+    .map(({ file }) => file);
 }
 
 async function detectWebhookSignatureVerification(projectRoot: string, apiRoutes: DetectedApiRoute[]) {
@@ -581,7 +602,7 @@ async function detectIgnoredBuildChecks(projectRoot: string, detectedFiles: Dete
   };
 }
 
-export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
+export async function scanProject(projectRoot: string, repositoryRoot = projectRoot): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
   const absoluteDetectedFiles = detectedFiles
     .filter((file) => file.exists)
@@ -594,13 +615,15 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
 
   const dependencies = flattenDependencies(packageJson);
   const scripts = packageJson?.scripts ?? {};
+  const publicScripts = publicScriptMetadata(scripts);
   const apiRoutes = await detectApiRoutes(projectRoot);
-  const gitignore = await readTextFile(path.join(projectRoot, ".gitignore"));
+  const sharedEvidenceFiles = await detectSharedEvidence(projectRoot, repositoryRoot);
+  const gitignore = await readTextFile(path.join(projectRoot, ".gitignore")) ?? await readTextFile(path.join(repositoryRoot, ".gitignore"));
   const localEnvFiles = [".env", ".env.local", ".env.development", ".env.production"].filter((file) =>
     detectedFiles.some((detectedFile) => detectedFile.path === file && detectedFile.exists),
   );
   const hasLocalEnvFile = localEnvFiles.length > 0;
-  const hasRateLimitImplementation = await detectRateLimitImplementation(projectRoot, apiRoutes, dependencies);
+  const rateLimitedRouteFiles = await detectRateLimitImplementation(projectRoot, apiRoutes);
   const hasWebhookSignatureVerification = await detectWebhookSignatureVerification(projectRoot, apiRoutes);
   const wildcardCorsFiles = await detectWildcardCors(projectRoot, apiRoutes, detectedFiles);
   const insecureSessionCookieFiles = await detectInsecureSessionCookies(projectRoot, apiRoutes);
@@ -624,19 +647,24 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
 
   return {
     projectRoot,
+    workspace: {
+      isMonorepo: projectRoot !== repositoryRoot,
+      appPath: projectRoot === repositoryRoot ? "." : normalizeRoutePath(path.relative(repositoryRoot, projectRoot)),
+      sharedEvidenceFiles,
+    },
     packageManager: detectPackageManager(projectRoot, absoluteDetectedFiles),
     framework: detectFramework(dependencies, scripts, detectedFiles),
-    scripts,
+    scripts: publicScripts,
     dependencies,
     detectedFiles,
     apiRoutes,
     securityEvidence: {
       wildcardCorsFiles,
       insecureSessionCookieFiles,
+      rateLimitedRouteFiles,
     },
     deploymentEvidence: {
       ...ignoredBuildChecks,
-      ...(startCommand ? { startCommand } : {}),
     },
     uiEvidence,
     signals: {
@@ -644,9 +672,9 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasNextConfig,
       hasAppRouter,
       hasPagesRouter,
-      hasEnvExample: detectedFiles.some((file) => file.path === ".env.example" && file.exists),
+      hasEnvExample: detectedFiles.some((file) => file.path === ".env.example" && file.exists) || sharedEvidenceFiles.includes(".env.example"),
       hasEnvironmentVariableUsage,
-      hasTests: await detectTests(projectRoot),
+      hasTests: await detectTests(projectRoot, repositoryRoot),
       hasMiddleware,
       hasAuthDependency: hasAnyDependency(dependencies, authPackages),
       hasStripeDependency: hasAnyDependency(dependencies, ["stripe", "@stripe/stripe-js"]),
@@ -654,7 +682,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasAnalyticsDependency: hasAnyDependency(dependencies, analyticsPackages),
       hasObservabilityPlan: detectedFiles.some((file) => file.path === "lib/observability/plan.ts" && file.exists),
       hasErrorTrackingDependency: hasAnyDependency(dependencies, errorTrackingPackages),
-      hasAiRules,
+      hasAiRules: hasAiRules || sharedEvidenceFiles.includes("AGENTS.md"),
       hasAuthRoute: apiRoutes.some((route) => route.signals.includes("auth")),
       hasCredentialAuthRoute: apiRoutes.some((route) => route.signals.includes("credential-auth")),
       hasPasswordRecoveryRoute: apiRoutes.some((route) => route.signals.includes("recovery")),
@@ -665,7 +693,7 @@ export async function scanProject(projectRoot: string): Promise<ScannerFacts> {
       hasHealthRoute: apiRoutes.some((route) => route.signals.includes("health")),
       hasLocalEnvFile,
       hasEnvGitignoreRule: ignoresEnvironmentFiles(gitignore, localEnvFiles),
-      hasRateLimitImplementation,
+      hasRateLimitImplementation: rateLimitedRouteFiles.length > 0,
       hasWildcardCors: wildcardCorsFiles.length > 0,
       hasInsecureSessionCookie: insecureSessionCookieFiles.length > 0,
       hasLockfile: detectedFiles.some(

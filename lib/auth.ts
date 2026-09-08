@@ -2,7 +2,9 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { NextAuthOptions } from "next-auth";
 import { getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { quotaUsageRetentionCutoff } from "@/lib/data-retention";
 
 const dailyScanLimit = Number.parseInt(process.env.VIBE_BETA_DAILY_SCAN_LIMIT ?? "20", 10);
 
@@ -71,13 +73,36 @@ export async function enforceBetaScanQuota(userId: string) {
   const prisma = getPrisma();
   if (!prisma) return { allowed: false, retryAfterSeconds: 60 };
 
-  const windowStartedAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const used = await prisma.scanRecord.count({ where: { userId, createdAt: { gte: windowStartedAt } } });
   const limit = getBetaDailyScanLimit();
+  const now = new Date();
+  const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const nextWindowStart = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);
 
-  return {
-    allowed: used < limit,
-    retryAfterSeconds: 60 * 60,
-    remaining: Math.max(0, limit - used),
-  };
+  try {
+    await prisma.scanQuotaUsage.deleteMany({ where: { updatedAt: { lt: quotaUsageRetentionCutoff(now) } } });
+    // Count the attempt before a scan begins. This stays correct for repeated,
+    // deduplicated, or failed scans and is atomic across concurrent requests.
+    const rows = await prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`
+      INSERT INTO "ScanQuotaUsage" ("userId", "windowStart", "count", "createdAt", "updatedAt")
+      VALUES (${userId}, ${windowStart}, 1, ${now}, ${now})
+      ON CONFLICT ("userId", "windowStart") DO UPDATE SET
+        "count" = "ScanQuotaUsage"."count" + 1,
+        "updatedAt" = ${now}
+      WHERE "ScanQuotaUsage"."count" < ${limit}
+      RETURNING "count"
+    `);
+
+    const used = rows[0]?.count;
+    const retryAfterSeconds = Math.max(1, Math.ceil((nextWindowStart.getTime() - now.getTime()) / 1000));
+
+    return {
+      allowed: used !== undefined,
+      retryAfterSeconds,
+      remaining: used === undefined ? 0 : Math.max(0, limit - used),
+    };
+  } catch {
+    // Fail closed: a missing or unavailable durable counter must not make the
+    // hosted scan endpoints unlimited.
+    return { allowed: false, retryAfterSeconds: 60, remaining: 0 };
+  }
 }

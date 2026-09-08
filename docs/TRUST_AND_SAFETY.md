@@ -29,7 +29,7 @@ Hosted deployments should use GitHub or ZIP scanning. Local workspace scanning i
 
 ## Uploaded ZIP Files
 
-ZIP uploads are size-limited, path-validated, extracted to a temporary folder, scanned, and removed after the request finishes. Future SaaS versions should add user accounts, quotas, retention controls, and deletion guarantees before accepting sensitive commercial repositories.
+ZIP uploads are size-limited, path-validated, extracted to a temporary folder, scanned, and removed after the request finishes. Hosted access is invite-gated; per-user scan quotas and time-bounded scan retention are enforced. Vibe still should not be used for repositories containing secrets or regulated data.
 
 ## GitHub Access
 

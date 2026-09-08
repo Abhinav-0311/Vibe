@@ -21,6 +21,12 @@ export type DetectedApiRoute = {
 
 export type ScannerFacts = {
   projectRoot: string;
+  workspace?: {
+    /** The selected Node.js app lives inside a larger repository. */
+    isMonorepo: boolean;
+    appPath: string;
+    sharedEvidenceFiles: string[];
+  };
   packageManager: PackageManager;
   framework: {
     name: string;
@@ -33,11 +39,12 @@ export type ScannerFacts = {
   securityEvidence?: {
     wildcardCorsFiles: string[];
     insecureSessionCookieFiles: string[];
+    /** Route files with direct, static rate-limit evidence. */
+    rateLimitedRouteFiles?: string[];
   };
   deploymentEvidence?: {
     ignoredTypeScriptBuildFiles: string[];
     ignoredEslintBuildFiles: string[];
-    startCommand?: string;
   };
   uiEvidence?: {
     filesScanned: string[];

@@ -37,6 +37,9 @@ function formatScannerFacts(facts: ScannerFacts) {
     `- Tests detected: ${facts.signals.hasTests ? "yes" : "no"}`,
     `- AI rules detected: ${facts.signals.hasAiRules ? "yes" : "no"}`,
     `- Environment example detected: ${facts.signals.hasEnvExample ? "yes" : "no"}`,
+    ...(facts.workspace?.isMonorepo
+      ? [`- Scan scope: ${facts.workspace.appPath} plus shared repository files (${facts.workspace.sharedEvidenceFiles.join(", ") || "none"})`]
+      : []),
   ].join("\n");
 }
 

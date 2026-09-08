@@ -90,6 +90,14 @@ function dedupeSavedScanRows<T extends { id: string; payload: Prisma.JsonValue }
   return deduped;
 }
 
+async function purgeExpiredScanRecords(prisma: NonNullable<ReturnType<typeof getPrisma>>) {
+  try {
+    await prisma.scanRecord.deleteMany({ where: { updatedAt: { lt: scanRetentionCutoff() } } });
+  } catch {
+    reportServerError("scan_retention_cleanup_failed");
+  }
+}
+
 export async function saveScanRecord(scan: ScanApiResponse, userId: string): Promise<ScanPersistenceResult> {
   const prisma = getPrisma();
 
@@ -102,7 +110,7 @@ export async function saveScanRecord(scan: ScanApiResponse, userId: string): Pro
   }
 
   try {
-    await prisma.scanRecord.deleteMany({ where: { updatedAt: { lt: scanRetentionCutoff() } } });
+    await purgeExpiredScanRecords(prisma);
     const scanHash = createScanHash(scan);
     const existingRecord = await prisma.scanRecord.findUnique({
       where: { userId_scanHash: { userId, scanHash } },
@@ -153,9 +161,11 @@ export async function listSavedScanRecords(userId: string, limit = 6): Promise<S
   const prisma = getPrisma();
 
   if (!prisma || !isDatabaseConfigured()) return [];
+  const retentionCutoff = scanRetentionCutoff();
+  await purgeExpiredScanRecords(prisma);
 
   const records = await prisma.scanRecord.findMany({
-    where: { userId },
+    where: { userId, updatedAt: { gte: retentionCutoff } },
     orderBy: [{ scannedAt: "desc" }, { id: "desc" }],
     take: limit * 4,
     select: {
@@ -178,9 +188,11 @@ export async function getSavedScanRecord(id: string, userId: string): Promise<Sa
   const prisma = getPrisma();
 
   if (!prisma || !isDatabaseConfigured()) return null;
+  const retentionCutoff = scanRetentionCutoff();
+  await purgeExpiredScanRecords(prisma);
 
   const record = await prisma.scanRecord.findFirst({
-    where: { id, userId },
+    where: { id, userId, updatedAt: { gte: retentionCutoff } },
     select: {
       id: true,
       projectName: true,
@@ -205,9 +217,11 @@ export async function getSavedScanRecord(id: string, userId: string): Promise<Sa
 export async function listReadinessTrend(userId: string, limit = 12): Promise<ReadinessTrendPoint[]> {
   const prisma = getPrisma();
   if (!prisma || !isDatabaseConfigured()) return [];
+  const retentionCutoff = scanRetentionCutoff();
+  await purgeExpiredScanRecords(prisma);
 
   const records = await prisma.scanRecord.findMany({
-    where: { userId },
+    where: { userId, updatedAt: { gte: retentionCutoff } },
     orderBy: [{ scannedAt: "desc" }, { id: "desc" }],
     take: limit,
     select: { id: true, projectName: true, score: true, findingCount: true, scannedAt: true, payload: true },

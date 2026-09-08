@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { addScanToHistory, createScanHistoryItem, parseScanHistory } from "@/lib/scan-history";
-import { compareScans, findPreviousComparableScan } from "@/lib/scan-comparison";
+import {
+  addScanToHistory,
+  createScanHistoryItem,
+  findingOverrideKey,
+  parseScanHistory,
+  storageKeyForUser,
+} from "@/lib/scan-history";
+import { compareScans, findPreviousComparableScan, scanComparisonKey } from "@/lib/scan-comparison";
 import type { ScanApiResponse } from "@/lib/scan-api";
 
 function createFinding(id: string): ScanApiResponse["checklist"]["findings"][number] {
@@ -106,6 +112,33 @@ describe("scan history", () => {
     expect(parseScanHistory(null)).toEqual([]);
     expect(parseScanHistory("not-json")).toEqual([]);
     expect(parseScanHistory("{}")).toEqual([]);
+  });
+
+  it("names browser state per account and scopes finding triage to one scan target", () => {
+    expect(storageKeyForUser("user-a", "scan-history")).not.toBe(storageKeyForUser("user-b", "scan-history"));
+    expect(findingOverrideKey("github:owner/repo:main", "missing-tests"))
+      .not.toBe(findingOverrideKey("github:other/repo:main", "missing-tests"));
+  });
+
+  it("normalizes GitHub repository casing but preserves case-sensitive branch identity", () => {
+    const first = createScan("2026-06-13T00:00:00.000Z", 80);
+    first.scanSource = {
+      type: "github",
+      label: "GitHub repository",
+      detail: "Owner/Vibe / Main",
+      repository: { owner: "Owner", repo: "Vibe", branch: "Main" },
+    };
+    const sameRepository = {
+      ...first,
+      scanSource: { ...first.scanSource, repository: { owner: "owner", repo: "vibe", branch: "Main" } },
+    };
+    const differentBranch = {
+      ...first,
+      scanSource: { ...first.scanSource, repository: { owner: "owner", repo: "vibe", branch: "main" } },
+    };
+
+    expect(scanComparisonKey(sameRepository)).toBe(scanComparisonKey(first));
+    expect(scanComparisonKey(differentBranch)).not.toBe(scanComparisonKey(first));
   });
 
   it("adds the newest scan first and removes equivalent snapshots", () => {

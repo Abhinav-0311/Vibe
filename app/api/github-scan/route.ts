@@ -8,6 +8,7 @@ import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
 import { extractProjectZipBuffer } from "@/lib/upload/zip-project";
 import { reportServerError } from "@/lib/observability/server";
 import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
+import { apiError } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -21,15 +22,12 @@ export async function POST(request: Request) {
 
   try {
     const betaUser = await getBetaUser();
-    if (!betaUser) return NextResponse.json({ error: "Private beta access is required." }, { status: 401 });
+    if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
     const quota = await enforceBetaScanQuota(betaUser.id);
-    if (!quota.allowed) return NextResponse.json({ error: "Daily beta scan limit reached. Try again later." }, { status: 429, headers: { "Retry-After": quota.retryAfterSeconds.toString() } });
+    if (!quota.allowed) return apiError("Daily beta scan limit reached. Try again later.", "quota_exceeded", 429, { retryAfterSeconds: quota.retryAfterSeconds });
     const rateLimit = await enforcePublicScanRateLimit(request, "github");
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Too many GitHub scans. Wait a minute before trying again." },
-        { status: 429, headers: { "Retry-After": rateLimit.retryAfterSeconds.toString() } },
-      );
+      return apiError("Too many GitHub scans. Wait a minute before trying again.", "rate_limited", 429, { retryAfterSeconds: rateLimit.retryAfterSeconds });
     }
     const body = (await request.json()) as {
       repoUrl?: string;
@@ -43,7 +41,7 @@ export async function POST(request: Request) {
     };
 
     if (!body.repoUrl) {
-      return NextResponse.json({ error: "Missing GitHub repository URL." }, { status: 400 });
+      return apiError("Missing GitHub repository URL.", "invalid_request", 400);
     }
 
     const params = new URLSearchParams({
@@ -65,7 +63,7 @@ export async function POST(request: Request) {
         ...archive.repository,
         branch: archive.branch,
       },
-    }, archive.name, readAuditProfileMode(params), betaUser.id);
+    }, archive.name, readAuditProfileMode(params), betaUser.id, uploadedProject.repositoryRoot);
 
     return NextResponse.json({
       ...response,

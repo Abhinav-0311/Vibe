@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferAuditContext, inferAuditProfile, selectedAuditProfile } from "@/lib/checklist/context-inference";
+import { getAuditProfileWarnings, inferAuditContext, inferAuditProfile, selectedAuditProfile } from "@/lib/checklist/context-inference";
 import type { AuditContext } from "@/lib/checklist/types";
 import type { ScannerFacts } from "@/lib/scanner/types";
 
@@ -62,6 +62,39 @@ const baseFacts: ScannerFacts = {
 };
 
 describe("inferAuditContext", () => {
+  it("flags account profiles that conflict with the declared product context without changing them", () => {
+    const context: AuditContext = {
+      ...requestedContentContext,
+      stage: "production",
+      hasUserAccounts: true,
+    };
+
+    const warnings = getAuditProfileWarnings(context);
+
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        id: "accounts-without-data",
+        suggestion: expect.objectContaining({ changes: { storesUserData: true } }),
+      }),
+      expect.objectContaining({
+        id: "accounts-on-content-profile",
+        suggestion: expect.objectContaining({ changes: { appType: "saas" } }),
+      }),
+    ]);
+    expect(context).toMatchObject({ appType: "content-site", storesUserData: false });
+  });
+
+  it("does not warn for a coherent SaaS account profile", () => {
+    expect(
+      getAuditProfileWarnings({
+        ...requestedContentContext,
+        appType: "saas",
+        hasUserAccounts: true,
+        storesUserData: true,
+      }),
+    ).toEqual([]);
+  });
+
   it("keeps a simple public portfolio on the content-site profile", () => {
     const profile = inferAuditProfile(baseFacts, requestedContentContext);
 
