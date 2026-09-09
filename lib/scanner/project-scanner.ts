@@ -364,8 +364,8 @@ async function detectCustomClientAuth(projectRoot: string, sourceFiles: string[]
 
   for (const { relativeFile, sample } of samples) {
     if (!sample) continue;
-    if (/(?:auth[-_]?context|createContext[\s\S]{0,200}\bauth\b)/i.test(`${relativeFile}\n${sample}`)) evidence.add(relativeFile);
-    if (/(?:protected[-_]?route|\bProtectedRoute\b)/i.test(`${relativeFile}\n${sample}`)) evidence.add(relativeFile);
+    if (/auth[-_]?context/i.test(relativeFile) || /createContext[\s\S]{0,200}\bauth\b/i.test(sample)) evidence.add(relativeFile);
+    if (/protected[-_]?route/i.test(relativeFile) || /\b(?:function|const|class)\s+ProtectedRoute\b/i.test(sample)) evidence.add(relativeFile);
     if (/Authorization["']?\s*:\s*[`"'][^`"']*Bearer\s/i.test(sample)) evidence.add(relativeFile);
   }
 
@@ -690,7 +690,9 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
   const includeJavaScriptUiFiles = framework.name === "Create React App" || framework.name === "Vite React";
   const uiEvidence = await detectUiEvidence(projectRoot, detectedFiles, includeJavaScriptUiFiles);
   const uiFiles = await collectUiSourceFiles(projectRoot, includeJavaScriptUiFiles);
-  const customAuthSourceFiles = await collectRouteFiles(projectRoot, /\.(?:tsx|jsx|ts|js)$/i);
+  const customAuthSourceFiles = (await collectRouteFiles(projectRoot, /\.(?:tsx|jsx|ts|js)$/i)).filter(
+    (file) => !/(?:^|[\\/])(?:__tests__|tests?|fixtures?)(?:[\\/]|$)/i.test(file),
+  );
   uiEvidence.customAuthEvidenceFiles = await detectCustomClientAuth(projectRoot, customAuthSourceFiles);
   const hasEnvironmentVariableUsage = await detectEnvironmentVariableUsage(projectRoot, uiFiles, apiRoutes);
   const startCommand = scripts.start?.trim();
