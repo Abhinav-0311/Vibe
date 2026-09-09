@@ -88,4 +88,14 @@ describe("githubFetch", () => {
       body: { error: "Enter a valid GitHub repository URL.", code: "validation_failed" },
     });
   });
+
+  it("gives unknown GitHub failures an actionable safe message", () => {
+    expect(githubErrorPayload(new Error("upstream failure"))).toEqual({
+      status: 500,
+      body: {
+        error: "Vibe could not complete the GitHub request. Retry shortly; if it continues, confirm the repository is public or connect GitHub for private access.",
+        code: "github_error",
+      },
+    });
+  });
 });

@@ -399,6 +399,9 @@ const rules: ChecklistRule[] = [
     severity: "high",
     evaluate: (facts, context) => {
       if (context.stage === "prototype" || facts.signals.hasBuildScript) return null;
+      const runtimeOnlyExpressApi = context.appType === "api" && facts.framework.name === "Express" &&
+        !facts.dependencies.some((dependency) => dependency.name === "typescript");
+      if (runtimeOnlyExpressApi) return null;
 
       return finding({
         id: "missing-build-script",
@@ -502,7 +505,7 @@ const rules: ChecklistRule[] = [
     category: "UI/UX",
     severity: "medium",
     evaluate: (facts, context) => {
-      if (!facts.uiEvidence || facts.uiEvidence.hasLoadingState) return null;
+      if (!facts.uiEvidence || facts.uiEvidence.filesScanned.length === 0 || facts.uiEvidence.hasLoadingState) return null;
       const simpleContent = isLowComplexityPublicSite(context);
 
       return finding({
@@ -527,7 +530,7 @@ const rules: ChecklistRule[] = [
     category: "UI/UX",
     severity: "high",
     evaluate: (facts, context) => {
-      if (!facts.uiEvidence || facts.uiEvidence.hasErrorState) return null;
+      if (!facts.uiEvidence || facts.uiEvidence.filesScanned.length === 0 || facts.uiEvidence.hasErrorState) return null;
       const simpleContent = isLowComplexityPublicSite(context);
 
       return finding({
@@ -996,6 +999,7 @@ const rules: ChecklistRule[] = [
     category: "Analytics",
     severity: "medium",
     evaluate: (facts, context) => {
+      if (context.appType === "api") return null;
       if (facts.signals.hasAnalyticsDependency) return null;
       if (isLowComplexityPublicSite(context) && context.stage === "prototype") return null;
       if (context.stage === "prototype" && facts.signals.hasAnalyticsPlan) return null;

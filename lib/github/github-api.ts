@@ -171,6 +171,9 @@ export function githubErrorPayload(error: unknown) {
 
   return {
     status: 500,
-    body: { error: "GitHub operation failed. Try again.", code: "github_error" },
+    body: {
+      error: "Vibe could not complete the GitHub request. Retry shortly; if it continues, confirm the repository is public or connect GitHub for private access.",
+      code: "github_error",
+    },
   };
 }

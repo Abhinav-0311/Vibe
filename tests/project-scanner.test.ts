@@ -50,6 +50,26 @@ describe("scanProject API route discovery", () => {
     });
     expect(facts.signals.hasEnvExample).toBe(true);
     expect(facts.signals.hasTests).toBe(true);
+    expect(facts.signals.hasAppRouter).toBe(true);
+  });
+
+  it("recognizes Next.js routers under src", async () => {
+    const appRouterProject = await createProject();
+    await createFile(appRouterProject, "src/app/page.tsx", "export default function Page() { return <main />; }");
+    await createFile(appRouterProject, "src/middleware.ts", "export function middleware() { return; }");
+    const pagesRouterProject = await createProject();
+    await createFile(pagesRouterProject, "src/pages/index.tsx", "export default function Page() { return <main />; }");
+
+    const [appRouterFacts, pagesRouterFacts] = await Promise.all([
+      scanProject(appRouterProject),
+      scanProject(pagesRouterProject),
+    ]);
+
+    expect(appRouterFacts.signals.hasAppRouter).toBe(true);
+    expect(appRouterFacts.signals.hasPagesRouter).toBe(false);
+    expect(appRouterFacts.signals.hasMiddleware).toBe(true);
+    expect(pagesRouterFacts.signals.hasAppRouter).toBe(false);
+    expect(pagesRouterFacts.signals.hasPagesRouter).toBe(true);
   });
 
   it("detects a Vite React frontend", async () => {
@@ -122,6 +142,29 @@ describe("scanProject API route discovery", () => {
     expect(facts.signals.hasWebhookSignatureVerification).toBe(false);
     expect(facts.signals.hasHealthRoute).toBe(true);
     expect(facts.signals.hasWildcardCors).toBe(false);
+  });
+
+  it("detects API routes inside src router layouts", async () => {
+    const projectRoot = await createProject();
+    await createFile(projectRoot, "src/app/api/auth/login/route.ts");
+    await createFile(projectRoot, "src/pages/api/health.ts");
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.apiRoutes.map((route) => route.route)).toEqual(["/api/auth/login", "/api/health"]);
+    expect(facts.signals.hasAuthRoute).toBe(true);
+    expect(facts.signals.hasHealthRoute).toBe(true);
+  });
+
+  it("recognizes an Express health handler without executing it", async () => {
+    const projectRoot = await createProject();
+    await createFile(projectRoot, "package.json", JSON.stringify({ dependencies: { express: "4.0.0" } }));
+    await createFile(projectRoot, "src/app.js", "app.get('/api/health', (_request, response) => response.json({ status: 'ok' }));\n");
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.framework.name).toBe("Express");
+    expect(facts.signals.hasHealthRoute).toBe(true);
   });
 
   it("detects Stripe signature verification inside a webhook route", async () => {

@@ -199,9 +199,13 @@ async function detectFiles(projectRoot: string): Promise<DetectedFile[]> {
     "next.config.mjs",
     "next.config.ts",
     "app",
+    "src/app",
     "pages",
+    "src/pages",
     "middleware.ts",
     "middleware.js",
+    "src/middleware.ts",
+    "src/middleware.js",
     ".env.example",
     ".env",
     ".env.local",
@@ -453,31 +457,48 @@ function createDetectedRoute(projectRoot: string, file: string, route: string): 
 }
 
 async function detectApiRoutes(projectRoot: string): Promise<DetectedApiRoute[]> {
-  const appRoot = path.join(projectRoot, "app");
-  const pagesApiRoot = path.join(projectRoot, "pages", "api");
-  const [appRouteFiles, pagesApiFiles] = await Promise.all([
-    collectRouteFiles(appRoot, routeFilePattern),
-    collectRouteFiles(pagesApiRoot, pagesApiFilePattern),
+  const appRoots = [path.join(projectRoot, "app"), path.join(projectRoot, "src", "app")];
+  const pagesApiRoots = [path.join(projectRoot, "pages", "api"), path.join(projectRoot, "src", "pages", "api")];
+  const [appRouteGroups, pagesApiGroups] = await Promise.all([
+    Promise.all(appRoots.map(async (appRoot) => ({ appRoot, files: await collectRouteFiles(appRoot, routeFilePattern) }))),
+    Promise.all(pagesApiRoots.map(async (pagesApiRoot) => ({ pagesApiRoot, files: await collectRouteFiles(pagesApiRoot, pagesApiFilePattern) }))),
   ]);
 
-  const appRoutes = appRouteFiles
-    .filter((file) => normalizeRoutePath(path.relative(appRoot, file)).includes("api/"))
-    .map((file) => {
-      const routeDirectory = path.dirname(path.relative(appRoot, file));
-      return createDetectedRoute(projectRoot, file, `/${normalizeRoutePath(routeDirectory)}`);
-    });
-  const pagesRoutes = pagesApiFiles
-    .filter((file) => !file.endsWith(".d.ts"))
-    .map((file) => {
-      const relativeFile = normalizeRoutePath(path.relative(pagesApiRoot, file));
-      const withoutExtension = relativeFile.replace(pagesApiFilePattern, "");
-      const routeSuffix = withoutExtension.endsWith("/index")
-        ? withoutExtension.slice(0, -"/index".length)
-        : withoutExtension;
-      return createDetectedRoute(projectRoot, file, `/api/${routeSuffix}`.replace(/\/$/, ""));
-    });
+  const appRoutes = appRouteGroups.flatMap(({ appRoot, files }) =>
+    files
+      .filter((file) => normalizeRoutePath(path.relative(appRoot, file)).includes("api/"))
+      .map((file) => {
+        const routeDirectory = path.dirname(path.relative(appRoot, file));
+        return createDetectedRoute(projectRoot, file, `/${normalizeRoutePath(routeDirectory)}`);
+      }),
+  );
+  const pagesRoutes = pagesApiGroups.flatMap(({ pagesApiRoot, files }) =>
+    files
+      .filter((file) => !file.endsWith(".d.ts"))
+      .map((file) => {
+        const relativeFile = normalizeRoutePath(path.relative(pagesApiRoot, file));
+        const withoutExtension = relativeFile.replace(pagesApiFilePattern, "");
+        const routeSuffix = withoutExtension.endsWith("/index")
+          ? withoutExtension.slice(0, -"/index".length)
+          : withoutExtension;
+        return createDetectedRoute(projectRoot, file, `/api/${routeSuffix}`.replace(/\/$/, ""));
+      }),
+  );
 
   return [...appRoutes, ...pagesRoutes].sort((a, b) => a.route.localeCompare(b.route));
+}
+
+async function detectExpressHealthRoute(projectRoot: string) {
+  const sourceRoots = [path.join(projectRoot, "src"), path.join(projectRoot, "routes")];
+  const rootFiles = ["app.js", "app.ts", "server.js", "server.ts", "index.js", "index.ts"];
+  const sourceGroups = await Promise.all(sourceRoots.map((root) => collectRouteFiles(root, /\.(?:js|ts|mjs|cjs)$/i)));
+  const sourceFiles = [
+    ...sourceGroups.flat().filter((file) => !/(?:^|[\\/])(?:__tests__|tests?|fixtures?)(?:[\\/]|$)/i.test(file)),
+    ...rootFiles.map((file) => path.join(/* turbopackIgnore: true */ projectRoot, file)),
+  ];
+  const healthRoutePattern = /\b(?:app|router)\s*\.\s*(?:get|use)\s*\(\s*["'`][^"'`]*(?:health|status)[^"'`]*/i;
+  const samples = await Promise.all(sourceFiles.map(readSecuritySample));
+  return samples.some((sample) => Boolean(sample && healthRoutePattern.test(sample)));
 }
 
 function ignoresEnvironmentFiles(gitignore: string | null, environmentFiles: string[]) {
@@ -542,6 +563,8 @@ async function detectWildcardCors(
       ...configFiles,
       "middleware.ts",
       "middleware.js",
+      "src/middleware.ts",
+      "src/middleware.js",
     ]),
   );
   const samples = await Promise.all(
@@ -565,7 +588,7 @@ async function detectInsecureSessionCookies(projectRoot: string, apiRoutes: Dete
   const authFiles = apiRoutes
     .filter((route) => route.signals.includes("auth"))
     .map((route) => route.file);
-  const relativeFiles = Array.from(new Set([...authFiles, "middleware.ts", "middleware.js"]));
+  const relativeFiles = Array.from(new Set([...authFiles, "middleware.ts", "middleware.js", "src/middleware.ts", "src/middleware.js"]));
   const samples = await Promise.all(
     relativeFiles.map(async (relativeFile) => ({
       relativeFile,
@@ -617,6 +640,9 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
   const scripts = packageJson?.scripts ?? {};
   const publicScripts = publicScriptMetadata(scripts);
   const apiRoutes = await detectApiRoutes(projectRoot);
+  const hasExpressHealthRoute = hasAnyDependency(dependencies, ["express"])
+    ? await detectExpressHealthRoute(projectRoot)
+    : false;
   const sharedEvidenceFiles = await detectSharedEvidence(projectRoot, repositoryRoot);
   const gitignore = await readTextFile(path.join(projectRoot, ".gitignore")) ?? await readTextFile(path.join(repositoryRoot, ".gitignore"));
   const localEnvFiles = [".env", ".env.local", ".env.development", ".env.production"].filter((file) =>
@@ -636,10 +662,10 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
     startCommand && /(?:\bnext\s+dev\b|\bvite\s+dev\b|\bnodemon\b|\btsx\s+watch\b)/i.test(startCommand),
   );
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
-  const hasAppRouter = detectedFiles.some((file) => file.path === "app" && file.exists);
-  const hasPagesRouter = detectedFiles.some((file) => file.path === "pages" && file.exists);
+  const hasAppRouter = detectedFiles.some((file) => (file.path === "app" || file.path === "src/app") && file.exists);
+  const hasPagesRouter = detectedFiles.some((file) => (file.path === "pages" || file.path === "src/pages") && file.exists);
   const hasMiddleware = detectedFiles.some(
-    (file) => file.exists && (file.path === "middleware.ts" || file.path === "middleware.js"),
+    (file) => file.exists && ["middleware.ts", "middleware.js", "src/middleware.ts", "src/middleware.js"].includes(file.path),
   );
   const hasAiRules = detectedFiles.some(
     (file) => file.exists && ["AGENTS.md", ".cursor/rules", ".cursorrules"].includes(file.path),
@@ -690,7 +716,7 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
       hasPaymentRoute: apiRoutes.some((route) => route.signals.includes("payments")),
       hasWebhookRoute: apiRoutes.some((route) => route.signals.includes("webhook")),
       hasWebhookSignatureVerification,
-      hasHealthRoute: apiRoutes.some((route) => route.signals.includes("health")),
+      hasHealthRoute: apiRoutes.some((route) => route.signals.includes("health")) || hasExpressHealthRoute,
       hasLocalEnvFile,
       hasEnvGitignoreRule: ignoresEnvironmentFiles(gitignore, localEnvFiles),
       hasRateLimitImplementation: rateLimitedRouteFiles.length > 0,

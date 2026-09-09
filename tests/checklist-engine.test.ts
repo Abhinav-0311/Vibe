@@ -465,6 +465,36 @@ describe("runChecklist", () => {
     });
   });
 
+  it("does not apply frontend build, UI-state, or product-analytics requirements to a JavaScript Express API", () => {
+    const apiFacts: ScannerFacts = {
+      ...baseFacts,
+      framework: { name: "Express", confidence: "medium" },
+      scripts: { start: "node server.js" },
+      dependencies: [{ name: "express", version: "4.0.0", kind: "dependency" }],
+      uiEvidence: {
+        filesScanned: [],
+        hasLoadingState: false,
+        hasErrorState: false,
+        hasNotFoundState: false,
+        placeholderCopyFiles: [],
+        imageWithoutAltFiles: [],
+        unlabeledControlFiles: [],
+        responsiveClassFiles: [],
+        portfolioContactFiles: [],
+        portfolioResumeFiles: [],
+        portfolioSocialLinkFiles: [],
+        portfolioProjectDetailFiles: [],
+      },
+    };
+    const result = runChecklist(apiFacts, { ...launchContext, appType: "api", hasUserAccounts: false, hasPayments: false, storesUserData: false });
+    const findingIds = result.findings.map((finding) => finding.id);
+
+    expect(findingIds).not.toContain("missing-build-script");
+    expect(findingIds).not.toContain("missing-ui-loading-state");
+    expect(findingIds).not.toContain("missing-ui-error-state");
+    expect(findingIds).not.toContain("missing-analytics");
+  });
+
   it("adds portfolio-specific findings only for simple content sites", () => {
     const portfolioFacts: ScannerFacts = {
       ...baseFacts,
