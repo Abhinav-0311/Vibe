@@ -468,7 +468,7 @@ async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile
     authLikeUiFiles: readableSamples
       .filter(({ relativeFile, sample }) => authLikeUiPattern.test(relativeFile) || authLikeUiPattern.test(sample))
       .map(({ relativeFile }) => relativeFile),
-    customAuthEvidenceFiles: [],
+    customAuthEvidenceFiles: [] as string[],
   };
 }
 
