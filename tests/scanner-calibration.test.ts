@@ -95,6 +95,19 @@ describe("scanner calibration matrix", () => {
     expect(finding?.severity).toBe("medium");
   });
 
+  it("treats a custom authentication route as unverified rather than missing", async () => {
+    const projectRoot = await createProject({ dependencies: { next: "15.0.0", react: "19.0.0" } });
+    await writeFile(projectRoot, "app/api/auth/login/route.ts", "export async function POST() { return Response.json({}); }\n");
+
+    const facts = await scanProject(projectRoot);
+    const findings = runChecklist(facts, { ...contentProfile, stage: "launch-prep", appType: "saas", hasUserAccounts: true }).findings;
+    const customAuthFinding = findings.find((item) => item.id === "unverified-custom-auth");
+
+    expect(facts.signals.hasAuthRoute).toBe(true);
+    expect(customAuthFinding).toMatchObject({ severity: "high", category: "Auth" });
+    expect(findings.map((item) => item.id)).not.toContain("missing-auth");
+  });
+
   it("promotes a credential-auth SaaS app and retains the auth evidence", async () => {
     const projectRoot = await createProject({
       dependencies: { next: "15.0.0", react: "19.0.0", "next-auth": "5.0.0" },

@@ -28,6 +28,7 @@ import { auditReport, emptyReport, type ActionPriority, type AuditFinding, type 
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import { buildScoreBreakdown } from "@/lib/score-breakdown";
 import { compareScans, findPreviousComparableScan, scanComparisonKey } from "@/lib/scan-comparison";
+import { formatScanProcessingTime } from "@/lib/scan-timing";
 import type {
   SavedScanDetailApiResponse,
   SavedScansApiResponse,
@@ -2374,7 +2375,7 @@ ${finding.prompt}`,
             </p>
           )}
           {scan.timing && (
-            <p className="mono mt-2 text-[9px] text-[#777171]">Scan processed in {(scan.timing.processingMs / 1000).toFixed(1)}s</p>
+            <p className="mono mt-2 text-[9px] text-[#777171]">Scan processed in {formatScanProcessingTime(scan.timing.processingMs)}</p>
           )}
           {fallbackMessage && <p className="mt-3 text-xs leading-5 text-[#ffd166]">{fallbackMessage}</p>}
           <h2 className="mt-4 max-w-xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">

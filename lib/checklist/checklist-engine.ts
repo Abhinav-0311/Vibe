@@ -801,6 +801,22 @@ const rules: ChecklistRule[] = [
       if (!context.hasUserAccounts) return null;
       if (facts.signals.hasAuthDependency) return null;
 
+      if (facts.signals.hasAuthRoute) {
+        return finding({
+          id: "unverified-custom-auth",
+          title: "Custom authentication needs verification",
+          category: "Auth",
+          severity: "high",
+          evidence:
+            "Authentication-like route files were detected, but no recognized authentication provider dependency was found.",
+          impact:
+            "A custom login route can exist without secure session handling, protected routes, recovery, or account lifecycle controls.",
+          fix: "Verify the custom authentication flow before launch, including session security, protected routes, logout, and account recovery where credentials are used.",
+          prompt:
+            "Audit the detected custom authentication routes before launch. Verify that passwords are handled safely, sessions use secure HTTP-only cookies or an equivalent secure mechanism, protected routes enforce authorization, logout invalidates sessions, and credential accounts have recovery and session-management flows. Add focused tests for unauthenticated, authorized, and unauthorized requests. Do not replace working custom auth with a provider unless the audit shows it is necessary.",
+        });
+      }
+
       return finding({
         id: "missing-auth",
         title: "No authentication provider detected",
