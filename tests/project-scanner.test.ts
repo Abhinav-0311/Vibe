@@ -104,6 +104,33 @@ describe("scanProject API route discovery", () => {
     expect(facts.framework).toEqual({ name: "Create React App", confidence: "high" });
   });
 
+  it("detects nested React tests and client-auth evidence without calling a src/pages folder a Next.js router", async () => {
+    const projectRoot = await createProject();
+    await createFile(
+      projectRoot,
+      "package.json",
+      JSON.stringify({
+        scripts: { start: "react-scripts start", build: "react-scripts build" },
+        dependencies: { react: "latest", "react-scripts": "latest" },
+      }),
+    );
+    await createFile(projectRoot, "src/__tests__/LoginPage.test.js", "it('logs in', () => {});\n");
+    await createFile(projectRoot, "src/context/AuthContext.js", "export const AuthContext = createContext(null);\n");
+    await createFile(projectRoot, "src/components/ProtectedRoute.js", "export function ProtectedRoute() { return null; }\n");
+    await createFile(projectRoot, "src/api/client.js", "headers: { Authorization: `Bearer \\${token}` };\n");
+    await createFile(projectRoot, "src/pages/LoginPage.js", "export default function LoginPage() { return null; }\n");
+
+    const facts = await scanProject(projectRoot);
+
+    expect(facts.signals.hasTests).toBe(true);
+    expect(facts.signals.hasPagesRouter).toBe(false);
+    expect(facts.uiEvidence?.customAuthEvidenceFiles).toEqual([
+      "src/api/client.js",
+      "src/components/ProtectedRoute.js",
+      "src/context/AuthContext.js",
+    ]);
+  });
+
   it("detects Express APIs", async () => {
     const projectRoot = await createProject();
     await createFile(

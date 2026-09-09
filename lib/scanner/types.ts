@@ -61,6 +61,8 @@ export type ScannerFacts = {
     portfolioProjectDetailFiles: string[];
     /** Login or signup UI is intent evidence only; it does not prove durable authentication exists. */
     authLikeUiFiles?: string[];
+    /** Multiple static client-auth signals were found; server-side security still needs verification. */
+    customAuthEvidenceFiles?: string[];
   };
   signals: {
     hasPackageJson: boolean;

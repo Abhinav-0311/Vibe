@@ -25,6 +25,7 @@ const maxRouteFiles = 500;
 const maxUiFiles = 600;
 const maxSecuritySampleBytes = 256 * 1024;
 const uiSourceFilePattern = /\.(?:tsx|jsx)$/i;
+const testFilePattern = /(?:^|[._-])(?:test|spec)\.(?:[cm]?[jt]sx?)$/i;
 
 async function pathExists(targetPath: string) {
   try {
@@ -237,13 +238,18 @@ async function detectFiles(projectRoot: string): Promise<DetectedFile[]> {
 async function detectTests(projectRoot: string, repositoryRoot = projectRoot) {
   const likelyTestPaths = [
     "__tests__",
+    "src/__tests__",
     "tests",
+    "src/tests",
     "test",
     "app.test.ts",
     "app.test.tsx",
     "vitest.config.ts",
+    "vitest.config.js",
     "jest.config.ts",
+    "jest.config.js",
     "playwright.config.ts",
+    "playwright.config.js",
   ];
 
   const sharedTestPaths = repositoryRoot === projectRoot
@@ -252,7 +258,9 @@ async function detectTests(projectRoot: string, repositoryRoot = projectRoot) {
   const results = await Promise.all(
     [...likelyTestPaths, ...sharedTestPaths].map((testPath) => pathExists(path.join(/* turbopackIgnore: true */ repositoryRoot, testPath))),
   );
-  return results.some(Boolean);
+  if (results.some(Boolean)) return true;
+
+  return (await collectRouteFiles(repositoryRoot, testFilePattern)).length > 0;
 }
 
 async function detectSharedEvidence(projectRoot: string, repositoryRoot: string) {
@@ -311,7 +319,7 @@ async function collectRouteFiles(root: string, matcher: RegExp) {
   return files;
 }
 
-async function collectUiSourceFiles(projectRoot: string) {
+async function collectUiSourceFiles(projectRoot: string, includeJavaScript = false) {
   const roots = ["app", "pages", "components", "src"].map((root) => path.join(/* turbopackIgnore: true */ projectRoot, root));
   const files: string[] = [];
 
@@ -328,7 +336,10 @@ async function collectUiSourceFiles(projectRoot: string) {
 
       if (entry.isDirectory()) {
         await visit(entryPath, depth + 1);
-      } else if (entry.isFile() && uiSourceFilePattern.test(entry.name)) {
+      } else if (
+        entry.isFile() &&
+        (uiSourceFilePattern.test(entry.name) || (includeJavaScript && /\.(?:ts|js)$/i.test(entry.name)))
+      ) {
         const relativePath = normalizeRoutePath(path.relative(projectRoot, entryPath));
         if (!relativePath.includes("/api/")) files.push(entryPath);
       }
@@ -340,6 +351,26 @@ async function collectUiSourceFiles(projectRoot: string) {
   }
 
   return Array.from(new Set(files)).sort();
+}
+
+async function detectCustomClientAuth(projectRoot: string, sourceFiles: string[]) {
+  const samples = await Promise.all(
+    sourceFiles.map(async (file) => ({
+      relativeFile: normalizeRoutePath(path.relative(projectRoot, file)),
+      sample: await readSecuritySample(file),
+    })),
+  );
+  const evidence = new Set<string>();
+
+  for (const { relativeFile, sample } of samples) {
+    if (!sample) continue;
+    if (/(?:auth[-_]?context|createContext[\s\S]{0,200}\bauth\b)/i.test(`${relativeFile}\n${sample}`)) evidence.add(relativeFile);
+    if (/(?:protected[-_]?route|\bProtectedRoute\b)/i.test(`${relativeFile}\n${sample}`)) evidence.add(relativeFile);
+    if (/Authorization["']?\s*:\s*[`"'][^`"']*Bearer\s/i.test(sample)) evidence.add(relativeFile);
+  }
+
+  // A login page alone can be a mock. Require at least two independent client-auth signals.
+  return evidence.size >= 2 ? [...evidence].sort() : [];
 }
 
 function hasAccessibleImageUsage(source: string) {
@@ -386,8 +417,8 @@ function hasUnlabeledFormControl(source: string) {
   });
 }
 
-async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile[]) {
-  const uiFiles = await collectUiSourceFiles(projectRoot);
+async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile[], includeJavaScript = false) {
+  const uiFiles = await collectUiSourceFiles(projectRoot, includeJavaScript);
   const samples = await Promise.all(
     uiFiles.map(async (file) => ({
       relativeFile: normalizeRoutePath(path.relative(projectRoot, file)),
@@ -437,6 +468,7 @@ async function detectUiEvidence(projectRoot: string, detectedFiles: DetectedFile
     authLikeUiFiles: readableSamples
       .filter(({ relativeFile, sample }) => authLikeUiPattern.test(relativeFile) || authLikeUiPattern.test(sample))
       .map(({ relativeFile }) => relativeFile),
+    customAuthEvidenceFiles: [],
   };
 }
 
@@ -639,6 +671,7 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
   const dependencies = flattenDependencies(packageJson);
   const scripts = packageJson?.scripts ?? {};
   const publicScripts = publicScriptMetadata(scripts);
+  const framework = detectFramework(dependencies, scripts, detectedFiles);
   const apiRoutes = await detectApiRoutes(projectRoot);
   const hasExpressHealthRoute = hasAnyDependency(dependencies, ["express"])
     ? await detectExpressHealthRoute(projectRoot)
@@ -654,16 +687,20 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
   const wildcardCorsFiles = await detectWildcardCors(projectRoot, apiRoutes, detectedFiles);
   const insecureSessionCookieFiles = await detectInsecureSessionCookies(projectRoot, apiRoutes);
   const ignoredBuildChecks = await detectIgnoredBuildChecks(projectRoot, detectedFiles);
-  const uiEvidence = await detectUiEvidence(projectRoot, detectedFiles);
-  const uiFiles = await collectUiSourceFiles(projectRoot);
+  const includeJavaScriptUiFiles = framework.name === "Create React App" || framework.name === "Vite React";
+  const uiEvidence = await detectUiEvidence(projectRoot, detectedFiles, includeJavaScriptUiFiles);
+  const uiFiles = await collectUiSourceFiles(projectRoot, includeJavaScriptUiFiles);
+  const customAuthSourceFiles = await collectRouteFiles(projectRoot, /\.(?:tsx|jsx|ts|js)$/i);
+  uiEvidence.customAuthEvidenceFiles = await detectCustomClientAuth(projectRoot, customAuthSourceFiles);
   const hasEnvironmentVariableUsage = await detectEnvironmentVariableUsage(projectRoot, uiFiles, apiRoutes);
   const startCommand = scripts.start?.trim();
   const hasDevelopmentStartScript = Boolean(
     startCommand && /(?:\bnext\s+dev\b|\bvite\s+dev\b|\bnodemon\b|\btsx\s+watch\b)/i.test(startCommand),
   );
   const hasNextConfig = detectedFiles.some((file) => file.exists && file.path.startsWith("next.config"));
-  const hasAppRouter = detectedFiles.some((file) => (file.path === "app" || file.path === "src/app") && file.exists);
-  const hasPagesRouter = detectedFiles.some((file) => (file.path === "pages" || file.path === "src/pages") && file.exists);
+  const isNextProject = framework.name === "Next.js" || hasNextConfig;
+  const hasAppRouter = isNextProject && detectedFiles.some((file) => (file.path === "app" || file.path === "src/app") && file.exists);
+  const hasPagesRouter = isNextProject && detectedFiles.some((file) => (file.path === "pages" || file.path === "src/pages") && file.exists);
   const hasMiddleware = detectedFiles.some(
     (file) => file.exists && ["middleware.ts", "middleware.js", "src/middleware.ts", "src/middleware.js"].includes(file.path),
   );
@@ -679,7 +716,7 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
       sharedEvidenceFiles,
     },
     packageManager: detectPackageManager(projectRoot, absoluteDetectedFiles),
-    framework: detectFramework(dependencies, scripts, detectedFiles),
+    framework,
     scripts: publicScripts,
     dependencies,
     detectedFiles,

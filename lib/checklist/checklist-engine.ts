@@ -804,14 +804,17 @@ const rules: ChecklistRule[] = [
       if (!context.hasUserAccounts) return null;
       if (facts.signals.hasAuthDependency) return null;
 
-      if (facts.signals.hasAuthRoute) {
+      const customAuthEvidence = facts.uiEvidence?.customAuthEvidenceFiles ?? [];
+      if (facts.signals.hasAuthRoute || customAuthEvidence.length > 0) {
+        const evidence = facts.signals.hasAuthRoute
+          ? "Authentication-like route files were detected, but no recognized authentication provider dependency was found."
+          : `Client-side authentication evidence was detected in ${customAuthEvidence.join(", ")}, but no recognized authentication provider dependency or server auth route was found.`;
         return finding({
           id: "unverified-custom-auth",
           title: "Custom authentication needs verification",
           category: "Auth",
           severity: "high",
-          evidence:
-            "Authentication-like route files were detected, but no recognized authentication provider dependency was found.",
+          evidence,
           impact:
             "A custom login route can exist without secure session handling, protected routes, recovery, or account lifecycle controls.",
           fix: "Verify the custom authentication flow before launch, including session security, protected routes, logout, and account recovery where credentials are used.",

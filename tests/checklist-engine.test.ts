@@ -331,6 +331,32 @@ describe("runChecklist", () => {
     expect(findingIds).not.toContain("missing-session-termination");
   });
 
+  it("downgrades a client-auth implementation to verification work instead of claiming authentication is absent", () => {
+    const clientAuthFacts: ScannerFacts = {
+      ...baseFacts,
+      uiEvidence: {
+        filesScanned: ["src/context/AuthContext.js", "src/components/ProtectedRoute.js"],
+        hasLoadingState: false,
+        hasErrorState: false,
+        hasNotFoundState: false,
+        placeholderCopyFiles: [],
+        imageWithoutAltFiles: [],
+        unlabeledControlFiles: [],
+        responsiveClassFiles: [],
+        portfolioContactFiles: [],
+        portfolioResumeFiles: [],
+        portfolioSocialLinkFiles: [],
+        portfolioProjectDetailFiles: [],
+        customAuthEvidenceFiles: ["src/context/AuthContext.js", "src/components/ProtectedRoute.js"],
+      },
+    };
+
+    const result = runChecklist(clientAuthFacts, launchContext);
+
+    expect(result.findings.map((finding) => finding.id)).toContain("unverified-custom-auth");
+    expect(result.findings.map((finding) => finding.id)).not.toContain("missing-auth");
+  });
+
   it("raises wildcard CORS severity for apps handling user data", () => {
     const corsFacts: ScannerFacts = {
       ...baseFacts,
