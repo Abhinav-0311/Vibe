@@ -63,15 +63,15 @@ async function readSecuritySample(targetPath: string): Promise<string | null> {
   }
 }
 
-function detectPackageManager(projectRoot: string, files: string[]): PackageManager {
-  const fileSet = new Set(files);
+function detectPackageManager(files: string[]): PackageManager {
+  const fileSet = new Set(files.map((file) => path.basename(file)));
 
-  if (fileSet.has(path.join(projectRoot, "pnpm-lock.yaml"))) return "pnpm";
-  if (fileSet.has(path.join(projectRoot, "yarn.lock"))) return "yarn";
-  if (fileSet.has(path.join(projectRoot, "bun.lockb")) || fileSet.has(path.join(projectRoot, "bun.lock"))) {
+  if (fileSet.has("pnpm-lock.yaml")) return "pnpm";
+  if (fileSet.has("yarn.lock")) return "yarn";
+  if (fileSet.has("bun.lockb") || fileSet.has("bun.lock")) {
     return "bun";
   }
-  if (fileSet.has(path.join(projectRoot, "package-lock.json"))) return "npm";
+  if (fileSet.has("package-lock.json")) return "npm";
 
   return "unknown";
 }
@@ -265,7 +265,19 @@ async function detectTests(projectRoot: string, repositoryRoot = projectRoot) {
 
 async function detectSharedEvidence(projectRoot: string, repositoryRoot: string) {
   if (projectRoot === repositoryRoot) return [];
-  const candidates = [".env.example", ".gitignore", "AGENTS.md", "README.md", "docker-compose.yml", "docker-compose.yaml"];
+  const candidates = [
+    ".env.example",
+    ".gitignore",
+    "AGENTS.md",
+    "README.md",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lock",
+    "bun.lockb",
+  ];
   const exists = await Promise.all(candidates.map((file) => pathExists(path.join(/* turbopackIgnore: true */ repositoryRoot, file))));
   return candidates.filter((file, index) => exists[index]);
 }
@@ -659,9 +671,6 @@ async function detectIgnoredBuildChecks(projectRoot: string, detectedFiles: Dete
 
 export async function scanProject(projectRoot: string, repositoryRoot = projectRoot): Promise<ScannerFacts> {
   const detectedFiles = await detectFiles(projectRoot);
-  const absoluteDetectedFiles = detectedFiles
-    .filter((file) => file.exists)
-    .map((file) => path.join(projectRoot, file.path));
   const packageJson = await readJsonFile<{
     scripts?: Record<string, string>;
     dependencies?: Record<string, string>;
@@ -677,6 +686,14 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
     ? await detectExpressHealthRoute(projectRoot)
     : false;
   const sharedEvidenceFiles = await detectSharedEvidence(projectRoot, repositoryRoot);
+  const sharedLockfiles = sharedEvidenceFiles.filter((file) => ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"].includes(file));
+  const detectedLockfiles = detectedFiles
+    .filter((file) => file.exists && ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"].includes(file.path))
+    .map((file) => path.join(projectRoot, file.path));
+  const packageManager = detectPackageManager([
+    ...detectedLockfiles,
+    ...sharedLockfiles.map((file) => path.join(repositoryRoot, file)),
+  ]);
   const gitignore = await readTextFile(path.join(projectRoot, ".gitignore")) ?? await readTextFile(path.join(repositoryRoot, ".gitignore"));
   const localEnvFiles = [".env", ".env.local", ".env.development", ".env.production"].filter((file) =>
     detectedFiles.some((detectedFile) => detectedFile.path === file && detectedFile.exists),
@@ -717,7 +734,7 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
       appPath: projectRoot === repositoryRoot ? "." : normalizeRoutePath(path.relative(repositoryRoot, projectRoot)),
       sharedEvidenceFiles,
     },
-    packageManager: detectPackageManager(projectRoot, absoluteDetectedFiles),
+    packageManager,
     framework,
     scripts: publicScripts,
     dependencies,
@@ -761,11 +778,7 @@ export async function scanProject(projectRoot: string, repositoryRoot = projectR
       hasRateLimitImplementation: rateLimitedRouteFiles.length > 0,
       hasWildcardCors: wildcardCorsFiles.length > 0,
       hasInsecureSessionCookie: insecureSessionCookieFiles.length > 0,
-      hasLockfile: detectedFiles.some(
-        (file) =>
-          file.exists &&
-          ["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock", "bun.lockb"].includes(file.path),
-      ),
+      hasLockfile: detectedLockfiles.length > 0 || sharedLockfiles.length > 0,
       hasBuildScript: Boolean(scripts.build?.trim()),
       hasStartScript: Boolean(startCommand),
       hasDevelopmentStartScript,

@@ -38,6 +38,7 @@ describe("scanProject API route discovery", () => {
     await createFile(frontendRoot, "package.json", JSON.stringify({ scripts: { build: "next build" }, dependencies: { next: "15.0.0", react: "19.0.0" } }));
     await createFile(frontendRoot, "src/app/page.tsx", "export default function Page() { return <main />; }");
     await createFile(repositoryRoot, ".env.example", "NEXT_PUBLIC_API_URL=https://example.test\n");
+    await createFile(repositoryRoot, "pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
     await createFile(repositoryRoot, "backend/tests/test_health.py", "def test_health(): pass\n");
     await createFile(repositoryRoot, "README.md", "# Multi-service app\n");
 
@@ -49,6 +50,8 @@ describe("scanProject API route discovery", () => {
       sharedEvidenceFiles: expect.arrayContaining([".env.example", "README.md"]),
     });
     expect(facts.signals.hasEnvExample).toBe(true);
+    expect(facts.packageManager).toBe("pnpm");
+    expect(facts.signals.hasLockfile).toBe(true);
     expect(facts.signals.hasTests).toBe(true);
     expect(facts.signals.hasAppRouter).toBe(true);
   });
