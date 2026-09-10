@@ -1,7 +1,7 @@
 import AdmZip from "adm-zip";
 import { access } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { extractProjectZipBuffer } from "@/lib/upload/zip-project";
+import { extractProjectZipBuffer, selectProjectRoot } from "@/lib/upload/zip-project";
 
 async function exists(targetPath: string) {
   try {
@@ -45,6 +45,23 @@ describe("ZIP project extraction", () => {
 
     const project = await extractProjectZipBuffer(zip.toBuffer());
     expect(project.relativeProjectRoot).toBe("repo-main/frontend");
+
+    await project.cleanup();
+  });
+
+  it("selects an explicit monorepo app path without leaving the extracted repository", async () => {
+    const zip = new AdmZip();
+    zip.addFile("repo-main/package.json", Buffer.from('{"name":"workspace"}'));
+    zip.addFile("repo-main/apps/web/package.json", Buffer.from('{"name":"web"}'));
+    zip.addFile("repo-main/apps/web/app/page.tsx", Buffer.from("export default function Page() { return null; }"));
+
+    const project = await extractProjectZipBuffer(zip.toBuffer());
+    const selected = await selectProjectRoot(project, "apps/web");
+    expect(selected.relativeProjectRoot).toBe("repo-main/apps/web");
+    expect(selected.projectRoot).not.toBe(project.projectRoot);
+
+    await expect(selectProjectRoot(project, "../outside")).rejects.toThrow("Project path must stay inside the repository.");
+    await expect(selectProjectRoot(project, "apps/missing")).rejects.toThrow('Project path "apps/missing" must contain a package.json file.');
 
     await project.cleanup();
   });

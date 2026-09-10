@@ -403,7 +403,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
     }
   }
 
-  async function runGitHubScan(repoUrl: string, branch: string, context = auditContext, profileMode = auditProfileMode) {
+  async function runGitHubScan(repoUrl: string, branch: string, projectPath: string, context = auditContext, profileMode = auditProfileMode) {
     setScanError(null);
     setUploadError(null);
     setGithubError(null);
@@ -421,6 +421,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
         body: JSON.stringify({
           repoUrl,
           branch,
+          projectPath,
           appType: context.appType,
           stage: context.stage,
           hasPayments: context.hasPayments,
@@ -530,7 +531,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
           githubError={githubError}
           isScanning={viewState === "loading"}
           onUploadScan={(file, context) => void runUploadScan(file, context)}
-          onGitHubScan={(repoUrl, branch, context) => void runGitHubScan(repoUrl, branch, context)}
+          onGitHubScan={(repoUrl, branch, projectPath, context) => void runGitHubScan(repoUrl, branch, projectPath, context)}
           profileMode={auditProfileMode}
           onUseInferredProfile={() => setAuditProfileMode("auto")}
         />
@@ -769,7 +770,7 @@ function ContextControls({
   githubError: string | null;
   isScanning: boolean;
   onUploadScan: (file: File, context: AuditContext) => void;
-  onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
+  onGitHubScan: (repoUrl: string, branch: string, projectPath: string, context: AuditContext) => void;
   profileMode: AuditProfileMode;
   onUseInferredProfile: () => void;
 }) {
@@ -1171,10 +1172,11 @@ function GitHubScanPanel({
   context: AuditContext;
   githubError: string | null;
   isScanning: boolean;
-  onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
+  onGitHubScan: (repoUrl: string, branch: string, projectPath: string, context: AuditContext) => void;
 }) {
   const [repoUrl, setRepoUrl] = useState("");
   const [manualBranch, setManualBranch] = useState("");
+  const [projectPath, setProjectPath] = useState("");
   const [status, setStatus] = useState<GitHubStatusApiResponse | null>(null);
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [selectedRepository, setSelectedRepository] = useState("");
@@ -1300,13 +1302,13 @@ function GitHubScanPanel({
       return;
     }
 
-    onGitHubScan(trimmedUrl, manualBranch.trim(), context);
+    onGitHubScan(trimmedUrl, manualBranch.trim(), projectPath.trim(), context);
   }
 
   function scanSelectedRepository() {
     const repository = repositories.find((item) => item.fullName === selectedRepository);
     if (!repository || !selectedBranch) return;
-    onGitHubScan(repository.url, selectedBranch, context);
+    onGitHubScan(repository.url, selectedBranch, projectPath.trim(), context);
   }
 
   return (
@@ -1443,6 +1445,18 @@ function GitHubScanPanel({
           {isScanning ? "Scanning repository" : "Scan public repo"}
         </button>
       </div>
+
+      <label className="mt-4 block max-w-xl" htmlFor="github-project-path">
+        <span className="mono text-[10px] text-[#d9d9d9]">App path (optional, for monorepos)</span>
+        <input
+          id="github-project-path"
+          value={projectPath}
+          onChange={(event) => setProjectPath(event.target.value)}
+          className="mt-3 w-full rounded-[18px] border border-[#3d3d3d] bg-[#111212] px-4 py-3 text-sm text-white outline-none transition placeholder:text-[#5f5858] focus:border-[#fc74dd] focus:ring-2 focus:ring-[#fc74dd]/30"
+          placeholder="apps/web"
+        />
+        <span className="mt-2 block text-xs leading-5 text-[#9b9696]">Leave empty to scan the repository root. Enter the folder containing the app’s package.json when a repository contains multiple apps.</span>
+      </label>
 
       {(panelError || githubError || connectionState === "error") && (
         <p className="mt-4 border-t border-[#3d3d3d] pt-4 text-sm leading-6 text-[#ff8f8f]">

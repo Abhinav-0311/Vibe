@@ -5,7 +5,7 @@ import { downloadGitHubRepoZip } from "@/lib/github/github-repo";
 import { getGitHubAccessToken } from "@/lib/github/github-session";
 import { createScanResponse } from "@/lib/scan-response";
 import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
-import { extractProjectZipBuffer } from "@/lib/upload/zip-project";
+import { extractProjectZipBuffer, selectProjectRoot } from "@/lib/upload/zip-project";
 import { reportServerError } from "@/lib/observability/server";
 import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
 import { apiError } from "@/lib/api-error";
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       repoUrl?: string;
       branch?: string;
+      projectPath?: string;
       appType?: string;
       stage?: string;
       hasPayments?: boolean;
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
     const token = await getGitHubAccessToken();
     const archive = await downloadGitHubRepoZip(body.repoUrl, { token, branch: body.branch });
     uploadedProject = await extractProjectZipBuffer(archive.buffer);
+    uploadedProject = await selectProjectRoot(uploadedProject, body.projectPath);
     const response = await createScanResponse(uploadedProject.projectRoot, readAuditContext(params), {
       type: "github",
       label: "GitHub repository",

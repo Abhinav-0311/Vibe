@@ -17,6 +17,7 @@ export class UploadValidationError extends Error {
 }
 
 export type UploadedProject = {
+  archiveRoot: string;
   projectRoot: string;
   repositoryRoot: string;
   relativeProjectRoot: string;
@@ -133,6 +134,34 @@ async function findRepositoryRoot(packageRoot: string, extractRoot: string) {
   return packageRoot;
 }
 
+export async function selectProjectRoot(project: UploadedProject, requestedPath?: string) {
+  const normalizedPath = requestedPath?.trim().replace(/\\/g, "/");
+  if (!normalizedPath || normalizedPath === ".") return project;
+
+  const segments = normalizedPath.split("/").filter(Boolean);
+  if (normalizedPath.startsWith("/") || segments.some((segment) => segment === "..")) {
+    throw new UploadValidationError("Project path must stay inside the repository.");
+  }
+
+  const selectedRoot = path.resolve(project.repositoryRoot, ...segments);
+  const relativeToRepository = path.relative(project.repositoryRoot, selectedRoot);
+  if (relativeToRepository.startsWith("..") || path.isAbsolute(relativeToRepository)) {
+    throw new UploadValidationError("Project path must stay inside the repository.");
+  }
+
+  if (!(await pathExists(path.join(selectedRoot, "package.json")))) {
+    throw new UploadValidationError(
+      `Project path \"${normalizedPath}\" must contain a package.json file.`,
+    );
+  }
+
+  return {
+    ...project,
+    projectRoot: selectedRoot,
+    relativeProjectRoot: normalizeRelativePath(path.relative(project.archiveRoot, selectedRoot)),
+  };
+}
+
 function describeUnsupportedArchive(entryNames: string[]) {
   const normalizedEntries = entryNames.map(normalizeArchivePath).map((entry) => entry.toLowerCase());
   const fileNames = new Set(normalizedEntries.map((entry) => entry.split("/").at(-1) ?? entry));
@@ -222,6 +251,7 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
     }
 
     return {
+      archiveRoot: extractRoot,
       projectRoot: packageRoot.path,
       repositoryRoot: await findRepositoryRoot(packageRoot.path, extractRoot),
       relativeProjectRoot: packageRoot.relativePath,
