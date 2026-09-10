@@ -532,6 +532,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
           onUploadScan={(file, context) => void runUploadScan(file, context)}
           onGitHubScan={(repoUrl, branch, context) => void runGitHubScan(repoUrl, branch, context)}
           profileMode={auditProfileMode}
+          onUseInferredProfile={() => setAuditProfileMode("auto")}
         />
         {viewState === "loading" && <LoadingState source={scanProgressSource} />}
         {viewState === "empty" && <EmptyState />}
@@ -754,6 +755,7 @@ function ContextControls({
   onUploadScan,
   onGitHubScan,
   profileMode,
+  onUseInferredProfile,
 }: {
   context: AuditContext;
   projectPath: string;
@@ -769,6 +771,7 @@ function ContextControls({
   onUploadScan: (file: File, context: AuditContext) => void;
   onGitHubScan: (repoUrl: string, branch: string, context: AuditContext) => void;
   profileMode: AuditProfileMode;
+  onUseInferredProfile: () => void;
 }) {
   const [sourceMode, setSourceMode] = useState<ProjectSourceMode>("github");
   const stages: AuditContext["stage"][] = ["prototype", "launch-prep", "production"];
@@ -983,7 +986,18 @@ function ContextControls({
             <p className="mt-2 text-sm leading-6 text-[#d9d9d9]">
               {context.stage} / {context.appType} / login {context.hasUserAccounts ? "yes" : "no"} / payments {context.hasPayments ? "yes" : "no"} / data {context.storesUserData ? "yes" : "no"}
             </p>
-            {profileMode === "manual" && <p className="mt-1 text-xs text-[#fc74dd]">Manual profile — Vibe will use these settings for the next scan.</p>}
+            {profileMode === "manual" && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <p className="text-xs text-[#fc74dd]">Manual profile — Vibe will use these settings for the next scan.</p>
+                <button
+                  type="button"
+                  onClick={onUseInferredProfile}
+                  className="mono rounded-full border border-[#fc74dd]/60 px-3 py-1.5 text-[9px] text-[#fc74dd] transition hover:border-[#fc74dd] hover:bg-[#fc74dd] hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]"
+                >
+                  Use inferred profile
+                </button>
+              </div>
+            )}
           </div>
           <span className="mono rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white transition group-open:bg-white group-open:text-black">
             Edit
