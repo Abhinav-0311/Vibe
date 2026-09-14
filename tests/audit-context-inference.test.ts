@@ -147,11 +147,7 @@ describe("inferAuditContext", () => {
         confidence: "medium",
       },
       dependencies: [{ name: "express", version: "^5.0.0", kind: "dependency" }],
-      apiRoutes: [{ route: "/health", file: "src/server.ts", signals: ["health"] }],
-      signals: {
-        ...baseFacts.signals,
-        hasHealthRoute: true,
-      },
+      apiRoutes: [],
     };
 
     const profile = inferAuditProfile(facts, requestedContentContext);

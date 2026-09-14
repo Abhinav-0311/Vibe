@@ -63,11 +63,11 @@ function hasServerProductSignals(facts: ScannerFacts) {
 
 function looksLikeApiProject(facts: ScannerFacts) {
   const framework = facts.framework.name.toLowerCase();
+  if (framework.includes("express") || framework.includes("nestjs")) return true;
+
   return (
     facts.apiRoutes.length > 0 &&
-    (framework.includes("express") ||
-      framework.includes("nestjs") ||
-      framework === "unknown" ||
+    (framework === "unknown" ||
       (!facts.signals.hasAppRouter && !facts.signals.hasPagesRouter))
   );
 }
@@ -109,7 +109,7 @@ export function inferAuditProfile(facts: ScannerFacts, requestedContext: AuditCo
       reasons.push("Account or payment signals make this closer to a SaaS app than a simple content site.");
     } else if (looksLikeApiProject(facts)) {
       inferred.appType = "api";
-      reasons.push("Backend framework and API route signals make this closer to an API project.");
+      reasons.push("Backend framework or API route signals make this closer to an API project.");
     } else if (!hasServerProductSignals(facts)) {
       inferred.appType = "content-site";
       reasons.push("No auth, payment, webhook, or backend operation signals were found, so Vibe kept the content-site profile.");
