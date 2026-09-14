@@ -1047,7 +1047,7 @@ const rules: ChecklistRule[] = [
             "This is acceptable for a prototype, but scanner and API failures will need visibility before launch.",
           fix: "Plan error tracking before the first real users run scans.",
           prompt:
-            "Create a lightweight observability plan for this Next.js prototype. Explain when to add Sentry or an equivalent tool, which errors to capture first, and what environment variables will be needed before launch.",
+            `Create a lightweight observability plan for this ${facts.framework.name} prototype. Explain when to add Sentry or an equivalent tool, which errors to capture first, and what environment variables will be needed before launch.`,
         });
       }
 
@@ -1066,7 +1066,7 @@ const rules: ChecklistRule[] = [
         prompt:
           isLowComplexityPublicSite(context)
             ? "Review whether this portfolio has forms, dynamic routes, or client-side integrations that can fail. If yes, recommend lightweight monitoring and document required environment variables. If no, rely on build checks and manual browser verification."
-            : "Add production error tracking to this Next.js app. Capture API route errors, scanner failures, and client rendering errors. Keep the setup minimal and document required environment variables in .env.example.",
+            : `Add production error tracking to this ${facts.framework.name} app. Capture API route errors, scanner failures, and client rendering errors. Keep the setup minimal and document required environment variables in .env.example.`,
       });
     },
   },

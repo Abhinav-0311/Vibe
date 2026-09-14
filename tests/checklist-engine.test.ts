@@ -89,6 +89,16 @@ describe("runChecklist", () => {
     expect(findingIds).not.toContain("missing-middleware");
   });
 
+  it("uses the detected stack in error-tracking guidance", () => {
+    const result = runChecklist(
+      { ...baseFacts, framework: { name: "Express", confidence: "high" } },
+      { ...prototypeContext, appType: "api" },
+    );
+
+    expect(result.findings.find((finding) => finding.id === "missing-error-tracking")?.prompt).toContain("Express prototype");
+    expect(result.findings.find((finding) => finding.id === "missing-error-tracking")?.prompt).not.toContain("Next.js");
+  });
+
   it("keeps simple portfolio scans focused on public-site readiness", () => {
     const fixture = scannerRegressionCases[0];
     const result = runChecklist(baseFacts, fixture.context);
