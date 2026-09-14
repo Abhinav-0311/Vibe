@@ -139,6 +139,26 @@ describe("inferAuditContext", () => {
     );
   });
 
+  it("infers stored user data only when account and persistent-store evidence agree", () => {
+    const facts: ScannerFacts = {
+      ...baseFacts,
+      dependencies: [
+        { name: "@supabase/ssr", version: "^0.1.0", kind: "dependency" },
+        { name: "@supabase/supabase-js", version: "^2.0.0", kind: "dependency" },
+      ],
+      detectedFiles: [{ path: "supabase/migrations", exists: true }],
+      signals: {
+        ...baseFacts.signals,
+        hasAuthDependency: true,
+      },
+    };
+
+    const profile = inferAuditProfile(facts, requestedContentContext);
+
+    expect(profile.applied.storesUserData).toBe(true);
+    expect(profile.reasons).toEqual(expect.arrayContaining([expect.stringContaining("persisted data-store evidence")]));
+  });
+
   it("promotes backend-only projects to the API profile", () => {
     const facts: ScannerFacts = {
       ...baseFacts,

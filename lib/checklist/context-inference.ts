@@ -61,6 +61,18 @@ function hasServerProductSignals(facts: ScannerFacts) {
   );
 }
 
+function hasPersistedAccountDataEvidence(facts: ScannerFacts) {
+  const dependencyNames = new Set(facts.dependencies.map((dependency) => dependency.name));
+  const hasSupportedDataClient = ["@prisma/client", "prisma", "drizzle-orm", "@supabase/supabase-js", "@supabase/ssr"].some((name) =>
+    dependencyNames.has(name),
+  );
+  const hasSchemaOrMigration = facts.detectedFiles.some(
+    (file) => file.exists && ["prisma/schema.prisma", "prisma/migrations", "drizzle", "supabase/migrations"].includes(file.path),
+  );
+
+  return hasSupportedDataClient && hasSchemaOrMigration;
+}
+
 function looksLikeApiProject(facts: ScannerFacts) {
   const framework = facts.framework.name.toLowerCase();
   if (framework.includes("express") || framework.includes("nestjs")) return true;
@@ -101,6 +113,11 @@ export function inferAuditProfile(facts: ScannerFacts, requestedContext: AuditCo
   if (hasPayments) {
     inferred.hasPayments = true;
     reasons.push("Stripe or payment route detected, so payment readiness is enabled for scoring.");
+  }
+
+  if (hasAccounts && hasPersistedAccountDataEvidence(facts)) {
+    inferred.storesUserData = true;
+    reasons.push("Account and persisted data-store evidence were detected, so stored user data is enabled for scoring.");
   }
 
   if (shouldPromoteFromContentProfile(requestedContext)) {
