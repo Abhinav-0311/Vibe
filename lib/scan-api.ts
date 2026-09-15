@@ -96,3 +96,11 @@ export type WorkspaceProjectsApiResponse = {
   localScanEnabled: boolean;
   projects: WorkspaceProject[];
 };
+
+export type BetaAccountApiResponse = {
+  email: string;
+  dailyScanLimit: number;
+  scansUsedToday: number;
+  scansRemainingToday: number;
+  scanRetentionDays: number;
+};

@@ -6,8 +6,6 @@ import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { quotaUsageRetentionCutoff } from "@/lib/data-retention";
 
-const dailyScanLimit = Number.parseInt(process.env.VIBE_BETA_DAILY_SCAN_LIMIT ?? "20", 10);
-
 function normalizedEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -17,6 +15,7 @@ export function googleAuthConfigured() {
 }
 
 export function getBetaDailyScanLimit() {
+  const dailyScanLimit = Number.parseInt(process.env.VIBE_BETA_DAILY_SCAN_LIMIT ?? "20", 10);
   return Number.isFinite(dailyScanLimit) && dailyScanLimit > 0 ? dailyScanLimit : 20;
 }
 

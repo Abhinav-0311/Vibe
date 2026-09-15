@@ -9,6 +9,7 @@ Vibe is a private beta. Access requires Google sign-in and an active beta invite
 - Saved scan payloads expire automatically after 30 days by default. Set `VIBE_SCAN_RETENTION_DAYS` to a positive number of days when a shorter policy is required.
 - Expired scans are filtered from every read and are also purged during scan saves and saved-scan reads.
 - Daily scan quota counters are retained for 48 hours, then deleted during the next quota check.
+- Beta users can inspect their remaining daily scan allowance and the retention period from **Beta account**. They can permanently delete their own account, saved scans, feedback, sessions, and connected GitHub credentials from the same control.
 - Core scan and persistence failures emit redacted structured events to Vercel runtime logs. Configure a Vercel log alert or connect an error tracker before inviting beta users.
 
 ## Required Services

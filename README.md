@@ -48,7 +48,7 @@ The deterministic scanner and checklist remain the source of truth. Optional Ope
 - PostgreSQL-backed scan history, deterministic deduplication, report restore, and a dependency-aware health endpoint.
 - GitHub OAuth with PKCE, branch selection, and explicit-only issue creation.
 - Versioned Next.js and Vite guidance with official sources, verification routes, and owner-scoped feedback.
-- Per-finding relevance and usefulness feedback, stored only for the signed-in beta user.
+- Per-finding relevance and usefulness feedback, stored only for the signed-in beta user, with visible scan allowances and self-service account-data deletion.
 - Optional structured OpenAI FixPlans with strict grounding and deterministic fallback.
 
 ## Trust boundaries
@@ -63,8 +63,8 @@ The deterministic scanner and checklist remain the source of truth. Optional Ope
 
 | Area | Current evidence |
 | --- | --- |
-| Readiness engine | 30 deterministic rules across 8 regression contexts |
-| Automated checks | 120 Vitest cases across 21 test files |
+| Readiness engine | 30 deterministic rules across 12 representative project shapes |
+| Automated checks | 164 Vitest cases across 26 test files |
 | Delivery gate | ESLint, Prisma validation, and a Next.js production build |
 | Data layer | PostgreSQL + Prisma migrations + scan deduplication |
 | Hosted access | Vercel private beta with Google sign-in and invite gating |
@@ -108,7 +108,7 @@ npx.cmd prisma validate
 
 ## Project status
 
-Vibe is a deployed private beta. The next meaningful work is calibration against more real projects and collecting beta-user feedback—not adding features without evidence of need.
+Vibe is a deployed private beta. The next meaningful work is collecting beta-user feedback and fixing evidence-backed gaps—not adding features without evidence of need.
 
 ## Further reading
 

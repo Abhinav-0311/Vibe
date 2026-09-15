@@ -8,7 +8,9 @@ type ServerErrorEvent =
   | "guidance_feedback_read_failed"
   | "guidance_feedback_write_failed"
   | "finding_feedback_read_failed"
-  | "finding_feedback_write_failed";
+  | "finding_feedback_write_failed"
+  | "beta_account_read_failed"
+  | "beta_account_delete_failed";
 
 export function reportServerError(event: ServerErrorEvent, details: Record<string, string | number | boolean> = {}) {
   // Structured Vercel runtime logs are the production monitoring surface for the

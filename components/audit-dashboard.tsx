@@ -13,6 +13,7 @@ import {
   Github,
   History,
   Loader2,
+  LogOut,
   RefreshCw,
   Server,
   ShieldAlert,
@@ -20,6 +21,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
 import type { ReactNode } from "react";
 import type { AuditProfileMode } from "@/lib/audit-context";
 import type { AuditContext } from "@/lib/checklist/types";
@@ -38,6 +40,7 @@ import type {
   GitHubRepository,
   GitHubStatusApiResponse,
   ScanApiResponse,
+  BetaAccountApiResponse,
   WorkspaceProjectsApiResponse,
 } from "@/lib/scan-api";
 import {
@@ -173,6 +176,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
   const [scanProgressSource, setScanProgressSource] = useState<ScanProgressSource>(null);
   const [scanSuccess, setScanSuccess] = useState<string | null>(null);
   const [previousScanNotice, setPreviousScanNotice] = useState<PreviousScanNotice | null>(null);
+  const [account, setAccount] = useState<BetaAccountApiResponse | null>(null);
 
   const report = useMemo(() => createReportFromScan(scanData), [scanData]);
   const activeScanScope = useMemo(() => (scanData ? scanComparisonKey(scanData) : null), [scanData]);
@@ -491,6 +495,10 @@ export function AuditDashboard({ userId }: { userId: string }) {
     void refreshWorkspaceProjects();
     void refreshSavedScans();
     void refreshHealth();
+    void fetch("/api/account")
+      .then(async (response) => (response.ok ? (await response.json()) as BetaAccountApiResponse : null))
+      .then(setAccount)
+      .catch(() => setAccount(null));
   }, [userId]);
 
   useEffect(() => {
@@ -513,7 +521,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
       <a className="skip-link mono" href="#scan-controls">Skip to scan controls</a>
       <div className="sr-only" aria-live="polite" aria-atomic="true">{scanSuccess}</div>
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-5 sm:px-8 lg:px-10">
-        <TopBar />
+        <TopBar account={account} />
         <Hero />
         <ContextControls
           context={auditContext}
@@ -662,15 +670,77 @@ function EvidenceDisclosure({ children }: { children: ReactNode }) {
   );
 }
 
-function TopBar() {
+function TopBar({ account }: { account: BetaAccountApiResponse | null }) {
   return (
     <header className="flex flex-col gap-4 border-b border-[#1d1a1a] pb-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="mono text-[11px] text-[#d9d9d9]">Launch readiness, before launch damage &gt;</div>
       <div className="flex items-center gap-3">
+        <AccountControls account={account} />
         <span className="h-2 w-2 rounded-full bg-[#ff4c33]" />
         <span className="mono text-[11px] text-white">Live audit draft</span>
       </div>
     </header>
+  );
+}
+
+function AccountControls({ account }: { account: BetaAccountApiResponse | null }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function removeAccount() {
+    setIsDeleting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/account", { method: "DELETE" });
+      if (!response.ok) throw new Error("Account deletion failed.");
+      await signOut({ callbackUrl: "/" });
+    } catch {
+      setIsDeleting(false);
+      setError("Vibe could not delete your account. Nothing was removed.");
+    }
+  }
+
+  return (
+    <>
+      <details open={isOpen} onToggle={(event) => setIsOpen((event.currentTarget as HTMLDetailsElement).open)} className="relative">
+        <summary className="mono cursor-pointer list-none rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]">
+          Beta account
+        </summary>
+        <section className="absolute right-0 z-30 mt-3 w-[min(22rem,calc(100vw-2.5rem))] rounded-[24px] border border-[#3d3d3d] bg-[#111212] p-5 shadow-2xl">
+          <p className="mono text-[10px] text-[#fc74dd]">Private beta</p>
+          {account ? (
+            <>
+              <p className="mt-3 break-all text-sm text-white">{account.email}</p>
+              <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">
+                {account.scansRemainingToday} of {account.dailyScanLimit} scans remain today. Saved scans are removed after {account.scanRetentionDays} days.
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">Account limits are temporarily unavailable. Your existing access is unchanged.</p>
+          )}
+          {error && <p role="alert" className="mt-4 text-sm text-[#ff8f8f]">{error}</p>}
+          <div className="mt-5 flex flex-wrap gap-3 border-t border-[#2f2a2a] pt-4">
+            <button onClick={() => void signOut({ callbackUrl: "/" })} className="mono inline-flex items-center gap-2 rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white transition hover:border-white">
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" /> Sign out
+            </button>
+            <button onClick={() => setConfirmDelete(true)} className="mono rounded-full px-3 py-2 text-[10px] text-[#ff8f8f] transition hover:bg-[#2a0f11]">
+              Delete data
+            </button>
+          </div>
+        </section>
+      </details>
+      <ConfirmationDialog
+        open={confirmDelete}
+        title="Delete your Vibe account?"
+        description="This permanently removes your account, saved scans, feedback, connected GitHub tokens, and beta access. This cannot be undone."
+        confirmLabel="Delete account"
+        isConfirming={isDeleting}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => void removeAccount()}
+      />
+    </>
   );
 }
 
