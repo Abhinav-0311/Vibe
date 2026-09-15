@@ -29,7 +29,7 @@ import { getAuditProfileWarnings } from "@/lib/checklist/context-inference";
 import { auditReport, emptyReport, type ActionPriority, type AuditFinding, type AuditReport, type Severity } from "@/lib/mock-audit";
 import { formatMarkdownReport } from "@/lib/report/markdown-export";
 import { buildScoreBreakdown } from "@/lib/score-breakdown";
-import { compareScans, findPreviousComparableScan, scanComparisonKey } from "@/lib/scan-comparison";
+import { buildReScanVerificationGuide, findPreviousComparableScan, scanComparisonKey } from "@/lib/scan-comparison";
 import { formatScanProcessingTime } from "@/lib/scan-timing";
 import type {
   SavedScanDetailApiResponse,
@@ -565,7 +565,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
                 repository={previousScanNotice ? undefined : scanData?.scanSource?.repository}
                 projectKey={activeScanScope ?? undefined}
               />
-              {scanData && comparisonBaseline && <ScanProgress baseline={comparisonBaseline} current={scanData} />}
+              {scanData && comparisonBaseline && <ScanProgress baseline={comparisonBaseline} current={scanData} onSelect={setSelectedId} />}
             </ResultSection>
 
             {!previousScanNotice && (
@@ -2761,8 +2761,9 @@ function ReportView({
   );
 }
 
-function ScanProgress({ baseline, current }: { baseline: ScanApiResponse; current: ScanApiResponse }) {
-  const comparison = compareScans(baseline, current);
+function ScanProgress({ baseline, current, onSelect }: { baseline: ScanApiResponse; current: ScanApiResponse; onSelect: (id: string) => void }) {
+  const guide = buildReScanVerificationGuide(baseline, current);
+  const { comparison } = guide;
   if (!comparison.isComparable) {
     return (
       <section className="rounded-[30px] border border-[#4d3c20] bg-[#161109] p-5 sm:p-6">
@@ -2774,11 +2775,6 @@ function ScanProgress({ baseline, current }: { baseline: ScanApiResponse; curren
   }
   const scoreChange = comparison.scoreChange > 0 ? `+${comparison.scoreChange}` : comparison.scoreChange.toString();
   const scoreClass = comparison.scoreChange > 0 ? "text-[#a7f35b]" : comparison.scoreChange < 0 ? "text-[#ff8f8f]" : "text-[#d9d9d9]";
-  const baselineFindings = new Map(baseline.checklist.findings.map((finding) => [finding.id, finding]));
-  const currentFindings = new Map(current.checklist.findings.map((finding) => [finding.id, finding]));
-  const resolvedTitles = comparison.resolvedFindingIds.map((id) => baselineFindings.get(id)?.title).filter(Boolean);
-  const newTitles = comparison.newFindingIds.map((id) => currentFindings.get(id)?.title).filter(Boolean);
-
   return (
     <section className="rounded-[30px] border border-[#315f46] bg-[#07130d] p-5 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -2796,12 +2792,31 @@ function ScanProgress({ baseline, current }: { baseline: ScanApiResponse; curren
         <ProgressMetric label="Still open" value={comparison.unchangedFindingIds.length} className="text-white" />
       </div>
 
-      {(resolvedTitles.length > 0 || newTitles.length > 0) && (
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
-          {resolvedTitles.length > 0 && <ProgressFindingList label="Resolved evidence" titles={resolvedTitles} className="text-[#a7f35b]" />}
-          {newTitles.length > 0 && <ProgressFindingList label="New evidence" titles={newTitles} className="text-[#ff8f8f]" />}
-        </div>
-      )}
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        {guide.evidenceCleared.length > 0 && <ProgressFindingList label="Evidence cleared" findings={guide.evidenceCleared} className="text-[#a7f35b]" />}
+        {guide.newRisks.length > 0 && <ProgressFindingList label="New evidence to review" findings={guide.newRisks} className="text-[#ff8f8f]" onSelect={onSelect} />}
+        {guide.stillOpen.length > 0 && <ProgressFindingList label="Still needs work" findings={guide.stillOpen} className="text-white" onSelect={onSelect} />}
+        {guide.evidenceCleared.length === 0 && guide.newRisks.length === 0 && guide.stillOpen.length === 0 && (
+          <div className="rounded-[20px] border border-[#315f46] p-4 md:col-span-2">
+            <p className="mono text-[9px] text-[#a7f35b]">No current findings</p>
+            <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">The same static ruleset found no remaining gaps for this scan context. Complete the project’s own runtime and provider checks before release.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-5 rounded-[20px] border border-[#315f46] bg-black/25 p-4">
+        <p className="mono text-[9px] text-[#a7f35b]">Verification route</p>
+        {guide.nextVerificationSteps.length > 0 ? (
+          <ul className="mt-3 grid gap-2 text-sm leading-6 text-[#d9d9d9]">
+            {guide.nextVerificationSteps.map((step) => (
+              <li key={step} className="flex gap-3"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#a7f35b]" aria-hidden="true" />{step}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">Vibe compares static repository evidence. Run the project’s own build, tests, browser checks, and provider-specific checks before considering a release verified.</p>
+        )}
+        <p className="mt-4 text-xs leading-5 text-[#9b9696]">Evidence cleared means the same static ruleset no longer detects the original signal. It is not runtime certification.</p>
+      </div>
     </section>
   );
 }
@@ -2815,11 +2830,28 @@ function ProgressMetric({ label, value, className }: { label: string; value: num
   );
 }
 
-function ProgressFindingList({ label, titles, className }: { label: string; titles: Array<string | undefined>; className: string }) {
+function ProgressFindingList({
+  label,
+  findings,
+  className,
+  onSelect,
+}: {
+  label: string;
+  findings: ScanApiResponse["checklist"]["findings"];
+  className: string;
+  onSelect?: (id: string) => void;
+}) {
   return (
     <div className="rounded-[20px] border border-[#315f46] p-4">
       <p className={`mono text-[9px] ${className}`}>{label}</p>
-      <p className="mt-3 text-sm leading-6 text-[#d9d9d9]">{titles.slice(0, 2).join(" · ")}{titles.length > 2 ? ` · +${titles.length - 2} more` : ""}</p>
+      <div className="mt-3 grid gap-2">
+        {findings.slice(0, 2).map((finding) => onSelect ? (
+          <button key={finding.id} onClick={() => onSelect(finding.id)} className="text-left text-sm leading-6 text-[#d9d9d9] underline-offset-4 transition hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]">{finding.title}</button>
+        ) : (
+          <p key={finding.id} className="text-sm leading-6 text-[#d9d9d9]">{finding.title}</p>
+        ))}
+        {findings.length > 2 && <p className="text-xs text-[#9b9696]">+{findings.length - 2} more</p>}
+      </div>
     </div>
   );
 }

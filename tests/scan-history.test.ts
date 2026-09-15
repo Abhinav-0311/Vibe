@@ -6,7 +6,7 @@ import {
   parseScanHistory,
   storageKeyForUser,
 } from "@/lib/scan-history";
-import { compareScans, findPreviousComparableScan, scanComparisonKey } from "@/lib/scan-comparison";
+import { buildReScanVerificationGuide, compareScans, findPreviousComparableScan, scanComparisonKey } from "@/lib/scan-comparison";
 import type { ScanApiResponse } from "@/lib/scan-api";
 
 function createFinding(id: string): ScanApiResponse["checklist"]["findings"][number] {
@@ -188,6 +188,11 @@ describe("scan history", () => {
     expect(comparison.newFindingIds).toEqual(["missing-rate-limiting"]);
     expect(comparison.unchangedFindingIds).toEqual(["missing-env-example"]);
 
+    const guide = buildReScanVerificationGuide(baseline, current);
+    expect(guide.evidenceCleared.map((finding) => finding.id)).toEqual(["missing-tests"]);
+    expect(guide.stillOpen.map((finding) => finding.id)).toEqual(["missing-env-example"]);
+    expect(guide.newRisks.map((finding) => finding.id)).toEqual(["missing-rate-limiting"]);
+
     const differentProfile = {
       ...current,
       checklist: { ...current.checklist, context: { ...current.checklist.context, appType: "content-site" as const } },
@@ -203,5 +208,19 @@ describe("scan history", () => {
     const comparison = compareScans(baseline, current);
     expect(comparison.isComparable).toBe(false);
     expect(comparison.resolvedFindingIds).toEqual([]);
+    expect(buildReScanVerificationGuide(baseline, current).evidenceCleared).toEqual([]);
+  });
+
+  it("keeps the next verification route grounded in remaining findings", () => {
+    const baseline = createScan("2026-06-13T00:00:00.000Z", 72, ["missing-tests", "missing-env-example"]);
+    const current = createScan("2026-06-13T00:05:00.000Z", 80, ["missing-env-example", "missing-rate-limiting"]);
+    current.checklist.findings[0].verification = ["Run npm test.", "Run npm run build."];
+    current.checklist.findings[1].verification = ["Run npm test.", "Send one authenticated request."];
+
+    expect(buildReScanVerificationGuide(baseline, current).nextVerificationSteps).toEqual([
+      "Run npm test.",
+      "Run npm run build.",
+      "Send one authenticated request.",
+    ]);
   });
 });

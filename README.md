@@ -64,7 +64,7 @@ The deterministic scanner and checklist remain the source of truth. Optional Ope
 | Area | Current evidence |
 | --- | --- |
 | Readiness engine | 30 deterministic rules across 12 representative project shapes |
-| Automated checks | 164 Vitest cases across 26 test files |
+| Automated checks | 165 Vitest cases across 26 test files |
 | Delivery gate | ESLint, Prisma validation, and a Next.js production build |
 | Data layer | PostgreSQL + Prisma migrations + scan deduplication |
 | Hosted access | Vercel private beta with Google sign-in and invite gating |
