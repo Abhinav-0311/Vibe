@@ -1,16 +1,16 @@
 # MVP QA Report
 
-Date: 2026-09-02
+Date: 2026-09-16
 
 ## Automated Gates
 
 - ESLint 9: passed with no warnings or errors
-- Vitest: 116 tests across 21 executed test files passed
+- Vitest: 165 tests across 26 executed test files passed
 - Next.js production build: passed
 - TypeScript validation: passed through the production build
 - Secret-pattern scan: no committed GitHub or OpenAI token pattern detected
 
-This validation reflects the local checkout, including the Phase 6 FixPlan reliability layer and Phase 7 trusted-guidance implementation. The pending `GuidanceFeedback` production migration must be applied before feedback persistence is available in Vercel.
+This validation reflects the current private-beta checkout, including scanner calibration fixtures, per-user beta controls, source-fingerprint caching, and comparable re-scan verification guidance.
 
 Latest local commands:
 
@@ -40,28 +40,26 @@ Environment: local Next.js server at `http://localhost:3005`.
 
 Environment: Vercel production deployment at `https://vibe-seven-snowy.vercel.app`.
 
-- Production deployment is ready on commit `cdce3c9`.
-- `/api/health` returned application `ok` and database `ok`.
+- The deployed private beta returned HTTP 200 from `/api/health` with application `ok` and database `ok`.
 - Production database migrations were applied to Neon PostgreSQL.
 - Hosted deployment uses GitHub and ZIP scanning; local workspace scanning is disabled for Vercel.
-- Security headers are active: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and `Cross-Origin-Opener-Policy`.
-- Public GitHub and ZIP scans are limited to four requests per minute per visitor with durable PostgreSQL-backed enforcement.
+- Public GitHub and ZIP scans use durable PostgreSQL-backed enforcement in addition to per-user beta scan quotas.
 
-## Phase 4 Browser QA
+## Current Browser Smoke Test
 
 Environment: Vercel production deployment, verified with Playwright browser automation.
 
-- Desktop visual smoke check completed at 1440px with no console warnings or errors.
-- Responsive DOM checks at 375px, 768px, and 1440px found no horizontal overflow.
-- All visible primary controls met a 42px or greater touch-target height; primary scan actions are 48px or greater.
-- A real public scan of `Abhinav-0311/Vibe` completed successfully, rendered the score breakdown, empty finding state, report handoff, and AI workspace setup-pack preview.
-- The self-scan returned 100/100 for the selected prototype/content-site context with no browser-console errors.
+- An authenticated browser session completed a public GitHub scan of `Abhinav-0311/Vibe` on the deployed private beta.
+- The source was inferred as a launch-prep SaaS with accounts and stored data; the scan completed successfully with a 62/100 readiness score and five static findings.
+- The result rendered source evidence, ranked findings, verification routes, deterministic report handoff, trusted framework guidance, and the setup-pack preview.
+- The scan did not execute the scanned repository's code.
 
 ## Known Environment Limits
 
-- OpenAI enhancement remained disabled; deterministic fallback behavior is covered by mocked tests.
-- Live private-repository OAuth and GitHub issue creation still require a configured GitHub OAuth app and were not mutated during browser QA.
+- OpenAI enhancement remains optional; deterministic fallback behavior is covered by mocked tests.
+- The deployed environment reports that GitHub OAuth is not configured, so private-repository scanning and issue creation remain unverified deployment capabilities.
+- Vibe's self-scan still identifies optional or operational work (error tracking, analytics, and an AI workspace rules file) plus reviewable request-protection signals. These are static findings, not a claim that the deployment is broken.
 
 ## Release Verdict
 
-The single-user MVP is ready for a portfolio demo, public GitHub/ZIP scanning, and controlled Vercel deployment. Public multi-user SaaS access remains blocked on authentication, tenant isolation, quotas, billing, background jobs, and hosted abuse controls; those are explicitly post-MVP capabilities.
+Vibe is ready to present as a deployed private beta: public GitHub/ZIP scanning, Google invite gating, per-user ownership, quotas, retention, scan comparison, and health checks are implemented. It is not marketed as an unrestricted multi-tenant SaaS; teams, billing, background jobs, and broad provider integrations remain intentionally out of scope.

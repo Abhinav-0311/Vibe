@@ -19,13 +19,12 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 - Versioned Next.js guidance with official source links, verification routes, and private-beta feedback
 - README, QA report, deployment notes, portfolio case study, and private-beta runbook
 
-## Publication Polish
+## Presentation Follow-up
 
-- Add README screenshots or a short GIF for the main workflow
-- Record a 60 to 90 second demo video
-- Add a public landing page that explains the product without exposing unrestricted scanning
-- Run a final manual responsive visual QA pass
-- Test the private GitHub OAuth path with a real OAuth app before demoing private repositories
+- README screenshots and a portfolio case study are present.
+- Run an occasional manual responsive visual QA pass after UI changes.
+- Configure and test the private GitHub OAuth path before presenting private-repository scanning as available.
+- Collect feedback from a small invited beta cohort before expanding scanner rules or AI behavior.
 
 ## Hosted Product Work
 

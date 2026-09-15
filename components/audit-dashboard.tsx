@@ -208,6 +208,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
     saveScanToHistory(scan);
     void refreshSavedScans();
     void refreshHealth();
+    void refreshAccount();
     setScanSuccess(`Scan complete. ${scan.checklist.findings.length} findings and a readiness score of ${scan.checklist.score}.`);
     setViewState("report");
   }
@@ -266,6 +267,15 @@ export function AuditDashboard({ userId }: { userId: string }) {
       setSavedScansState("ready");
     } catch {
       setSavedScansState("error");
+    }
+  }
+
+  async function refreshAccount() {
+    try {
+      const response = await fetch("/api/account");
+      setAccount(response.ok ? (await response.json()) as BetaAccountApiResponse : null);
+    } catch {
+      setAccount(null);
     }
   }
 
@@ -495,10 +505,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
     void refreshWorkspaceProjects();
     void refreshSavedScans();
     void refreshHealth();
-    void fetch("/api/account")
-      .then(async (response) => (response.ok ? (await response.json()) as BetaAccountApiResponse : null))
-      .then(setAccount)
-      .catch(() => setAccount(null));
+    void refreshAccount();
   }, [userId]);
 
   useEffect(() => {

@@ -108,7 +108,7 @@ npx.cmd prisma validate
 
 ## Project status
 
-Vibe is a deployed private beta. The next meaningful work is collecting beta-user feedback and fixing evidence-backed gaps—not adding features without evidence of need.
+Vibe is a deployed private beta. A current browser smoke test completed a public GitHub scan on the hosted deployment; see the [QA report](./docs/MVP_QA_REPORT.md). The next meaningful work is collecting beta-user feedback and fixing evidence-backed gaps—not adding features without evidence of need.
 
 ## Further reading
 

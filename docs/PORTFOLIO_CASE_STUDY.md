@@ -72,11 +72,15 @@ flowchart LR
 
 ## Verified Engineering Snapshot
 
-Current local validation on 2026-09-02:
+Current validation on 2026-09-16:
 
 - 30 distinct readiness rules
-- 8 regression contexts covering content sites, SaaS account flows, payment webhooks, and APIs
-- 116 passing Vitest cases across 21 executed test files
+- 12 deterministic representative project shapes covering portfolios, SaaS account flows, payment webhooks, APIs, ZIP safety, and Next.js error/loading boundaries
+- 165 passing Vitest cases across 26 executed test files
 - ESLint and the Next.js production build passing
+- Deployed health endpoint returned application `ok` and database `ok`
+- Authenticated browser smoke test completed a public GitHub scan of `Abhinav-0311/Vibe`
 
-These are implementation checks, not a claim that Vibe has been validated against a large external-repository benchmark. The confirmed live self-scan is Vibe itself; broader real-repository validation remains future work.
+The current private beta also includes per-user scan ownership, quotas, retention/deletion controls, source-fingerprint caching, and a comparable re-scan guide that distinguishes static evidence clearance from runtime certification.
+
+These are implementation checks, not a claim that Vibe has been validated against a large external-repository benchmark or that a scan proves production security. The confirmed live self-scan is Vibe itself; broader external calibration and beta feedback remain future work.
