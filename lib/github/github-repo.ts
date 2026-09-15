@@ -44,9 +44,19 @@ type GitHubArchive = {
   buffer: Buffer;
   branch: string;
   repository: GitHubRepoRef;
+  commitSha: string;
+  isPublic: boolean;
 };
 
-// ponytail: dedupes only concurrent requests within one server instance; add durable caching after tenant ownership exists.
+export type GitHubRepoRevision = {
+  name: string;
+  repository: GitHubRepoRef;
+  branch: string;
+  commitSha: string;
+  isPublic: boolean;
+};
+
+// Deduplicate only concurrent archive downloads within one server instance.
 const publicDownloads = new Map<string, Promise<GitHubArchive>>();
 
 async function readArchiveBuffer(response: Response) {
@@ -71,7 +81,7 @@ async function readArchiveBuffer(response: Response) {
 
 export async function downloadGitHubRepoZip(
   repoUrl: string,
-  options: { token?: string | null; branch?: string } = {},
+  options: { token?: string | null; branch?: string; revision?: GitHubRepoRevision } = {},
 ): Promise<GitHubArchive> {
   const repo = parseGitHubRepoUrl(repoUrl);
 
@@ -93,27 +103,12 @@ export async function downloadGitHubRepoZip(
 
 async function downloadGitHubRepoZipFromRepo(
   repo: GitHubRepoRef,
-  options: { token?: string | null; branch?: string },
+  options: { token?: string | null; branch?: string; revision?: GitHubRepoRevision },
 ): Promise<GitHubArchive> {
-  const metadataResponse = await githubFetch(`/repos/${repo.owner}/${repo.repo}`, { token: options.token });
-
-  const metadata = (await metadataResponse.json()) as { default_branch?: string; full_name?: string };
-  const branch = options.branch?.trim() || metadata.default_branch;
-
-  if (!branch) {
-    throw new Error("Could not detect the repository default branch.");
-  }
-
-  if (!isValidGitHubBranch(branch)) {
-    throw new GitHubApiError(
-      "Enter a valid GitHub branch name.",
-      400,
-      "invalid_branch",
-    );
-  }
+  const revision = options.revision ?? await resolveGitHubRepoRevisionFromRepo(repo, options);
 
   const archiveResponse = await githubFetch(
-    `/repos/${repo.owner}/${repo.repo}/zipball/${encodeURIComponent(branch)}`,
+    `/repos/${repo.owner}/${repo.repo}/zipball/${encodeURIComponent(revision.branch)}`,
     {
       token: options.token,
       accept: "application/vnd.github+json",
@@ -137,10 +132,47 @@ async function downloadGitHubRepoZipFromRepo(
     );
   }
 
+  return { ...revision, buffer };
+}
+
+export async function resolveGitHubRepoRevision(
+  repoUrl: string,
+  options: { token?: string | null; branch?: string } = {},
+): Promise<GitHubRepoRevision> {
+  return resolveGitHubRepoRevisionFromRepo(parseGitHubRepoUrl(repoUrl), options);
+}
+
+async function resolveGitHubRepoRevisionFromRepo(
+  repo: GitHubRepoRef,
+  options: { token?: string | null; branch?: string },
+): Promise<GitHubRepoRevision> {
+  const metadataResponse = await githubFetch(`/repos/${repo.owner}/${repo.repo}`, { token: options.token });
+
+  const metadata = (await metadataResponse.json()) as { default_branch?: string; full_name?: string; private?: boolean };
+  const branch = options.branch?.trim() || metadata.default_branch;
+
+  if (!branch) {
+    throw new Error("Could not detect the repository default branch.");
+  }
+
+  if (!isValidGitHubBranch(branch)) {
+    throw new GitHubApiError(
+      "Enter a valid GitHub branch name.",
+      400,
+      "invalid_branch",
+    );
+  }
+
+  const commitResponse = await githubFetch(`/repos/${repo.owner}/${repo.repo}/commits/${encodeURIComponent(branch)}`, { token: options.token });
+  const commit = (await commitResponse.json()) as { sha?: string };
+
+  if (!commit.sha) throw new Error("Could not resolve the selected GitHub commit.");
+
   return {
     name: metadata.full_name ?? `${repo.owner}/${repo.repo}`,
-    buffer,
     branch,
     repository: repo,
+    commitSha: commit.sha,
+    isPublic: metadata.private === false,
   };
 }

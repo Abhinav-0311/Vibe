@@ -22,7 +22,8 @@ export class GitHubApiError extends Error {
   }
 }
 
-// ponytail: per-instance cooldown; use shared rate-limit storage only after hosted users have identities and quotas.
+// This per-instance cooldown protects transient failures while durable limits
+// handle hosted user traffic.
 let publicRetryAt = 0;
 const githubRequestTimeoutMs = 12_000;
 

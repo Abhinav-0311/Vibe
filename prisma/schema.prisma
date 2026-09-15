@@ -9,6 +9,7 @@ datasource db {
 model ScanRecord {
   id           String   @id @default(cuid())
   scanHash     String
+  sourceFingerprint String?
   userId       String?
   projectName  String
   appType      String
@@ -24,6 +25,7 @@ model ScanRecord {
 
   @@index([createdAt])
   @@index([userId, createdAt])
+  @@index([userId, sourceFingerprint, updatedAt])
   @@unique([userId, scanHash])
   @@index([stage, createdAt])
   @@index([appType, createdAt])

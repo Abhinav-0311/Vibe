@@ -79,6 +79,7 @@ export async function enforcePublicScanRateLimit(request: Request, bucket: "uplo
   const key = requestKey(request, bucket);
   const durableResult = await consumeDatabaseRateLimit(key, new Date());
 
-  // ponytail: process-memory fallback when persistence is unavailable; set DATABASE_URL and VIBE_RATE_LIMIT_SECRET for shared enforcement.
+  // Process-memory fallback when persistence is unavailable. Configure the
+  // database-backed secret for shared enforcement across hosted instances.
   return durableResult ?? consumeRateLimitWindow(fallbackWindows, key);
 }

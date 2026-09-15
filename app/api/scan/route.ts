@@ -5,10 +5,12 @@ import { resolveWorkspaceProjectPath } from "@/lib/workspace-paths";
 import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
 import { apiError } from "@/lib/api-error";
 import { reportServerError } from "@/lib/observability/server";
+import { reportScanCompleted } from "@/lib/scan-telemetry";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const requestStartedAt = Date.now();
   try {
     const betaUser = await getBetaUser();
     if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
@@ -23,6 +25,16 @@ export async function GET(request: Request) {
 
     const context = readAuditContext(searchParams);
     const response = await createScanResponse(resolvedProject.projectPath, context, undefined, undefined, readAuditProfileMode(searchParams), betaUser.id);
+
+    reportScanCompleted({
+      source: "local",
+      totalMs: Date.now() - requestStartedAt,
+      analysisMs: response.timing?.analysisMs,
+      enhancementMs: response.timing?.enhancementMs,
+      setupPackMs: response.timing?.setupPackMs,
+      architectureStressMs: response.timing?.architectureStressMs,
+      persistenceMs: response.timing?.persistenceMs,
+    });
 
     return NextResponse.json(response);
   } catch {

@@ -98,7 +98,11 @@ async function purgeExpiredScanRecords(prisma: NonNullable<ReturnType<typeof get
   }
 }
 
-export async function saveScanRecord(scan: ScanApiResponse, userId: string): Promise<ScanPersistenceResult> {
+export async function saveScanRecord(
+  scan: ScanApiResponse,
+  userId: string,
+  options: { sourceFingerprint?: string } = {},
+): Promise<ScanPersistenceResult> {
   const prisma = getPrisma();
 
   if (!prisma) {
@@ -122,6 +126,7 @@ export async function saveScanRecord(scan: ScanApiResponse, userId: string): Pro
       create: {
         scanHash,
         userId,
+        sourceFingerprint: options.sourceFingerprint,
         projectName: scan.scannedProject,
         appType: scan.checklist.context.appType,
         stage: scan.checklist.context.stage,
@@ -131,6 +136,7 @@ export async function saveScanRecord(scan: ScanApiResponse, userId: string): Pro
         payload: scan as unknown as Prisma.InputJsonValue,
       },
       update: {
+        sourceFingerprint: options.sourceFingerprint,
         projectName: scan.scannedProject,
         appType: scan.checklist.context.appType,
         stage: scan.checklist.context.stage,
@@ -154,6 +160,24 @@ export async function saveScanRecord(scan: ScanApiResponse, userId: string): Pro
       saved: false,
       reason: "database_error",
     };
+  }
+}
+
+export async function findCachedGitHubScan(userId: string, sourceFingerprint: string): Promise<ScanApiResponse | null> {
+  const prisma = getPrisma();
+  if (!prisma || !isDatabaseConfigured()) return null;
+
+  try {
+    const record = await prisma.scanRecord.findFirst({
+      where: { userId, sourceFingerprint, updatedAt: { gte: scanRetentionCutoff() } },
+      orderBy: { updatedAt: "desc" },
+      select: { payload: true },
+    });
+
+    return record ? (record.payload as unknown as ScanApiResponse) : null;
+  } catch {
+    reportServerError("saved_scan_read_failed");
+    return null;
   }
 }
 

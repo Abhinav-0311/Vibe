@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadGitHubRepoZip, parseGitHubRepoUrl } from "@/lib/github/github-repo";
+import { downloadGitHubRepoZip, parseGitHubRepoUrl, resolveGitHubRepoRevision } from "@/lib/github/github-repo";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -43,8 +43,9 @@ describe("downloadGitHubRepoZip", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), { status: 200 }),
+        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project", private: false }), { status: 200 }),
       )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sha: "commit-sha" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4]), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -53,8 +54,9 @@ describe("downloadGitHubRepoZip", () => {
       downloadGitHubRepoZip("https://github.com/owner/project"),
     ]);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(second).toEqual(first);
+    expect(first.commitSha).toBe("commit-sha");
   });
 
   it("returns an actionable error when GitHub cannot be reached", async () => {
@@ -71,11 +73,12 @@ describe("downloadGitHubRepoZip", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), {
+        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project", private: false }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }),
       )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sha: "commit-sha" }), { status: 200 }))
       .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4]), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -86,8 +89,9 @@ describe("downloadGitHubRepoZip", () => {
 
     expect(result.branch).toBe("release/candidate");
     expect(result.repository).toEqual({ owner: "owner", repo: "project" });
+    expect(result.commitSha).toBe("commit-sha");
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       "https://api.github.com/repos/owner/project/zipball/release%2Fcandidate",
       expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer test-token" }) }),
     );
@@ -133,8 +137,9 @@ describe("downloadGitHubRepoZip", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), { status: 200 }),
+        new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project", private: false }), { status: 200 }),
       )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sha: "commit-sha" }), { status: 200 }))
       .mockResolvedValueOnce(
         new Response(new Uint8Array([1]), {
           status: 200,
@@ -162,7 +167,8 @@ describe("downloadGitHubRepoZip", () => {
       "fetch",
       vi
         .fn()
-        .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project", private: false }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ sha: "commit-sha" }), { status: 200 }))
         .mockResolvedValueOnce(stalledArchive),
     );
 
@@ -172,5 +178,21 @@ describe("downloadGitHubRepoZip", () => {
 
     await expectedTimeout;
     expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("resolves an immutable public commit before a cache lookup", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ default_branch: "main", full_name: "owner/project", private: false }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sha: "a1b2c3" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(resolveGitHubRepoRevision("https://github.com/owner/project")).resolves.toEqual({
+      name: "owner/project",
+      repository: { owner: "owner", repo: "project" },
+      branch: "main",
+      commitSha: "a1b2c3",
+      isPublic: true,
+    });
   });
 });

@@ -22,6 +22,15 @@ export type ScanApiResponse = {
   timing?: {
     /** Scan processing only; persistence happens after this response is assembled. */
     processingMs: number;
+    sourceMs?: number;
+    extractionMs?: number;
+    analysisMs?: number;
+    enhancementMs?: number;
+    setupPackMs?: number;
+    architectureStressMs?: number;
+    persistenceMs?: number;
+    /** True only when a per-user immutable public-repository result was reused. */
+    cacheHit?: boolean;
   };
   facts: ScannerFacts;
   profileInference?: AuditProfileInference;

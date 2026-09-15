@@ -6,6 +6,7 @@ import { extractUploadedProject, UploadValidationError } from "@/lib/upload/zip-
 import { reportServerError } from "@/lib/observability/server";
 import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
 import { apiError } from "@/lib/api-error";
+import { reportScanCompleted } from "@/lib/scan-telemetry";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ function formatUploadDetail(fileName: string, relativeProjectRoot: string) {
 
 export async function POST(request: Request) {
   let uploadedProject: Awaited<ReturnType<typeof extractUploadedProject>> | null = null;
+  const requestStartedAt = Date.now();
 
   try {
     const betaUser = await getBetaUser();
@@ -32,7 +34,9 @@ export async function POST(request: Request) {
       return apiError("Missing project ZIP upload.", "invalid_upload", 400);
     }
 
+    const extractionStartedAt = Date.now();
     uploadedProject = await extractUploadedProject(file);
+    const extractionMs = Date.now() - extractionStartedAt;
     const searchParams = new URLSearchParams();
 
     for (const [key, value] of formData.entries()) {
@@ -46,7 +50,18 @@ export async function POST(request: Request) {
       type: "upload",
       label: "ZIP upload",
       detail: formatUploadDetail(file.name, uploadedProject.relativeProjectRoot),
-    }, projectName, readAuditProfileMode(searchParams), betaUser.id, uploadedProject.repositoryRoot);
+    }, projectName, readAuditProfileMode(searchParams), betaUser.id, uploadedProject.repositoryRoot, { extractionMs });
+
+    reportScanCompleted({
+      source: "upload",
+      totalMs: Date.now() - requestStartedAt,
+      extractionMs,
+      analysisMs: response.timing?.analysisMs,
+      enhancementMs: response.timing?.enhancementMs,
+      setupPackMs: response.timing?.setupPackMs,
+      architectureStressMs: response.timing?.architectureStressMs,
+      persistenceMs: response.timing?.persistenceMs,
+    });
 
     return NextResponse.json({
       ...response,
