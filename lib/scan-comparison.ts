@@ -42,15 +42,27 @@ export function scanComparisonKey(scan: ScanApiResponse) {
     source: normalizedProjectSource(scan),
     project: scan.scannedProject,
     context: scan.checklist.context,
+    appPath: scan.facts.workspace?.appPath.replace(/\\/g, "/"),
   });
 }
 
 export function findPreviousComparableScan(history: ScanHistoryItem[], scan: ScanApiResponse) {
   const key = scanComparisonKey(scan);
-  return history.find((item) => item.scan.scannedAt !== scan.scannedAt && scanComparisonKey(item.scan) === key)?.scan ?? null;
+  return history.find((item) => Date.parse(item.scan.scannedAt) < Date.parse(scan.scannedAt) && scanComparisonKey(item.scan) === key)?.scan ?? null;
 }
 
 export function compareScans(baseline: ScanApiResponse, current: ScanApiResponse): ScanComparison {
+  if (scanComparisonKey(baseline) !== scanComparisonKey(current) || !(Date.parse(baseline.scannedAt) < Date.parse(current.scannedAt))) {
+    return {
+      baseline,
+      isComparable: false,
+      reason: "Choose an earlier scan of the same project, app, branch, and readiness profile to verify changes.",
+      scoreChange: 0,
+      resolvedFindingIds: [],
+      newFindingIds: [],
+      unchangedFindingIds: [],
+    };
+  }
   const baselineRulesetVersion = baseline.checklist.rulesetVersion;
   const currentRulesetVersion = current.checklist.rulesetVersion;
   if (!baselineRulesetVersion || !currentRulesetVersion || baselineRulesetVersion !== currentRulesetVersion) {

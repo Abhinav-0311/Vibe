@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
+import { completeAccountDeletion } from "@/lib/account-deletion";
 import type { ReactNode } from "react";
 import type { AuditProfileMode } from "@/lib/audit-context";
 import type { AuditContext } from "@/lib/checklist/types";
@@ -45,6 +46,7 @@ import type {
 } from "@/lib/scan-api";
 import {
   addScanToHistory,
+  clearBrowserAccountData,
   findingOverrideKey,
   findingStatusReasonStorageKey,
   findingStatusStorageKey,
@@ -177,6 +179,20 @@ export function AuditDashboard({ userId }: { userId: string }) {
   const [scanSuccess, setScanSuccess] = useState<string | null>(null);
   const [previousScanNotice, setPreviousScanNotice] = useState<PreviousScanNotice | null>(null);
   const [account, setAccount] = useState<BetaAccountApiResponse | null>(null);
+  const accountDeleted = useRef(false);
+
+  function stopDeletedAccountStorage() {
+    accountDeleted.current = true;
+    setStorageHydratedForUser(null);
+    setScanData(null);
+    setScanHistory([]);
+    setComparisonBaseline(null);
+    setSavedScans(null);
+    setAccount(null);
+    setStatusOverrides({});
+    setStatusReasonOverrides({});
+    setViewState("empty");
+  }
 
   const report = useMemo(() => createReportFromScan(scanData), [scanData]);
   const activeScanScope = useMemo(() => (scanData ? scanComparisonKey(scanData) : null), [scanData]);
@@ -199,6 +215,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
   );
 
   function applyCompletedScan(scan: ScanApiResponse, profileMode: AuditProfileMode) {
+    if (accountDeleted.current) return;
     setPreviousScanNotice(null);
     setComparisonBaseline(findPreviousComparableScan(scanHistory, scan));
     setScanData(scan);
@@ -231,10 +248,12 @@ export function AuditDashboard({ userId }: { userId: string }) {
   }
 
   function saveScanToHistory(scan: ScanApiResponse) {
+    if (accountDeleted.current) return;
     setScanHistory((current) => addScanToHistory(current, scan));
   }
 
   function selectHistoryItem(item: ScanHistoryItem) {
+    if (accountDeleted.current) return;
     setPreviousScanNotice(null);
     setComparisonBaseline(findPreviousComparableScan(scanHistory, item.scan));
     setScanData(item.scan);
@@ -263,6 +282,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
       }
 
       const data = (await response.json()) as SavedScansApiResponse;
+      if (accountDeleted.current) return;
       setSavedScans(data);
       setSavedScansState("ready");
     } catch {
@@ -323,6 +343,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
       }
 
       const data = (await response.json()) as SavedScanDetailApiResponse;
+      if (accountDeleted.current) return;
 
       if (!data.record) {
         throw new Error("Saved scan record was not found");
@@ -509,17 +530,17 @@ export function AuditDashboard({ userId }: { userId: string }) {
   }, [userId]);
 
   useEffect(() => {
-    if (storageHydratedForUser !== userId) return;
+    if (accountDeleted.current || storageHydratedForUser !== userId) return;
     window.localStorage.setItem(storageKeyForUser(userId, "finding-status-overrides"), JSON.stringify(statusOverrides));
   }, [statusOverrides, storageHydratedForUser, userId]);
 
   useEffect(() => {
-    if (storageHydratedForUser !== userId) return;
+    if (accountDeleted.current || storageHydratedForUser !== userId) return;
     window.localStorage.setItem(storageKeyForUser(userId, "finding-status-reasons"), JSON.stringify(statusReasonOverrides));
   }, [statusReasonOverrides, storageHydratedForUser, userId]);
 
   useEffect(() => {
-    if (storageHydratedForUser !== userId) return;
+    if (accountDeleted.current || storageHydratedForUser !== userId) return;
     window.localStorage.setItem(storageKeyForUser(userId, "scan-history"), JSON.stringify(scanHistory));
   }, [scanHistory, storageHydratedForUser, userId]);
 
@@ -528,7 +549,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
       <a className="skip-link mono" href="#scan-controls">Skip to scan controls</a>
       <div className="sr-only" aria-live="polite" aria-atomic="true">{scanSuccess}</div>
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-5 sm:px-8 lg:px-10">
-        <TopBar account={account} />
+        <TopBar account={account} userId={userId} onDeleted={stopDeletedAccountStorage} />
         <Hero />
         <ContextControls
           context={auditContext}
@@ -677,12 +698,14 @@ function EvidenceDisclosure({ children }: { children: ReactNode }) {
   );
 }
 
-function TopBar({ account }: { account: BetaAccountApiResponse | null }) {
+type AccountControlsProps = { account: BetaAccountApiResponse | null; userId: string; onDeleted: () => void };
+
+function TopBar({ account, userId, onDeleted }: AccountControlsProps) {
   return (
     <header className="flex flex-col gap-4 border-b border-[#1d1a1a] pb-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="mono text-[11px] text-[#d9d9d9]">Launch readiness, before launch damage &gt;</div>
       <div className="flex items-center gap-3">
-        <AccountControls account={account} />
+        <AccountControls account={account} userId={userId} onDeleted={onDeleted} />
         <span className="h-2 w-2 rounded-full bg-[#ff4c33]" />
         <span className="mono text-[11px] text-white">Live audit draft</span>
       </div>
@@ -690,23 +713,36 @@ function TopBar({ account }: { account: BetaAccountApiResponse | null }) {
   );
 }
 
-function AccountControls({ account }: { account: BetaAccountApiResponse | null }) {
+function AccountControls({ account, userId, onDeleted }: AccountControlsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDeleted, setIsDeleted] = useState(false);
+
+  async function finishSignOut() {
+    try {
+      await signOut({ callbackUrl: "/" });
+    } catch {
+      setError(isDeleted
+        ? "Your account was deleted, but sign-out failed. Please retry Sign out."
+        : "Sign-out failed. Please try again.");
+    }
+  }
 
   async function removeAccount() {
     setIsDeleting(true);
     setError(null);
-    try {
-      const response = await fetch("/api/account", { method: "DELETE" });
-      if (!response.ok) throw new Error("Account deletion failed.");
-      await signOut({ callbackUrl: "/" });
-    } catch {
-      setIsDeleting(false);
-      setError("Vibe could not delete your account. Nothing was removed.");
-    }
+    const result = await completeAccountDeletion({
+      requestDeletion: () => fetch("/api/account", { method: "DELETE" }),
+      onDeleted: () => { setIsDeleted(true); onDeleted(); },
+      clearBrowserData: () => clearBrowserAccountData(window.localStorage, userId),
+      signOut: () => signOut({ callbackUrl: "/" }),
+    });
+    setIsDeleting(false);
+    setConfirmDelete(false);
+    setIsOpen(true);
+    setError(result.warning);
   }
 
   return (
@@ -717,7 +753,7 @@ function AccountControls({ account }: { account: BetaAccountApiResponse | null }
         </summary>
         <section className="absolute right-0 z-30 mt-3 w-[min(22rem,calc(100vw-2.5rem))] rounded-[24px] border border-[#3d3d3d] bg-[#111212] p-5 shadow-2xl">
           <p className="mono text-[10px] text-[#fc74dd]">Private beta</p>
-          {account ? (
+          {isDeleted ? <p className="mt-3 text-sm text-white">Your Vibe account has been deleted.</p> : account ? (
             <>
               <p className="mt-3 break-all text-sm text-white">{account.email}</p>
               <p className="mt-4 text-sm leading-6 text-[#d9d9d9]">
@@ -729,10 +765,10 @@ function AccountControls({ account }: { account: BetaAccountApiResponse | null }
           )}
           {error && <p role="alert" className="mt-4 text-sm text-[#ff8f8f]">{error}</p>}
           <div className="mt-5 flex flex-wrap gap-3 border-t border-[#2f2a2a] pt-4">
-            <button onClick={() => void signOut({ callbackUrl: "/" })} className="mono inline-flex items-center gap-2 rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white transition hover:border-white">
+            <button disabled={isDeleting} onClick={() => void finishSignOut()} className="mono inline-flex items-center gap-2 rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-white transition hover:border-white disabled:cursor-not-allowed disabled:opacity-40">
               <LogOut className="h-3.5 w-3.5" aria-hidden="true" /> Sign out
             </button>
-            <button onClick={() => setConfirmDelete(true)} className="mono rounded-full px-3 py-2 text-[10px] text-[#ff8f8f] transition hover:bg-[#2a0f11]">
+            <button disabled={isDeleted || isDeleting} onClick={() => setConfirmDelete(true)} className="mono rounded-full px-3 py-2 text-[10px] text-[#ff8f8f] transition hover:bg-[#2a0f11] disabled:cursor-not-allowed disabled:opacity-40">
               Delete data
             </button>
           </div>
@@ -741,7 +777,7 @@ function AccountControls({ account }: { account: BetaAccountApiResponse | null }
       <ConfirmationDialog
         open={confirmDelete}
         title="Delete your Vibe account?"
-        description="This permanently removes your account, saved scans, feedback, connected GitHub tokens, and beta access. This cannot be undone."
+        description="This permanently removes your account, saved scans, feedback, beta access, and Vibe's GitHub connection in this browser. Local scan history in this browser is also cleared. Clear Vibe's site data on any other devices you used. This cannot be undone."
         confirmLabel="Delete account"
         isConfirming={isDeleting}
         onCancel={() => setConfirmDelete(false)}

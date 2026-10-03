@@ -23,6 +23,18 @@ export function storageKeyForUser(userId: string, resource: "scan-history" | "fi
   return `vibe:${encodedUserId(userId)}:${resource}`;
 }
 
+export function clearBrowserAccountData(storage: Pick<Storage, "removeItem">, userId: string) {
+  const resources = ["scan-history", "finding-status-overrides", "finding-status-reasons"] as const;
+  let failed = false;
+  for (const resource of resources) {
+    // Try every key even if browser storage rejects one removal.
+    for (const key of [storageKeyForUser(userId, resource), `vibe:${resource}`]) {
+      try { storage.removeItem(key); } catch { failed = true; }
+    }
+  }
+  if (failed) throw new Error("Browser data could not be fully cleared.");
+}
+
 export function findingOverrideKey(scanScope: string, findingId: string) {
   return `${scanScope}:${findingId}`;
 }
@@ -42,6 +54,7 @@ function scanHistorySignature(scan: ScanApiResponse) {
     source,
     project: scan.scannedProject,
     context: scan.checklist.context,
+    appPath: scan.facts.workspace?.appPath.replace(/\\/g, "/"),
     rulesetVersion: scan.checklist.rulesetVersion ?? "legacy",
     score: scan.checklist.score,
     findings,

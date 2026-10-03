@@ -152,6 +152,56 @@ describe("scan history", () => {
     expect(secondHistory[0].scan.scannedAt).toBe("2026-06-13T00:05:00.000Z");
   });
 
+  it("keeps different monorepo apps separate in history, comparisons, and triage", () => {
+    const baseline = createScan("2026-06-13T00:00:00.000Z", 72, ["missing-tests"]);
+    baseline.scanSource = {
+      type: "github", label: "GitHub repository",
+      repository: { owner: "Owner", repo: "Monorepo", branch: "main" },
+    };
+    baseline.facts.workspace = { isMonorepo: true, appPath: "apps/web", sharedEvidenceFiles: [] };
+    const otherApp = {
+      ...baseline, scannedAt: "2026-06-13T00:05:00.000Z",
+      facts: { ...baseline.facts, workspace: { ...baseline.facts.workspace, appPath: "apps/admin" } },
+    };
+    expect(scanComparisonKey(baseline)).not.toBe(scanComparisonKey(otherApp));
+    expect(findingOverrideKey(scanComparisonKey(baseline), "missing-tests"))
+      .not.toBe(findingOverrideKey(scanComparisonKey(otherApp), "missing-tests"));
+    expect(addScanToHistory([createScanHistoryItem(baseline)], otherApp)).toHaveLength(2);
+    expect(parseScanHistory(JSON.stringify([createScanHistoryItem(baseline), createScanHistoryItem(otherApp)]))).toHaveLength(2);
+    expect(findPreviousComparableScan([createScanHistoryItem(baseline)], otherApp)).toBeNull();
+    expect(compareScans(baseline, otherApp).isComparable).toBe(false);
+    expect(buildReScanVerificationGuide(baseline, otherApp).evidenceCleared).toEqual([]);
+  });
+
+  it("normalizes app path separators without merging case-sensitive app names", () => {
+    const baseline = createScan("2026-06-13T00:00:00.000Z", 72);
+    baseline.facts.workspace = { isMonorepo: true, appPath: "apps/web", sharedEvidenceFiles: [] };
+    const windowsPath = { ...baseline, facts: { ...baseline.facts, workspace: { ...baseline.facts.workspace, appPath: "apps\\web" } } };
+    const otherCase = { ...baseline, facts: { ...baseline.facts, workspace: { ...baseline.facts.workspace, appPath: "apps/Web" } } };
+    expect(scanComparisonKey(windowsPath)).toBe(scanComparisonKey(baseline));
+    expect(createScanHistoryItem(windowsPath).id).toBe(createScanHistoryItem(baseline).id);
+    expect(scanComparisonKey(otherCase)).not.toBe(scanComparisonKey(baseline));
+  });
+
+  it("rejects direct comparisons across profiles and branches", () => {
+    const baseline = createScan("2026-06-13T00:00:00.000Z", 72);
+    const current = createScan("2026-06-13T00:05:00.000Z", 86);
+    current.checklist.context.appType = "content-site";
+    expect(compareScans(baseline, current).isComparable).toBe(false);
+    current.checklist.context = { ...baseline.checklist.context };
+    baseline.scanSource = { type: "github", label: "GitHub", repository: { owner: "o", repo: "r", branch: "main" } };
+    current.scanSource = { type: "github", label: "GitHub", repository: { owner: "o", repo: "r", branch: "other" } };
+    expect(compareScans(baseline, current).isComparable).toBe(false);
+  });
+
+  it("does not treat a later scan as the baseline for an earlier snapshot", () => {
+    const baseline = createScan("2026-06-13T00:05:00.000Z", 86);
+    const current = createScan("2026-06-13T00:00:00.000Z", 72, ["missing-tests"]);
+    expect(findPreviousComparableScan([createScanHistoryItem(baseline)], current)).toBeNull();
+    expect(compareScans(baseline, current).isComparable).toBe(false);
+    expect(compareScans(current, current).isComparable).toBe(false);
+  });
+
   it("compacts equivalent snapshots already saved in local storage", () => {
     const olderScan = createScan("2026-06-13T00:00:00.000Z", 100);
     const newerScan = createScan("2026-06-13T00:05:00.000Z", 100);

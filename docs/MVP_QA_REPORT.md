@@ -1,16 +1,28 @@
 # MVP QA Report
 
-Date: 2026-09-16
+Local verification date: 2026-10-03. Browser/deployment observations below are from the earlier 2026-09-16 smoke test, not a new deployment verification.
 
 ## Automated Gates
 
 - ESLint 9: passed with no warnings or errors
-- Vitest: 165 tests across 26 executed test files passed
+- Vitest: 181 tests across 28 executed test files passed
 - Next.js production build: passed
-- TypeScript validation: passed through the production build
+- TypeScript validation: passed through the production build and standalone `tsc --noEmit`
+- Prisma schema validation: passed; no migrations or database mutations were run
 - Secret-pattern scan: no committed GitHub or OpenAI token pattern detected
+- Coverage percentage: not measured; no coverage provider is installed, and no packages were installed for this verification
 
 This validation reflects the current private-beta checkout, including scanner calibration fixtures, per-user beta controls, source-fingerprint caching, and comparable re-scan verification guidance.
+
+## Final Correctness Fixes
+
+- Account deletion expires the current browser's GitHub connection and pending OAuth cookies after database deletion succeeds.
+- Confirmed deletion clears the account's browser scan history and triage keys, stops local persistence, and rejects late scan/restore results. Other accounts' browser data is preserved.
+- Cleanup/sign-out failures no longer falsely claim that nothing was deleted. A missing server response is treated as an unknown outcome, not proof of failure.
+- Monorepo app paths isolate comparisons, finding triage, and browser history. Direct comparisons also require the same target/profile and an earlier baseline.
+- Added mocked route and cleanup regression tests; no real account was deleted for testing.
+- Fresh Google login, copy/export, actual fix/re-scan, and deletion with a disposable account still need browser acceptance. Browser automation could not connect during this verification run.
+- These changes are locally verified. Post-push CI, deployment status, and fresh browser acceptance are separate release checks.
 
 Latest local commands:
 
@@ -18,6 +30,8 @@ Latest local commands:
 npm.cmd test
 npm.cmd run lint
 npm.cmd run build
+npx.cmd --no-install tsc --noEmit
+npx.cmd --no-install prisma validate
 ```
 
 ## Browser Smoke Test
@@ -45,7 +59,7 @@ Environment: Vercel production deployment at `https://vibe-seven-snowy.vercel.ap
 - Hosted deployment uses GitHub and ZIP scanning; local workspace scanning is disabled for Vercel.
 - Public GitHub and ZIP scans use durable PostgreSQL-backed enforcement in addition to per-user beta scan quotas.
 
-## Current Browser Smoke Test
+## Previous Browser Smoke Test
 
 Environment: Vercel production deployment, verified with Playwright browser automation.
 

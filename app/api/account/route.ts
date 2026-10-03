@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { deleteBetaAccount, getBetaAccountSummary } from "@/lib/beta-account";
 import { getBetaUser } from "@/lib/auth";
 import { reportServerError } from "@/lib/observability/server";
+import { githubTokenCookie, githubOauthStateCookie, githubOauthVerifierCookie } from "@/lib/github/github-oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,11 @@ export async function DELETE() {
   try {
     const deleted = await deleteBetaAccount(betaUser);
     if (!deleted) return NextResponse.json({ error: "Account deletion could not be completed." }, { status: 409 });
-    return NextResponse.json({ deleted: true });
+    const response = NextResponse.json({ deleted: true });
+    for (const name of [githubTokenCookie, githubOauthStateCookie, githubOauthVerifierCookie]) {
+      response.cookies.delete(name);
+    }
+    return response;
   } catch {
     reportServerError("beta_account_delete_failed");
     return NextResponse.json({ error: "Account deletion could not be completed." }, { status: 503 });

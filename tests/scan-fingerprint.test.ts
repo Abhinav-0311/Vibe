@@ -104,6 +104,14 @@ describe("createScanHash", () => {
     );
   });
 
+  it("does not deduplicate saved scans across different monorepo apps", () => {
+    const first = createScan("2026-06-13T00:00:00.000Z");
+    const second = createScan("2026-06-13T00:01:00.000Z");
+    first.facts.workspace = { isMonorepo: true, appPath: "apps/web", sharedEvidenceFiles: [] };
+    second.facts.workspace = { isMonorepo: true, appPath: "apps/admin", sharedEvidenceFiles: [] };
+    expect(createScanHash(first)).not.toBe(createScanHash(second));
+  });
+
   it("ignores generated report wording and implementation-prompt variation", () => {
     const first = createScan("2026-06-13T00:00:00.000Z");
     const second = createScan("2026-06-13T00:00:00.000Z");
