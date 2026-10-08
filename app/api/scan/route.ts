@@ -3,7 +3,7 @@ import { readAuditContext, readAuditProfileMode } from "@/lib/audit-context";
 import { createScanResponse } from "@/lib/scan-response";
 import { resolveWorkspaceProjectPath } from "@/lib/workspace-paths";
 import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
-import { apiError } from "@/lib/api-error";
+import { apiError, scanQuotaError } from "@/lib/api-error";
 import { reportServerError } from "@/lib/observability/server";
 import { reportScanCompleted } from "@/lib/scan-telemetry";
 
@@ -14,8 +14,8 @@ export async function GET(request: Request) {
   try {
     const betaUser = await getBetaUser();
     if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
-    const quota = await enforceBetaScanQuota(betaUser.id);
-    if (!quota.allowed) return apiError("Daily beta scan limit reached. Try again later.", "quota_exceeded", 429, { retryAfterSeconds: quota.retryAfterSeconds });
+    const quotaError = scanQuotaError(await enforceBetaScanQuota(betaUser.id));
+    if (quotaError) return quotaError;
     const searchParams = new URL(request.url).searchParams;
     const resolvedProject = resolveWorkspaceProjectPath(searchParams.get("projectPath"));
 

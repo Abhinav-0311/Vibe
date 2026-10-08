@@ -5,10 +5,10 @@ import { downloadGitHubRepoZip, resolveGitHubRepoRevision } from "@/lib/github/g
 import { getGitHubAccessToken } from "@/lib/github/github-session";
 import { createScanResponse, reuseCachedScanResponse } from "@/lib/scan-response";
 import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
-import { extractProjectZipBuffer, selectProjectRoot } from "@/lib/upload/zip-project";
+import { extractProjectZipBuffer, selectProjectRoot, UploadValidationError } from "@/lib/upload/zip-project";
 import { reportServerError } from "@/lib/observability/server";
 import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
-import { apiError } from "@/lib/api-error";
+import { apiError, scanQuotaError } from "@/lib/api-error";
 import { createGitHubScanCacheKey } from "@/lib/github/github-scan-cache";
 import { findCachedGitHubScan, saveScanRecord } from "@/lib/db/scan-records";
 import { reportScanCompleted } from "@/lib/scan-telemetry";
@@ -27,8 +27,8 @@ export async function POST(request: Request) {
   try {
     const betaUser = await getBetaUser();
     if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
-    const quota = await enforceBetaScanQuota(betaUser.id);
-    if (!quota.allowed) return apiError("Daily beta scan limit reached. Try again later.", "quota_exceeded", 429, { retryAfterSeconds: quota.retryAfterSeconds });
+    const quotaError = scanQuotaError(await enforceBetaScanQuota(betaUser.id));
+    if (quotaError) return quotaError;
     const rateLimit = await enforcePublicScanRateLimit(request, "github");
     if (!rateLimit.allowed) {
       return apiError("Too many GitHub scans. Wait a minute before trying again.", "rate_limited", 429, { retryAfterSeconds: rateLimit.retryAfterSeconds });
@@ -111,6 +111,7 @@ export async function POST(request: Request) {
       scannedProject: archive.name,
     });
   } catch (error) {
+    if (error instanceof UploadValidationError) return apiError(error.message, "invalid_upload", 400);
     const payload = githubErrorPayload(error);
     if (payload.status >= 500) reportServerError("github_scan_failed", { status: payload.status });
     return NextResponse.json(payload.body, { status: payload.status });

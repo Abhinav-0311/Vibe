@@ -60,22 +60,40 @@ export type GitHubRepoRevision = {
 const publicDownloads = new Map<string, Promise<GitHubArchive>>();
 
 async function readArchiveBuffer(response: Response) {
+  if (!response.body) return Buffer.alloc(0);
+  const reader = response.body.getReader();
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
+  async function read() {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return Buffer.concat(chunks, bytes);
+      bytes += value.byteLength;
+      if (bytes > maxArchiveBytes) {
+        throw new GitHubApiError("This repository archive is larger than Vibe's 25 MB scan limit.", 413, "archive_too_large");
+      }
+      chunks.push(Buffer.from(value));
+    }
+  }
+
   try {
-    const archive = await Promise.race([
-      response.arrayBuffer(),
+    return await Promise.race([
+      read(),
       new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {
-          void response.body?.cancel();
           reject(new GitHubApiError("GitHub archive download timed out. Try again.", 504, "request_timeout"));
         }, archiveReadTimeoutMs);
       }),
     ]);
-
-    return Buffer.from(archive);
+  } catch (error) {
+    // Cancel through the reader that owns the lock; cleanup must not mask the scan error.
+    void reader.cancel().catch(() => undefined);
+    throw error;
   } finally {
     if (timeout) clearTimeout(timeout);
+    reader.releaseLock();
   }
 }
 
@@ -87,7 +105,11 @@ export async function downloadGitHubRepoZip(
 
   if (options.token) return downloadGitHubRepoZipFromRepo(repo, options);
 
-  const key = `${repo.owner}/${repo.repo}:${options.branch?.trim() ?? ""}`.toLowerCase();
+  const key = JSON.stringify([
+    `${repo.owner}/${repo.repo}`.toLowerCase(),
+    options.revision?.branch ?? options.branch?.trim() ?? "",
+    options.revision?.commitSha ?? null,
+  ]);
   const existing = publicDownloads.get(key);
   if (existing) return existing;
 
@@ -108,7 +130,7 @@ async function downloadGitHubRepoZipFromRepo(
   const revision = options.revision ?? await resolveGitHubRepoRevisionFromRepo(repo, options);
 
   const archiveResponse = await githubFetch(
-    `/repos/${repo.owner}/${repo.repo}/zipball/${encodeURIComponent(revision.branch)}`,
+    `/repos/${repo.owner}/${repo.repo}/zipball/${encodeURIComponent(revision.commitSha)}`,
     {
       token: options.token,
       accept: "application/vnd.github+json",
@@ -124,13 +146,6 @@ async function downloadGitHubRepoZipFromRepo(
   }
 
   const buffer = await readArchiveBuffer(archiveResponse);
-  if (buffer.byteLength > maxArchiveBytes) {
-    throw new GitHubApiError(
-      "This repository archive is larger than Vibe's 25 MB scan limit.",
-      413,
-      "archive_too_large",
-    );
-  }
 
   return { ...revision, buffer };
 }

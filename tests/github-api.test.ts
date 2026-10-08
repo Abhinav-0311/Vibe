@@ -3,10 +3,48 @@ import { githubErrorPayload, githubFetch, resetPublicGitHubCooldownForTests } fr
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   resetPublicGitHubCooldownForTests();
 });
 
 describe("githubFetch", () => {
+  it("resumes anonymous requests after the cooldown expires", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-08T12:00:00Z"));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: "secondary rate limit" }), { status: 429, headers: { "Retry-After": "2" } }))
+      .mockResolvedValueOnce(new Response("recovered", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(githubFetch("/repos/owner/project")).rejects.toMatchObject({ status: 429, retryAt: "2026-10-08T12:00:02.000Z" });
+    await expect(githubFetch("/repos/owner/project")).rejects.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(2_001);
+    expect((await githubFetch("/repos/owner/project")).status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("bounds a stalled GitHub request using its real abort signal", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn((_url, options: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      options.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    })));
+    const expected = expect(githubFetch("/repos/owner/project")).rejects.toMatchObject({ status: 504, code: "request_timeout" });
+    await vi.advanceTimersByTimeAsync(12_000);
+    await expected;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not block an authenticated connection with another request's anonymous cooldown", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "Retry-After": "60" } }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(githubFetch("/repos/owner/project")).rejects.toMatchObject({ status: 429 });
+    expect((await githubFetch("/repos/owner/project", { token: "test-token" })).status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("maps exhausted primary rate limits and includes the reset time", async () => {
     const reset = Math.floor(Date.now() / 1000) + 60;
     vi.stubGlobal(

@@ -1,4 +1,5 @@
 type ServerErrorEvent =
+  | "scan_quota_unavailable"
   | "scan_persistence_failed"
   | "scan_retention_cleanup_failed"
   | "saved_scan_read_failed"

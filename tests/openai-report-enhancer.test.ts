@@ -14,6 +14,7 @@ const originalEnvironment = {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
   if (originalEnvironment.enabled === undefined) delete process.env.OPENAI_REPORT_ENABLED;
   else process.env.OPENAI_REPORT_ENABLED = originalEnvironment.enabled;
   if (originalEnvironment.apiKey === undefined) delete process.env.OPENAI_API_KEY;
@@ -84,6 +85,40 @@ function enableOpenAI() {
 }
 
 describe("enhanceReportWithOpenAI", () => {
+  it("keeps the deterministic report after a network failure", async () => {
+    enableOpenAI();
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("private upstream detail"));
+    const result = await enhanceReportWithOpenAI({ projectName: "Vibe", facts, checklist, report }, fetchMock);
+    expect(result.checklist).toBe(checklist);
+    expect(result.report.generation).toMatchObject({ mode: "deterministic", fallbackReason: "api_error" });
+    expect(result.report.executiveSummary).toBe(report.executiveSummary);
+    expect(JSON.stringify(result)).not.toContain("private upstream detail");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it.each(["not JSON", JSON.stringify({ output: [{ type: "message", content: [{ type: "output_text", text: '{"findingPlans":[null]}' }] }] })])("rejects malformed AI output without changing scanner results: %s", async (body) => {
+    enableOpenAI();
+    const result = await enhanceReportWithOpenAI({ projectName: "Vibe", facts, checklist, report }, vi.fn().mockResolvedValue(new Response(body, { status: 200 })));
+    expect(result.checklist).toBe(checklist);
+    expect(result.report.generation).toMatchObject({ mode: "deterministic", fallbackReason: "invalid_output" });
+    expect(result.report.executiveSummary).toBe(report.executiveSummary);
+  });
+
+  it("falls back after the timeout aborts a stalled AI request", async () => {
+    enableOpenAI();
+    vi.useFakeTimers();
+    const fetchMock = vi.fn((_url: unknown, options?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    }));
+    const resultPromise = enhanceReportWithOpenAI({ projectName: "Vibe", facts, checklist, report }, fetchMock);
+    await vi.advanceTimersByTimeAsync(15_000);
+    const result = await resultPromise;
+    expect(result.checklist).toBe(checklist);
+    expect(result.report.generation).toMatchObject({ mode: "deterministic", fallbackReason: "timeout" });
+    expect(result.report.executiveSummary).toBe(report.executiveSummary);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("merges a grounded FixPlan without changing deterministic findings or summary", async () => {
     enableOpenAI();
     const fetchMock = vi.fn().mockResolvedValue(

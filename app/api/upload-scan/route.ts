@@ -5,7 +5,7 @@ import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
 import { extractUploadedProject, UploadValidationError } from "@/lib/upload/zip-project";
 import { reportServerError } from "@/lib/observability/server";
 import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
-import { apiError } from "@/lib/api-error";
+import { apiError, scanQuotaError } from "@/lib/api-error";
 import { reportScanCompleted } from "@/lib/scan-telemetry";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +21,8 @@ export async function POST(request: Request) {
   try {
     const betaUser = await getBetaUser();
     if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
-    const quota = await enforceBetaScanQuota(betaUser.id);
-    if (!quota.allowed) return apiError("Daily beta scan limit reached. Try again later.", "quota_exceeded", 429, { retryAfterSeconds: quota.retryAfterSeconds });
+    const quotaError = scanQuotaError(await enforceBetaScanQuota(betaUser.id));
+    if (quotaError) return quotaError;
     const rateLimit = await enforcePublicScanRateLimit(request, "upload");
     if (!rateLimit.allowed) {
       return apiError("Too many upload scans. Wait a minute before trying again.", "rate_limited", 429, { retryAfterSeconds: rateLimit.retryAfterSeconds });

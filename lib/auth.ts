@@ -5,6 +5,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { quotaUsageRetentionCutoff } from "@/lib/data-retention";
+import { reportServerError } from "@/lib/observability/server";
 
 function normalizedEmail(email: string) {
   return email.trim().toLowerCase();
@@ -69,15 +70,13 @@ export async function getBetaUser(): Promise<BetaUser | null> {
 }
 
 export async function enforceBetaScanQuota(userId: string) {
-  const prisma = getPrisma();
-  if (!prisma) return { allowed: false, retryAfterSeconds: 60 };
-
-  const limit = getBetaDailyScanLimit();
-  const now = new Date();
-  const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const nextWindowStart = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);
-
   try {
+    const prisma = getPrisma();
+    if (!prisma) throw new Error("Quota database unavailable");
+    const limit = getBetaDailyScanLimit();
+    const now = new Date();
+    const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const nextWindowStart = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);
     await prisma.scanQuotaUsage.deleteMany({ where: { updatedAt: { lt: quotaUsageRetentionCutoff(now) } } });
     // Count the attempt before a scan begins. This stays correct for repeated,
     // deduplicated, or failed scans and is atomic across concurrent requests.
@@ -102,6 +101,7 @@ export async function enforceBetaScanQuota(userId: string) {
   } catch {
     // Fail closed: a missing or unavailable durable counter must not make the
     // hosted scan endpoints unlimited.
-    return { allowed: false, retryAfterSeconds: 60, remaining: 0 };
+    reportServerError("scan_quota_unavailable", { status: 503 });
+    return { allowed: false, retryAfterSeconds: 60, remaining: 0, unavailable: true };
   }
 }

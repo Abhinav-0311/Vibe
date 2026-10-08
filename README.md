@@ -64,12 +64,13 @@ The deterministic scanner and checklist remain the source of truth. Optional Ope
 | Area | Current evidence |
 | --- | --- |
 | Readiness engine | 30 deterministic rules across 12 representative project shapes |
-| Automated checks | 181 Vitest cases across 28 test files |
-| Delivery gate | ESLint, Prisma validation, and a Next.js production build |
+| Automated checks | 233 passing Vitest cases across 31 test files (2026-10-08 local checkout) |
+| Delivery gate | ESLint, TypeScript, Prisma schema validation, and a Next.js production build |
+| Local concurrency | Small ZIP fixtures at 1/5/10/20 concurrent jobs; cleanup and stable results verified, not hosted capacity |
 | Data layer | PostgreSQL + Prisma migrations + scan deduplication |
 | Hosted access | Vercel private beta with Google sign-in and invite gating |
 
-These are implementation checks, not a claim of broad external benchmarking. See the [case study](./docs/PORTFOLIO_CASE_STUDY.md) for the evidence model and known limitations.
+These are local implementation checks, not a claim of broad external benchmarking or production load testing. Database writes were mocked and AI/network calls disabled in the concurrency harness. See the [QA report](./docs/MVP_QA_REPORT.md) for measurements and pending release checks, and the [case study](./docs/PORTFOLIO_CASE_STUDY.md) for the evidence model and known limitations.
 
 ## Stack
 
@@ -93,7 +94,8 @@ Create `.env` from [`.env.example`](./.env.example) before starting. For configu
 npm.cmd run lint
 npm.cmd test
 npm.cmd run build
-npx.cmd prisma validate
+npx.cmd --no-install tsc --noEmit
+npx.cmd --no-install prisma validate
 ```
 
 ## Repository map
@@ -108,7 +110,7 @@ npx.cmd prisma validate
 
 ## Project status
 
-Vibe is a deployed private beta. A current browser smoke test completed a public GitHub scan on the hosted deployment; see the [QA report](./docs/MVP_QA_REPORT.md). The next meaningful work is collecting beta-user feedback and fixing evidence-backed gaps—not adding features without evidence of need.
+Vibe is a deployed private beta. An earlier browser smoke test completed a public GitHub scan on the hosted deployment; the latest archive, source-consistency, and quota-outage fixes are verified locally. CI and deployment status are checked separately for each release. Fresh browser acceptance and staging/database load tests remain pending; see the [QA report](./docs/MVP_QA_REPORT.md). After release verification, the next meaningful work is collecting beta-user feedback and fixing evidence-backed gaps—not adding features without evidence of need.
 
 ## Further reading
 

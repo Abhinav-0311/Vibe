@@ -206,14 +206,17 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
   }
 
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "vibe-upload-"));
-  const zipPath = path.join(tempRoot, "project.zip");
   const extractRoot = path.join(tempRoot, "project");
-  await fs.mkdir(extractRoot, { recursive: true });
   try {
-    await fs.writeFile(zipPath, buffer);
-
-    const zip = new AdmZip(zipPath);
-    const entries = zip.getEntries();
+    await fs.mkdir(extractRoot, { recursive: true });
+    let zip: AdmZip;
+    let entries: AdmZip.IZipEntry[];
+    try {
+      zip = new AdmZip(buffer);
+      entries = zip.getEntries();
+    } catch {
+      throw new UploadValidationError("Archive is corrupt or uses an unsupported ZIP format. Try a different ZIP.");
+    }
     if (entries.length > maxArchiveEntries) {
       throw new UploadValidationError(`Archive contains more than ${maxArchiveEntries.toLocaleString()} entries.`);
     }
@@ -231,7 +234,7 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
         throw new UploadValidationError("Archive expands beyond Vibe's 100 MB extraction limit.");
       }
 
-      const targetPath = path.resolve(extractRoot, entry.entryName);
+      const targetPath = path.resolve(extractRoot, entry.entryName.replace(/\\/g, "/"));
       const relativePath = path.relative(extractRoot, targetPath);
       const isInsideExtractRoot =
         relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
@@ -259,6 +262,13 @@ async function extractZipBuffer(buffer: Buffer): Promise<UploadedProject> {
     };
   } catch (error) {
     await fs.rm(tempRoot, { recursive: true, force: true });
+    // Archive/decompression failures are invalid input; filesystem failures remain server errors.
+    if (error instanceof Error && (
+      error.message.startsWith("ADM-ZIP: ") ||
+      ["Z_DATA_ERROR", "Z_BUF_ERROR", "ERR_BUFFER_TOO_LARGE"].includes((error as NodeJS.ErrnoException).code ?? "")
+    )) {
+      throw new UploadValidationError("Archive is corrupt or uses an unsupported ZIP format. Try a different ZIP.");
+    }
     throw error;
   }
 }

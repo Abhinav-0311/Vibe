@@ -3,7 +3,8 @@ import type { AuditProfileMode } from "@/lib/audit-context";
 import type { AuditContext } from "@/lib/checklist/types";
 import type { GitHubRepoRevision } from "@/lib/github/github-repo";
 
-const cacheFormatVersion = 1;
+// Older entries may contain a moving branch's archive instead of the resolved commit.
+const cacheFormatVersion = 2;
 
 /**
  * Identifies one immutable public GitHub source plus the scoring choices that

@@ -72,12 +72,14 @@ flowchart LR
 
 ## Verified Engineering Snapshot
 
-Local validation on 2026-10-03:
+Local validation on 2026-10-08 (CI/deployment and browser acceptance are separate release checks):
 
 - 30 distinct readiness rules
 - 12 deterministic representative project shapes covering portfolios, SaaS account flows, payment webhooks, APIs, ZIP safety, and Next.js error/loading boundaries
-- 181 passing Vitest cases across 28 executed test files
-- ESLint and the Next.js production build passing
+- 233 passing Vitest cases across 31 executed test files
+- ESLint, standalone TypeScript, Prisma schema validation, and the Next.js production build passing
+- Local pressure-test regressions cover corrupt ZIP validation, safe stream cancellation and byte limits, commit-pinned GitHub ingestion/cache isolation, AI fallback, and fail-closed quota-store outage handling
+- Bounded local concurrency passed at 1/5/10/20 jobs on small ZIP fixtures, with stable scan fingerprints and temporary-directory cleanup; AI/network calls were disabled and persistence mocked. These are not hosted/database load results; see the [QA report](./MVP_QA_REPORT.md) for scope and measurements
 - Earlier deployed smoke test (2026-09-16): health endpoint returned application `ok` and database `ok`, and an authenticated browser session completed a public GitHub scan of `Abhinav-0311/Vibe`
 - Final local regressions cover browser account-deletion cleanup and app-scoped monorepo comparisons; fresh browser acceptance remains outstanding
 
