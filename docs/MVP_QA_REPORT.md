@@ -2,6 +2,8 @@
 
 Baseline hosted release checked: `20e0e93031f3aa8278dacb88b0f0a07b6d5652f1`. Closeout changes and full local verification: 2026-10-09. Hosted acceptance: 2026-10-08/09. The current checks below supersede the historical browser limitations recorded later in this report. Local tests, CI, deployed smoke checks, and unverified operating limits are listed separately.
 
+Closeout code release: `3d13d7510cc7a08e9c6d0bc865cc93e6b967c93d`. GitHub Quality [37923311183](https://github.com/Abhinav-0311/Vibe/actions/runs/37923311183) passed, including the new PostgreSQL service and HTTP tests. Vercel deployment `dpl_82Bw1S6CdU3b13gfd2Lg3goivck9` reached Ready and owns the production alias. On that deployment, application/database health passed, a public self-scan completed at 62/100, and restoring the earlier ZIP report returned 83/100 with the stale success notice cleared. Browser warning/error logs were empty; the deployment-scoped recent warning/error/fatal query returned no records. These observations are bounded checks, not a guarantee of zero future failures.
+
 ## Automated Gates
 
 - ESLint 9: passed with no warnings or errors
@@ -118,9 +120,9 @@ npm.cmd test -- tests/scan-concurrency.test.ts --reporter=verbose --silent=false
 ## Current Verification Commands
 
 ```powershell
-npm.cmd test
 npm.cmd run lint
 npm.cmd run build
+npm.cmd test
 npx.cmd --no-install tsc --noEmit
 npx.cmd --no-install prisma validate
 ```
@@ -177,9 +179,9 @@ Environment: Vercel production deployment, verified with Playwright browser auto
 | 6. Private GitHub / issues | **Optional, not configured in hosted UI; unverified.** No credentials or permissions added. Public GitHub scanning passed. |
 | 7. Live AI enhancement | **Optional, unverified.** No provider key or external source transmission added; deterministic fallback and mocked failure cases remain covered. |
 | 8. Accessibility / performance | **Focused smoke checks passed.** Labels, landmarks, keyboard skip, responsive overflow checked. Full WCAG/Core Web Vitals audit not performed; no auditor installed. |
-| 9. PostgreSQL SSL compatibility | **Fixed and locally tested.** Strict pg 8 verification made explicit without changing secrets; live health must pass on the deployed patch. |
-| 10. Release handoff | **Local gates passed.** Commit, CI, and deployment outcome are reported separately after publication. |
+| 9. PostgreSQL SSL compatibility | **Fixed, tested, deployed.** Strict pg 8 verification made explicit without changing secrets; application/database health passed on the patch. |
+| 10. Release handoff | **Passed for code release `3d13d75`.** Commit pushed, CI green, Vercel Ready, relevant production smoke checks passed. Local test container and ephemeral test data removed; no new dependency or production migration. |
 
 ## Release Verdict
 
-All 243 local cases passed, including real HTTP/database isolation, deletion, and bounded concurrency. The baseline release passed hosted scan/fix/re-scan, persistence, and fresh Google sign-in/out checks. Owner-skipped alerts and the explicitly unverified boundaries in the single checklist above remain limits, not hidden completion claims. Vibe is suitable to present as a deployed private beta, not as a fully capacity-tested public production service. Keep access invite-only; teams, billing, background jobs, and broad provider integrations remain out of scope.
+All 243 local cases passed, including real HTTP/database isolation, deletion, and bounded concurrency. Closeout code release `3d13d75` passed CI and was verified on production; the earlier hosted scan/fix/re-scan and fresh Google sign-in/out checks are recorded separately above. Owner-skipped alerts and the explicitly unverified boundaries in the single checklist above remain limits, not hidden completion claims. Vibe is suitable to present as a deployed private beta, not as a fully capacity-tested public production service. Keep access invite-only; teams, billing, background jobs, and broad provider integrations remain out of scope.
