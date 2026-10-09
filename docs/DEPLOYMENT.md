@@ -12,9 +12,11 @@ Vibe is a private beta. Access requires Google sign-in and an active beta invite
 - Beta users can inspect their remaining daily scan allowance and the retention period from **Beta account**. They can permanently delete their own account, saved scans, feedback, sessions, and connected GitHub credentials from the same control.
 - Core scan and persistence failures emit redacted structured events to Vercel runtime logs. Configure a Vercel log alert or connect an error tracker before inviting beta users.
 
+Monitoring decision (2026-10-09): production health passed, but no Vercel drain or application error-tracker integration was found. The current Hobby account's Alerts page requires Pro. The owner explicitly skipped alert setup; no paid upgrade or new service was configured. Runtime logs are available, but there is no verified notification destination. Failures can therefore go unnoticed until someone checks logs or reports them. Revisit alerts before expanding beta access; never intentionally break production to test delivery.
+
 ## Required Services
 
-- Node.js 22 runtime
+- Node.js 22 for CI; the checked Vercel production deployment uses Node.js 24.x
 - PostgreSQL 17 or a compatible managed PostgreSQL service
 - Persistent deployment secrets
 - HTTPS origin for production GitHub OAuth
@@ -30,6 +32,8 @@ Vibe is a private beta. Access requires Google sign-in and an active beta invite
 - `GITHUB_TOKEN_ENCRYPTION_KEY`: random secret containing at least 32 characters
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `NEXTAUTH_SECRET`: required for private-beta sign-in
 - `VIBE_ENABLE_LOCAL_SCAN`: optional. Keep unset or `false` on Vercel. Use `true` only for trusted local/self-hosted environments.
+
+The application normalizes pg's `sslmode=prefer`, `require`, and `verify-ca` aliases to explicit `verify-full`, preserving their current pg 8 certificate-verification behavior before a future pg 9 upgrade. Explicit `uselibpqcompat=true`, `disable`, and local URLs without SSL options are unchanged. No database secret needs to be edited for this application fix. Prisma CLI commands still use the configured URL directly.
 
 ## Vercel Readiness
 
@@ -56,7 +60,7 @@ Recommended Vercel setup:
 1. Provision PostgreSQL and take a provider snapshot before migration changes.
 2. Configure deployment secrets from `.env.example`; never upload the local `.env` file.
 3. Run `npm ci` and `npm run db:generate`.
-4. Run `npm run lint`, `npm test`, and `npm run build`.
+4. Run `npm run lint`, `npm run build`, and `npm test`. CI also migrates a disposable PostgreSQL database and enables the three HTTP/database acceptance cases with `VIBE_TEST_DATABASE_URL`. Never use the target production database for these tests.
 5. Run `npm run db:deploy` against the target database.
 6. Deploy the same verified commit.
 7. Request `/api/health`; require HTTP 200 before directing traffic.

@@ -64,13 +64,14 @@ The deterministic scanner and checklist remain the source of truth. Optional Ope
 | Area | Current evidence |
 | --- | --- |
 | Readiness engine | 30 deterministic rules across 12 representative project shapes |
-| Automated checks | 233 passing Vitest cases across 31 test files (2026-10-08 local checkout) |
+| Automated checks | 243 passing Vitest cases across 33 test files, including real PostgreSQL/HTTP acceptance (2026-10-09) |
 | Delivery gate | ESLint, TypeScript, Prisma schema validation, and a Next.js production build |
-| Local concurrency | Small ZIP fixtures at 1/5/10/20 concurrent jobs; cleanup and stable results verified, not hosted capacity |
+| Local concurrency | Static ZIP fixtures at 1/5/10/20 jobs; real HTTP burst of 20 uploads: four accepted, 16 rate-limited; not hosted capacity |
 | Data layer | PostgreSQL + Prisma migrations + scan deduplication |
 | Hosted access | Vercel private beta with Google sign-in and invite gating |
+| Hosted acceptance | Fresh Google sign-in/out, public GitHub scan, evidence, copy/export, restore, mobile/keyboard smoke checks; ZIP fix/re-scan: 76 → 83 (2026-10-08/09) |
 
-These are local implementation checks, not a claim of broad external benchmarking or production load testing. Database writes were mocked and AI/network calls disabled in the concurrency harness. See the [QA report](./docs/MVP_QA_REPORT.md) for measurements and pending release checks, and the [case study](./docs/PORTFOLIO_CASE_STUDY.md) for the evidence model and known limitations.
+Automated and concurrency measurements are local implementation checks, not broad external benchmarking or production load testing. The static concurrency harness mocks persistence; the separate HTTP suite uses a disposable local PostgreSQL database and real database sessions to verify ownership, deletion, quotas, and rate limits. Neither calls an AI provider. See the [QA report](./docs/MVP_QA_REPORT.md) for measurements and remaining checks, and the [case study](./docs/PORTFOLIO_CASE_STUDY.md) for the evidence model and known limitations.
 
 ## Stack
 
@@ -92,11 +93,13 @@ Create `.env` from [`.env.example`](./.env.example) before starting. For configu
 
 ```powershell
 npm.cmd run lint
-npm.cmd test
 npm.cmd run build
+npm.cmd test
 npx.cmd --no-install tsc --noEmit
 npx.cmd --no-install prisma validate
 ```
+
+CI provisions PostgreSQL and runs all 243 cases. Without `VIBE_TEST_DATABASE_URL`, local runs skip the three HTTP/database cases. To run those, first migrate a **disposable loopback database named `vibe_closeout_test`**, build the app, then set `VIBE_TEST_DATABASE_URL` to that database's connection string and run `npm.cmd test`. Never point this suite at production or a shared database.
 
 ## Repository map
 
@@ -110,7 +113,7 @@ npx.cmd --no-install prisma validate
 
 ## Project status
 
-Vibe is a deployed private beta. An earlier browser smoke test completed a public GitHub scan on the hosted deployment; the latest archive, source-consistency, and quota-outage fixes are verified locally. CI and deployment status are checked separately for each release. Fresh browser acceptance and staging/database load tests remain pending; see the [QA report](./docs/MVP_QA_REPORT.md). After release verification, the next meaningful work is collecting beta-user feedback and fixing evidence-backed gaps—not adding features without evidence of need.
+Vibe is a deployed private beta. Hosted checks on 2026-10-08/09 covered Google sign-in/out, public GitHub scanning, evidence, copy/export, saved-scan restore, responsive/keyboard use, and a comparable ZIP fix/re-scan. Real HTTP/database ownership and deletion checks passed locally using disposable accounts; destructive testing of a live Google account was not performed. Private GitHub flows, live AI enhancement, hosted capacity, and a full accessibility/performance audit remain unverified. Error-alert setup was explicitly skipped by the owner; runtime logs remain available, but notification delivery is not configured. Keep access invite-only. See the single [closeout checklist](./docs/MVP_QA_REPORT.md#closeout-checklist-2026-10-09) for exact boundaries. The next product work is collecting beta-user feedback, not adding features without evidence of need.
 
 ## Further reading
 

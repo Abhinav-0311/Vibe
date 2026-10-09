@@ -9,11 +9,21 @@ export function isDatabaseConfigured() {
   return Boolean(process.env.DATABASE_URL);
 }
 
+export function databaseConnectionString(value: string) {
+  const url = new URL(value);
+  // Preserve pg 8's certificate verification when its SSL aliases change in pg 9.
+  if (["prefer", "require", "verify-ca"].includes(url.searchParams.get("sslmode") ?? "") && url.searchParams.get("uselibpqcompat") !== "true") {
+    url.searchParams.set("sslmode", "verify-full");
+    return url.toString();
+  }
+  return value;
+}
+
 export function getPrisma() {
   if (!isDatabaseConfigured()) return null;
 
   const adapter = new PrismaPg({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: databaseConnectionString(process.env.DATABASE_URL!),
   });
   const prisma =
     globalForPrisma.prisma ??

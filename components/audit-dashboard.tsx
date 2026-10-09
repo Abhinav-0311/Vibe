@@ -254,6 +254,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
 
   function selectHistoryItem(item: ScanHistoryItem) {
     if (accountDeleted.current) return;
+    setScanSuccess(null);
     setPreviousScanNotice(null);
     setComparisonBaseline(findPreviousComparableScan(scanHistory, item.scan));
     setScanData(item.scan);
@@ -332,6 +333,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
   }
 
   async function restoreSavedScan(recordId: string) {
+    setScanSuccess(null);
     setRestoringRecordId(recordId);
     setRestoreError(null);
 

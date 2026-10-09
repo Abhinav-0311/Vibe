@@ -1,19 +1,74 @@
 # MVP QA Report
 
-Local verification date: 2026-10-08. These results cover this changeset, including the pressure-test fixes. Earlier browser/deployment observations below are historical and were not repeated for this changeset; local results do not prove the deployed version contains these fixes. CI and deployment status are checked separately for each release.
+Baseline hosted release checked: `20e0e93031f3aa8278dacb88b0f0a07b6d5652f1`. Closeout changes and full local verification: 2026-10-09. Hosted acceptance: 2026-10-08/09. The current checks below supersede the historical browser limitations recorded later in this report. Local tests, CI, deployed smoke checks, and unverified operating limits are listed separately.
 
 ## Automated Gates
 
 - ESLint 9: passed with no warnings or errors
-- Vitest: 233 tests across 31 executed test files passed
+- Vitest: 243 tests across 33 executed test files passed, with the disposable database suite enabled
 - Next.js production build: passed
 - TypeScript validation: passed through the production build and standalone `tsc --noEmit`
-- Prisma schema validation: passed; no migrations or database mutations were run
+- Prisma schema validation: passed; all nine existing migrations were applied only to a new disposable local test database, not production
 - Token-pattern hygiene check: no matching GitHub/OpenAI token pattern in tracked source/documentation or the new untracked tests; this is not a complete secret audit
 - `git diff --check`: passed
 - Coverage percentage: not measured; no coverage provider is installed, and no packages were installed for this verification
 
 This validation reflects the current private-beta checkout, including scanner calibration fixtures, per-user beta controls, source-fingerprint caching, and comparable re-scan verification guidance.
+
+## Hosted Release Acceptance (2026-10-08/09)
+
+- GitHub Quality workflow [37758395654](https://github.com/Abhinav-0311/Vibe/actions/runs/37758395654) passed for `20e0e93` using Node.js 22. Vercel production deployment `dpl_89tKpKBeT212zB7Lt9MpDRauuahG` is Ready at [the private beta](https://vibe-seven-snowy.vercel.app/); its observed runtime is Node.js 24.x.
+- An already-authenticated session completed a public scan of `Abhinav-0311/Vibe`: 62/100, five findings, zero critical and two high. Evidence, finding detail, prompt/report copy, and setup-pack export were exercised. The downloaded ZIP contained seven non-empty, safely named files.
+- Refreshing the PostgreSQL archive and restoring the self-scan returned the saved report. This exercised persistence/restore, not cross-account isolation.
+- Viewports at 375, 768, and 1440 pixels showed no horizontal page overflow. The keyboard skip link reached scan controls. These are smoke checks, not a full accessibility or Core Web Vitals audit.
+- `/api/health` returned application `ok` and database `ok` again on 2026-10-09. During the ZIP check, browser warning/error logs were empty. Five recent Vercel records labelled `error` contained PostgreSQL SSL-mode compatibility warnings, not confirmed application failures. The closeout patch makes existing pg 8 certificate verification explicit with `verify-full`; seven regression cases cover alias normalization and unchanged explicit/local configurations.
+- Fresh Vibe sign-out showed the private-beta gate; signing back in through Google's existing account chooser returned to the dashboard on 2026-10-09. No password, permissions, or beta invitations were changed.
+- The signed-in empty dashboard had one main landmark, one H1, English document language, labelled visible inputs, no unnamed visible buttons, and no images missing alt attributes. Browser warning/error logs were empty. This is a focused DOM/browser smoke check, not WCAG certification or a Core Web Vitals measurement.
+
+### ZIP → fix → re-scan (2026-10-09)
+
+Two dependency-free synthetic project archives used the same filename, package name, and archive root. The selected profile stayed manual `launch-prep / content-site`, with accounts, payments, and stored data disabled. The only change was adding an npm lockfile.
+
+| Check | Baseline | After lockfile |
+| --- | --- | --- |
+| App readiness | 76/100 | 83/100 |
+| Findings | 5 | 4 |
+| Missing lockfile | Detected | No longer detected |
+
+- The hosted comparison showed **+7 points**, one evidence-cleared finding (`missing-lockfile`), zero new findings, and four still open. It explicitly said evidence clearance is not runtime certification.
+- Both results appeared in the server-saved PostgreSQL archive. The corrected result was restored after refreshing the archive.
+- A separate local assert-based check exercised actual ZIP extraction, scanning, scoring, comparison, and extraction cleanup, with the same 76 → 83 result. It did not use HTTP, authentication, persistence, or AI.
+- Focused regression verification passed 35 tests across `scan-archive-errors`, `scan-database-recovery`, and `scan-history`. The first sandboxed attempt could not start tests because of temporary-file permissions; the successful retry ran outside that restriction.
+- Initial upload attempts with unavailable temporary fixtures failed; persistent local fixtures completed both uploads. No application fix was required. No fixture code, dependency installation, build, or test command was executed from the uploaded project. This checks static signal clearance, not a real dependency installation or deployment.
+
+Reproduce the focused regression checks:
+
+```powershell
+npm.cmd test -- tests/scan-archive-errors.test.ts tests/scan-database-recovery.test.ts tests/scan-history.test.ts
+```
+
+### Monitoring check (2026-10-09)
+
+`lib/observability/server.ts` emits low-cardinality `vibe.*` errors to runtime logs. The deployed project has no configured Vercel drain; no application error-tracker integration was found in source or matching deployed environment-variable names. The account's Observability → Alerts page requires **Upgrade to Pro**. The owner explicitly chose **skip this** for alert setup. No plan upgrade, new service, or intentional production failure was introduced. Notification delivery remains unconfigured, not passed; failures may be missed without manual log review.
+
+## Real PostgreSQL / HTTP Acceptance (2026-10-09)
+
+`tests/database-http.test.ts` starts the production Next.js build on a random loopback port and uses real PostgreSQL, NextAuth database sessions, and disposable synthetic users. It refuses non-loopback URLs or any database name other than `vibe_closeout_test`. Test users and uploaded ZIPs never reach Google, GitHub, an AI provider, or production. These checks are now part of CI with a PostgreSQL service.
+
+- An unauthenticated scan-history request returned 401. Two users uploaded ZIPs through real HTTP handlers; each saw only their own persisted scan, finding feedback, guidance feedback, and quota counter. Own-report restore returned 200; cross-user restore returned 404.
+- Deleting one disposable account through `DELETE /api/account` removed its invite and user. Accounts, sessions, saved scans, quota usage, and both feedback tables cascaded to zero for that user while the other user's records remained. The deleted session then returned 401; the retained account still returned 200.
+- A bounded burst of 20 concurrent uploads produced four 200 responses and 16 rate-limit 429 responses with `Retry-After`; all accepted reports were saved with identical scores. Atomic quota usage recorded all 20 attempts, and the next request returned `quota_exceeded`. One focused run took 303 ms for the burst plus quota assertions; machine-dependent, not a production latency promise.
+- A stale success announcement observed when restoring a different saved scan was cleared at both history-selection and server-restore boundaries. The report itself was correct; only the previous scan's success text was stale.
+- The suite exercises the actual HTTP/database deletion path, not live Google OAuth account deletion or the browser's destructive confirmation/cleanup interaction. The owner's real account was not deleted.
+
+Reproduce only against an isolated local database, after applying the existing migrations and building the app:
+
+```powershell
+$env:VIBE_TEST_DATABASE_URL = 'postgresql://postgres@127.0.0.1:55439/vibe_closeout_test'
+npm.cmd test -- tests/database-http.test.ts tests/prisma.test.ts --reporter=verbose --silent=false
+```
+
+Use the connection string for your disposable test database; the example port is not a persistent project service. Without this variable, the three HTTP cases are skipped. No production migration or new dependency is required by the closeout patch.
 
 ## Pressure-Test Fixes (2026-10-08, Locally Verified)
 
@@ -57,8 +112,8 @@ npm.cmd test -- tests/scan-concurrency.test.ts --reporter=verbose --silent=false
 - Cleanup/sign-out failures no longer falsely claim that nothing was deleted. A missing server response is treated as an unknown outcome, not proof of failure.
 - Monorepo app paths isolate comparisons, finding triage, and browser history. Direct comparisons also require the same target/profile and an earlier baseline.
 - Added mocked route and cleanup regression tests; no real account was deleted for testing.
-- Fresh Google login, copy/export, actual fix/re-scan, and deletion with a disposable account still need browser acceptance. Browser automation could not connect during this verification run.
-- These changes are locally verified. Post-push CI, deployment status, and fresh browser acceptance are separate release checks.
+- At that verification run, browser automation could not connect. Copy/export and actual fix/re-scan were subsequently exercised in the hosted release checks above; fresh Google login and deletion with a disposable account remain unverified.
+- The current-release section above records subsequent CI/deployment and bounded browser acceptance separately from these local regression checks.
 
 ## Current Verification Commands
 
@@ -107,16 +162,24 @@ Environment: Vercel production deployment, verified with Playwright browser auto
 ## Known Environment Limits
 
 - OpenAI enhancement remains optional; deterministic fallback behavior is covered by mocked tests.
-- Earlier deployed observations reported that GitHub OAuth was not configured. Private-repository scanning and issue creation remain unverified for this changeset.
-- Historical self-scan results identified optional or operational work (error tracking, analytics, and an AI workspace rules file) plus reviewable request-protection signals. They are not a current scan of these fixes or proof that the deployment is broken.
+- The hosted UI reported GitHub OAuth was not configured during this release check. Private-repository scanning and issue creation remain unverified.
+- Self-scan recommendations include operational or optional work. Static findings and a healthy endpoint neither prove complete production readiness nor establish a runtime failure.
 
-## Pending Release Checks
+## Closeout Checklist (2026-10-09)
 
-1. Confirm CI and the Vercel deployment succeed for the released commit. Local verification is not a substitute for these release gates.
-2. Run fresh browser acceptance on the released version: Google sign-in, public GitHub/ZIP scan, evidence, copy/export, fix/re-scan, restore/history, mobile/keyboard use, account isolation, and deletion with a disposable account. Browser automation could not connect during the latest testing attempt.
-3. Use a separate staging database and disposable accounts for bounded hosted/database load tests. The local harness bypasses HTTP/auth/quota enforcement and does not exercise real persistence or provider traffic.
-4. Recheck deployed health and logs after release; do not treat earlier production observations as acceptance of the new changeset.
+| Item | Status and boundary |
+| --- | --- |
+| 1. Error notifications | **Owner-skipped.** Logs remain available; no destination or delivery test. |
+| 2. Fresh Google login/logout | **Passed on production.** Existing invited account signed out and back in. |
+| 3. Account isolation | **Passed locally with real HTTP/PostgreSQL.** Two synthetic database-session users; not two live Google accounts. |
+| 4. Account deletion | **Passed locally with real HTTP/PostgreSQL.** Cascades and session revocation verified. Live destructive browser acceptance needs an explicitly approved disposable invited account. |
+| 5. Load enforcement | **Passed locally.** Twenty concurrent HTTP uploads exercised persistence, quota and rate limits. Hosted capacity/soak tests remain deferred; no replacement staging project or production load test. |
+| 6. Private GitHub / issues | **Optional, not configured in hosted UI; unverified.** No credentials or permissions added. Public GitHub scanning passed. |
+| 7. Live AI enhancement | **Optional, unverified.** No provider key or external source transmission added; deterministic fallback and mocked failure cases remain covered. |
+| 8. Accessibility / performance | **Focused smoke checks passed.** Labels, landmarks, keyboard skip, responsive overflow checked. Full WCAG/Core Web Vitals audit not performed; no auditor installed. |
+| 9. PostgreSQL SSL compatibility | **Fixed and locally tested.** Strict pg 8 verification made explicit without changing secrets; live health must pass on the deployed patch. |
+| 10. Release handoff | **Local gates passed.** Commit, CI, and deployment outcome are reported separately after publication. |
 
 ## Release Verdict
 
-Local automated gates pass for this changeset, and bounded local concurrency produced stable results and complete cleanup. CI/deployment checks are tracked per release; fresh browser acceptance and staging/database load verification remain outstanding. Vibe can be presented as a deployed private beta with these limitations, not as a fully pressure-tested production service; teams, billing, background jobs, and broad provider integrations remain intentionally out of scope.
+All 243 local cases passed, including real HTTP/database isolation, deletion, and bounded concurrency. The baseline release passed hosted scan/fix/re-scan, persistence, and fresh Google sign-in/out checks. Owner-skipped alerts and the explicitly unverified boundaries in the single checklist above remain limits, not hidden completion claims. Vibe is suitable to present as a deployed private beta, not as a fully capacity-tested public production service. Keep access invite-only; teams, billing, background jobs, and broad provider integrations remain out of scope.
