@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readAuditContext, readAuditProfileMode } from "@/lib/audit-context";
 import { createScanResponse } from "@/lib/scan-response";
 import { resolveWorkspaceProjectPath } from "@/lib/workspace-paths";
-import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
+import { enforceScanQuota, getAuthenticatedUser } from "@/lib/auth";
 import { apiError, scanQuotaError } from "@/lib/api-error";
 import { reportServerError } from "@/lib/observability/server";
 import { reportScanCompleted } from "@/lib/scan-telemetry";
@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const requestStartedAt = Date.now();
   try {
-    const betaUser = await getBetaUser();
-    if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
-    const quotaError = scanQuotaError(await enforceBetaScanQuota(betaUser.id));
+    const authenticatedUser = await getAuthenticatedUser();
+    if (!authenticatedUser) return apiError("Sign in with Google to continue.", "auth_required", 401);
+    const quotaError = scanQuotaError(await enforceScanQuota(authenticatedUser.id));
     if (quotaError) return quotaError;
     const searchParams = new URL(request.url).searchParams;
     const resolvedProject = resolveWorkspaceProjectPath(searchParams.get("projectPath"));
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     }
 
     const context = readAuditContext(searchParams);
-    const response = await createScanResponse(resolvedProject.projectPath, context, undefined, undefined, readAuditProfileMode(searchParams), betaUser.id);
+    const response = await createScanResponse(resolvedProject.projectPath, context, undefined, undefined, readAuditProfileMode(searchParams), authenticatedUser.id);
 
     reportScanCompleted({
       source: "local",

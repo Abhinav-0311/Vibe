@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { listReadinessTrend, listSavedScanRecords } from "@/lib/db/scan-records";
 import { isDatabaseConfigured } from "@/lib/prisma";
 import { reportServerError } from "@/lib/observability/server";
-import { getBetaUser } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const betaUser = await getBetaUser();
-  if (!betaUser) return NextResponse.json({ error: "Private beta access is required." }, { status: 401 });
+  const authenticatedUser = await getAuthenticatedUser();
+  if (!authenticatedUser) return NextResponse.json({ error: "Sign in with Google to continue." }, { status: 401 });
 
   if (!isDatabaseConfigured()) {
     return NextResponse.json({
@@ -19,8 +19,8 @@ export async function GET() {
 
   try {
     const [records, trend] = await Promise.all([
-      listSavedScanRecords(betaUser.id),
-      listReadinessTrend(betaUser.id),
+      listSavedScanRecords(authenticatedUser.id),
+      listReadinessTrend(authenticatedUser.id),
     ]);
 
     return NextResponse.json({

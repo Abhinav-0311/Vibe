@@ -41,7 +41,7 @@ import type {
   GitHubRepository,
   GitHubStatusApiResponse,
   ScanApiResponse,
-  BetaAccountApiResponse,
+  AccountApiResponse,
   WorkspaceProjectsApiResponse,
 } from "@/lib/scan-api";
 import {
@@ -178,7 +178,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
   const [scanProgressSource, setScanProgressSource] = useState<ScanProgressSource>(null);
   const [scanSuccess, setScanSuccess] = useState<string | null>(null);
   const [previousScanNotice, setPreviousScanNotice] = useState<PreviousScanNotice | null>(null);
-  const [account, setAccount] = useState<BetaAccountApiResponse | null>(null);
+  const [account, setAccount] = useState<AccountApiResponse | null>(null);
   const accountDeleted = useRef(false);
 
   function stopDeletedAccountStorage() {
@@ -294,7 +294,7 @@ export function AuditDashboard({ userId }: { userId: string }) {
   async function refreshAccount() {
     try {
       const response = await fetch("/api/account");
-      setAccount(response.ok ? (await response.json()) as BetaAccountApiResponse : null);
+      setAccount(response.ok ? (await response.json()) as AccountApiResponse : null);
     } catch {
       setAccount(null);
     }
@@ -700,7 +700,7 @@ function EvidenceDisclosure({ children }: { children: ReactNode }) {
   );
 }
 
-type AccountControlsProps = { account: BetaAccountApiResponse | null; userId: string; onDeleted: () => void };
+type AccountControlsProps = { account: AccountApiResponse | null; userId: string; onDeleted: () => void };
 
 function TopBar({ account, userId, onDeleted }: AccountControlsProps) {
   return (
@@ -751,10 +751,10 @@ function AccountControls({ account, userId, onDeleted }: AccountControlsProps) {
     <>
       <details open={isOpen} onToggle={(event) => setIsOpen((event.currentTarget as HTMLDetailsElement).open)} className="relative">
         <summary className="mono cursor-pointer list-none rounded-full border border-[#3d3d3d] px-4 py-2 text-[10px] text-[#d9d9d9] transition hover:border-white hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fc74dd]">
-          Beta account
+          Account
         </summary>
         <section className="absolute right-0 z-30 mt-3 w-[min(22rem,calc(100vw-2.5rem))] rounded-[24px] border border-[#3d3d3d] bg-[#111212] p-5 shadow-2xl">
-          <p className="mono text-[10px] text-[#fc74dd]">Private beta</p>
+          <p className="mono text-[10px] text-[#fc74dd]">Your account</p>
           {isDeleted ? <p className="mt-3 text-sm text-white">Your Vibe account has been deleted.</p> : account ? (
             <>
               <p className="mt-3 break-all text-sm text-white">{account.email}</p>
@@ -779,7 +779,7 @@ function AccountControls({ account, userId, onDeleted }: AccountControlsProps) {
       <ConfirmationDialog
         open={confirmDelete}
         title="Delete your Vibe account?"
-        description="This permanently removes your account, saved scans, feedback, beta access, and Vibe's GitHub connection in this browser. Local scan history in this browser is also cleared. Clear Vibe's site data on any other devices you used. This cannot be undone."
+        description="This permanently removes your account, saved scans, feedback, sessions, and Vibe's GitHub connection in this browser. Local scan history in this browser is also cleared. Clear Vibe's site data on any other devices you used. This cannot be undone. Signing in again creates a new account without restoring deleted data."
         confirmLabel="Delete account"
         isConfirming={isDeleting}
         onCancel={() => setConfirmDelete(false)}

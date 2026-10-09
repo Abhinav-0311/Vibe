@@ -21,6 +21,11 @@ NEXT_PUBLIC_APP_URL=https://YOUR_DOMAIN
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public
 VIBE_RATE_LIMIT_SECRET=
 VIBE_ENABLE_LOCAL_SCAN=false
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+NEXTAUTH_URL=https://YOUR_DOMAIN
+NEXTAUTH_SECRET=
+VIBE_DAILY_SCAN_LIMIT=20
 OPENAI_REPORT_ENABLED=false
 OPENAI_API_KEY=
 OPENAI_REPORT_MODEL=gpt-5.4-mini
@@ -36,6 +41,9 @@ Required for a basic public launch:
 - `DATABASE_URL`
 - `VIBE_RATE_LIMIT_SECRET` (a random secret used to hash public scan limiter keys)
 - `VIBE_ENABLE_LOCAL_SCAN=false`
+- Google OAuth credentials, `NEXTAUTH_URL`, and `NEXTAUTH_SECRET`; public registration still requires sign-in
+
+No invitation list is required. Confirm Google's OAuth audience permits public users; see [Accounts](./ACCOUNTS.md).
 
 Set `DATABASE_URL` before the first Vercel deployment. The build can generate Prisma Client without it, but saved scans and `/api/health` require a real managed PostgreSQL connection.
 

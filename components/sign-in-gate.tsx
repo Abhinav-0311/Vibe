@@ -3,16 +3,16 @@
 import { LogIn, ShieldCheck } from "lucide-react";
 import { signIn } from "next-auth/react";
 
-export function PrivateBetaGate({ configured }: { configured: boolean }) {
+export function SignInGate({ configured }: { configured: boolean }) {
   return (
     <main className="min-h-screen bg-black px-5 py-6 text-white sm:px-8 sm:py-10">
-      <section className="mx-auto grid min-h-[calc(100vh-3rem)] max-w-5xl place-items-center rounded-[32px] border border-[#242020] bg-[#111212] p-7 sm:p-12">
+      <section className="mx-auto grid min-h-[calc(100svh-3rem)] max-w-5xl place-items-center rounded-[32px] border border-[#242020] bg-[#111212] p-7 sm:min-h-[calc(100svh-5rem)] sm:p-12">
         <div className="max-w-xl text-center">
           <ShieldCheck className="mx-auto h-9 w-9 text-[#fc74dd]" aria-hidden="true" />
-          <p className="mono mt-9 text-[11px] uppercase tracking-[0.16em] text-[#fc74dd]">Private beta</p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">A quieter place to check what is ready.</h1>
+          <p className="mono mt-9 text-[11px] uppercase tracking-[0.16em] text-[#fc74dd]">Vibe</p>
+          <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Know what is ready. Fix what isn’t.</h1>
           <p className="mx-auto mt-6 max-w-lg text-sm leading-7 text-[#b8b3b3]">
-            Vibe is currently available to invited testers. Sign in with the Google account that received your beta access.
+            Scan a repository or ZIP, understand the launch risks, and get evidence-backed fixes. Sign in with Google to keep your scans together.
           </p>
           {configured ? (
             <button
@@ -24,7 +24,7 @@ export function PrivateBetaGate({ configured }: { configured: boolean }) {
             </button>
           ) : (
             <p className="mt-9 rounded-2xl border border-[#4d363e] bg-[#24151b] px-5 py-4 text-sm leading-6 text-[#f2b8d9]">
-              Sign-in is being configured. Please return once the beta administrator confirms access.
+              Sign-in is temporarily unavailable. Please try again later.
             </p>
           )}
         </div>

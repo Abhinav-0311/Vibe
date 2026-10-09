@@ -1,9 +1,9 @@
 import { AuditDashboard } from "@/components/audit-dashboard";
-import { PrivateBetaGate } from "@/components/private-beta-gate";
-import { getBetaUser, googleAuthConfigured } from "@/lib/auth";
+import { SignInGate } from "@/components/sign-in-gate";
+import { getAuthenticatedUser, googleAuthConfigured } from "@/lib/auth";
 
 export default async function Home() {
-  const betaUser = await getBetaUser();
-  if (!betaUser) return <PrivateBetaGate configured={googleAuthConfigured()} />;
-  return <AuditDashboard userId={betaUser.id} />;
+  const authenticatedUser = await getAuthenticatedUser();
+  if (!authenticatedUser) return <SignInGate configured={googleAuthConfigured()} />;
+  return <AuditDashboard userId={authenticatedUser.id} />;
 }

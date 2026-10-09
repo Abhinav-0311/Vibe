@@ -17,12 +17,12 @@ describe("GitHub token encryption", () => {
     expect(decryptGitHubToken(encrypted)).toBe("github-secret-token");
   });
 
-  it("binds a GitHub connection to the beta user who authorized it", () => {
+  it("binds a GitHub connection to the user who authorized it", () => {
     process.env.GITHUB_TOKEN_ENCRYPTION_KEY = "test-key-with-at-least-thirty-two-characters";
-    const encrypted = encryptGitHubToken("github-secret-token", "beta-user-a");
+    const encrypted = encryptGitHubToken("github-secret-token", "user-a");
 
-    expect(decryptGitHubToken(encrypted, "beta-user-a")).toBe("github-secret-token");
-    expect(decryptGitHubToken(encrypted, "beta-user-b")).toBeNull();
+    expect(decryptGitHubToken(encrypted, "user-a")).toBe("github-secret-token");
+    expect(decryptGitHubToken(encrypted, "user-b")).toBeNull();
   });
 
   it("rejects a modified encrypted token", () => {

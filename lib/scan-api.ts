@@ -97,7 +97,7 @@ export type WorkspaceProjectsApiResponse = {
   projects: WorkspaceProject[];
 };
 
-export type BetaAccountApiResponse = {
+export type AccountApiResponse = {
   email: string;
   dailyScanLimit: number;
   scansUsedToday: number;

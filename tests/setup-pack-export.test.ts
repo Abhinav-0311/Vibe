@@ -2,7 +2,7 @@ import AdmZip from "adm-zip";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth", () => ({
-  getBetaUser: async () => ({ id: "beta-user", email: "tester@example.com" }),
+  getAuthenticatedUser: async () => ({ id: "test-user", email: "tester@example.com" }),
 }));
 
 import { POST } from "@/app/api/setup-pack/export/route";

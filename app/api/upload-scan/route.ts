@@ -4,7 +4,7 @@ import { createScanResponse } from "@/lib/scan-response";
 import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
 import { extractUploadedProject, UploadValidationError } from "@/lib/upload/zip-project";
 import { reportServerError } from "@/lib/observability/server";
-import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
+import { enforceScanQuota, getAuthenticatedUser } from "@/lib/auth";
 import { apiError, scanQuotaError } from "@/lib/api-error";
 import { reportScanCompleted } from "@/lib/scan-telemetry";
 
@@ -19,9 +19,9 @@ export async function POST(request: Request) {
   const requestStartedAt = Date.now();
 
   try {
-    const betaUser = await getBetaUser();
-    if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
-    const quotaError = scanQuotaError(await enforceBetaScanQuota(betaUser.id));
+    const authenticatedUser = await getAuthenticatedUser();
+    if (!authenticatedUser) return apiError("Sign in with Google to continue.", "auth_required", 401);
+    const quotaError = scanQuotaError(await enforceScanQuota(authenticatedUser.id));
     if (quotaError) return quotaError;
     const rateLimit = await enforcePublicScanRateLimit(request, "upload");
     if (!rateLimit.allowed) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       type: "upload",
       label: "ZIP upload",
       detail: formatUploadDetail(file.name, uploadedProject.relativeProjectRoot),
-    }, projectName, readAuditProfileMode(searchParams), betaUser.id, uploadedProject.repositoryRoot, { extractionMs });
+    }, projectName, readAuditProfileMode(searchParams), authenticatedUser.id, uploadedProject.repositoryRoot, { extractionMs });
 
     reportScanCompleted({
       source: "upload",

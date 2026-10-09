@@ -15,7 +15,7 @@ type ScanTelemetry = {
 
 /**
  * Vercel structured logs are intentionally the observability surface for the
- * beta. This accepts durations and coarse source names only—never repository
+ * service. This accepts durations and coarse source names only—never repository
  * names, file paths, user IDs, code, or secrets.
  */
 export function reportScanCompleted(telemetry: ScanTelemetry) {

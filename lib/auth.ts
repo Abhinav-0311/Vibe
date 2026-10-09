@@ -15,8 +15,9 @@ export function googleAuthConfigured() {
   return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.NEXTAUTH_SECRET);
 }
 
-export function getBetaDailyScanLimit() {
-  const dailyScanLimit = Number.parseInt(process.env.VIBE_BETA_DAILY_SCAN_LIMIT ?? "20", 10);
+export function getDailyScanLimit() {
+  // Preserve existing deployment limits while moving to the public setting.
+  const dailyScanLimit = Number.parseInt(process.env.VIBE_DAILY_SCAN_LIMIT ?? process.env.VIBE_BETA_DAILY_SCAN_LIMIT ?? "20", 10);
   return Number.isFinite(dailyScanLimit) && dailyScanLimit > 0 ? dailyScanLimit : 20;
 }
 
@@ -33,16 +34,13 @@ export const authOptions: NextAuthOptions = {
     : [],
   session: { strategy: "database" },
   callbacks: {
-    async signIn({ user }) {
-      const prisma = getPrisma();
-      if (!prisma || !user.email) return false;
-
-      const invite = await prisma.betaInvite.findUnique({
-        where: { email: normalizedEmail(user.email) },
-        select: { active: true },
-      });
-
-      return Boolean(invite?.active);
+    async signIn({ user, account, profile }) {
+      // Google authenticates identity; enrollment does not require approval.
+      return Boolean(
+        getPrisma() && account?.provider === "google" && user.email &&
+        profile && "email_verified" in profile && profile.email_verified === true && typeof profile.email === "string" &&
+        normalizedEmail(profile.email) === normalizedEmail(user.email)
+      );
     },
     async session({ session, user }) {
       if (session.user) session.user.id = user.id;
@@ -52,28 +50,23 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/" },
 };
 
-export type BetaUser = { id: string; email: string };
+export type AuthenticatedUser = { id: string; email: string };
 
-export async function getBetaUser(): Promise<BetaUser | null> {
+export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id;
   const email = session?.user?.email;
   const prisma = getPrisma();
   if (!userId || !email || !prisma) return null;
 
-  const invite = await prisma.betaInvite.findUnique({
-    where: { email: normalizedEmail(email) },
-    select: { active: true },
-  });
-
-  return invite?.active ? { id: userId, email: normalizedEmail(email) } : null;
+  return { id: userId, email: normalizedEmail(email) };
 }
 
-export async function enforceBetaScanQuota(userId: string) {
+export async function enforceScanQuota(userId: string) {
   try {
     const prisma = getPrisma();
     if (!prisma) throw new Error("Quota database unavailable");
-    const limit = getBetaDailyScanLimit();
+    const limit = getDailyScanLimit();
     const now = new Date();
     const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const nextWindowStart = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);

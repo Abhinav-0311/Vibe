@@ -1,6 +1,6 @@
 # Future Roadmap
 
-Vibe's current single-user MVP is ready for local portfolio demos and controlled deployment. The roadmap below separates publication-ready MVP work from future SaaS work.
+Vibe supports Google accounts, owner-scoped scans, and bounded public registration. The roadmap separates the current auditor from optional future SaaS work; public access does not establish production capacity.
 
 ## MVP Complete
 
@@ -13,18 +13,18 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 - Evidence-backed findings with learning notes and copyable prompts
 - AI workspace setup-pack preview and ZIP export
 - PostgreSQL scan archive, deduplication, restore, and health visibility
-- Google private-beta sign-in, invite gating, per-user scan ownership, and quotas
+- Open Google sign-in, per-user scan ownership, and quotas
 - Comparable re-scan progress, durable readiness trends, and PR-ready handoff briefs
 - Optional evidence-grounded OpenAI FixPlans with strict schema validation, deterministic fallback, token/cost metadata, and regression coverage
-- Versioned Next.js guidance with official source links, verification routes, and private-beta feedback
-- README, QA report, deployment notes, portfolio case study, and private-beta runbook
+- Versioned Next.js guidance with official source links, verification routes, and owner-scoped feedback
+- README, QA report, deployment notes, portfolio case study, and account guide
 
 ## Presentation Follow-up
 
 - README screenshots and a portfolio case study are present.
 - Run an occasional manual responsive visual QA pass after UI changes.
 - Configure and test the private GitHub OAuth path before presenting private-repository scanning as available.
-- Collect feedback from a small invited beta cohort before expanding scanner rules or AI behavior.
+- Collect feedback from real users before expanding scanner rules or AI behavior.
 
 ## Hosted Product Work
 
@@ -48,7 +48,7 @@ Vibe's current single-user MVP is ready for local portfolio demos and controlled
 - Workspace-specific remediation templates
 - Safer multi-step fix planning with user approval checkpoints
 - Optional model comparison for prompt quality once a real evaluation corpus exists
-- Evaluation harness for generated prompts and setup-pack quality after beta users provide feedback
+- Evaluation harness for generated prompts and setup-pack quality after users provide feedback
 
 ## Enterprise Readiness
 

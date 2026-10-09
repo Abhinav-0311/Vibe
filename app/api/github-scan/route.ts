@@ -7,7 +7,7 @@ import { createScanResponse, reuseCachedScanResponse } from "@/lib/scan-response
 import { enforcePublicScanRateLimit } from "@/lib/scan-rate-limit";
 import { extractProjectZipBuffer, selectProjectRoot, UploadValidationError } from "@/lib/upload/zip-project";
 import { reportServerError } from "@/lib/observability/server";
-import { enforceBetaScanQuota, getBetaUser } from "@/lib/auth";
+import { enforceScanQuota, getAuthenticatedUser } from "@/lib/auth";
 import { apiError, scanQuotaError } from "@/lib/api-error";
 import { createGitHubScanCacheKey } from "@/lib/github/github-scan-cache";
 import { findCachedGitHubScan, saveScanRecord } from "@/lib/db/scan-records";
@@ -25,9 +25,9 @@ export async function POST(request: Request) {
   const requestStartedAt = Date.now();
 
   try {
-    const betaUser = await getBetaUser();
-    if (!betaUser) return apiError("Private beta access is required.", "auth_required", 401);
-    const quotaError = scanQuotaError(await enforceBetaScanQuota(betaUser.id));
+    const authenticatedUser = await getAuthenticatedUser();
+    if (!authenticatedUser) return apiError("Sign in with Google to continue.", "auth_required", 401);
+    const quotaError = scanQuotaError(await enforceScanQuota(authenticatedUser.id));
     if (quotaError) return quotaError;
     const rateLimit = await enforcePublicScanRateLimit(request, "github");
     if (!rateLimit.allowed) {
@@ -66,12 +66,12 @@ export async function POST(request: Request) {
       context: readAuditContext(params),
       profileMode: readAuditProfileMode(params),
     });
-    const cached = revision.isPublic ? await findCachedGitHubScan(betaUser.id, sourceFingerprint) : null;
+    const cached = revision.isPublic ? await findCachedGitHubScan(authenticatedUser.id, sourceFingerprint) : null;
 
     if (cached) {
       const response = reuseCachedScanResponse(cached, Date.now() - requestStartedAt);
       const persistenceStartedAt = Date.now();
-      const persistence = await saveScanRecord(response, betaUser.id, { sourceFingerprint });
+      const persistence = await saveScanRecord(response, authenticatedUser.id, { sourceFingerprint });
       const persistenceMs = Date.now() - persistenceStartedAt;
       const persisted = { ...response, timing: { ...response.timing, persistenceMs }, persistence };
       reportScanCompleted({ source: "github", totalMs: Date.now() - requestStartedAt, sourceMs: Date.now() - sourceStartedAt, persistenceMs, cacheHit: true });
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
         ...archive.repository,
         branch: archive.branch,
       },
-    }, archive.name, readAuditProfileMode(params), betaUser.id, uploadedProject.repositoryRoot, { sourceMs, extractionMs }, sourceFingerprint);
+    }, archive.name, readAuditProfileMode(params), authenticatedUser.id, uploadedProject.repositoryRoot, { sourceMs, extractionMs }, sourceFingerprint);
 
     reportScanCompleted({
       source: "github",

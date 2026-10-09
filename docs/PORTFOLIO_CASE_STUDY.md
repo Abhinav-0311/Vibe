@@ -83,6 +83,6 @@ Local validation on 2026-10-08 (CI/deployment and browser acceptance are separat
 - Earlier deployed smoke test (2026-09-16): health endpoint returned application `ok` and database `ok`, and an authenticated browser session completed a public GitHub scan of `Abhinav-0311/Vibe`
 - Final local regressions cover browser account-deletion cleanup and app-scoped monorepo comparisons; fresh browser acceptance remains outstanding
 
-The current private beta also includes per-user scan ownership, quotas, retention/deletion controls, source-fingerprint caching, and a comparable re-scan guide that distinguishes static evidence clearance from runtime certification.
+The current application also includes open Google sign-in, per-user scan ownership, quotas, retention/deletion controls, source-fingerprint caching, and a comparable re-scan guide that distinguishes static evidence clearance from runtime certification. The dated snapshot above predates open registration; see the [QA report](./MVP_QA_REPORT.md) for current verification.
 
-These are implementation checks, not a claim that Vibe has been validated against a large external-repository benchmark or that a scan proves production security. The confirmed live self-scan is Vibe itself; broader external calibration and beta feedback remain future work.
+These are implementation checks, not a claim that Vibe has been validated against a large external-repository benchmark or that a scan proves production security. The confirmed live self-scan is Vibe itself; broader external calibration and user feedback remain future work.

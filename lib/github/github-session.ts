@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
 import { decryptGitHubToken, githubTokenCookie } from "@/lib/github/github-oauth";
-import { getBetaUser } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export async function getGitHubAccessToken() {
-  const betaUser = await getBetaUser();
-  if (!betaUser) return null;
+  const authenticatedUser = await getAuthenticatedUser();
+  if (!authenticatedUser) return null;
   const cookieStore = await cookies();
   const encryptedToken = cookieStore.get(githubTokenCookie)?.value;
-  return encryptedToken ? decryptGitHubToken(encryptedToken, betaUser.id) : null;
+  return encryptedToken ? decryptGitHubToken(encryptedToken, authenticatedUser.id) : null;
 }

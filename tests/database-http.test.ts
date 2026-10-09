@@ -33,7 +33,6 @@ describe.skipIf(!databaseUrl).sequential("production HTTP handlers with real Pos
     const id = `closeout-${randomUUID()}`;
     const user = { id, email: `${id}@example.invalid`, sessionToken: randomUUID() };
     users.push(user);
-    await db.betaInvite.create({ data: { email: user.email } });
     await db.user.create({ data: {
       id, email: user.email,
       accounts: { create: { type: "oauth", provider: "google", providerAccountId: id, access_token: "synthetic-test-token" } },
@@ -74,7 +73,7 @@ describe.skipIf(!databaseUrl).sequential("production HTTP handlers with real Pos
       env: {
         ...process.env, NODE_ENV: "production", DATABASE_URL: databaseUrl!, NEXTAUTH_URL: origin,
         NEXTAUTH_URL_INTERNAL: origin, NEXT_PUBLIC_APP_URL: origin, NEXTAUTH_SECRET: randomUUID(),
-        VIBE_RATE_LIMIT_SECRET: randomUUID(), VIBE_BETA_DAILY_SCAN_LIMIT: "20", VIBE_ENABLE_LOCAL_SCAN: "false",
+        VIBE_RATE_LIMIT_SECRET: randomUUID(), VIBE_DAILY_SCAN_LIMIT: "20", VIBE_ENABLE_LOCAL_SCAN: "false",
         GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", GITHUB_CLIENT_ID: "", GITHUB_CLIENT_SECRET: "",
         OPENAI_REPORT_ENABLED: "false", OPENAI_API_KEY: "", SENTRY_DSN: "",
       },
@@ -104,8 +103,11 @@ describe.skipIf(!databaseUrl).sequential("production HTTP handlers with real Pos
     }
   });
 
-  it("isolates scans, restore, finding feedback, guidance, and quotas between two real database accounts", async () => {
+  it("allows accounts without invitations and isolates scans, restore, feedback, and quotas", async () => {
     expect((await request("/api/scans")).status).toBe(401);
+    expect(await db.betaInvite.count({ where: { email: { in: users.map((user) => user.email) } } })).toBe(0);
+    // A historical disabled enrollment must not deny a valid session either.
+    await db.betaInvite.create({ data: { email: users[1].email, active: false } });
     for (const [index, user] of users.entries()) {
       const response = await upload(user);
       expect(response.status).toBe(200);
@@ -134,6 +136,7 @@ describe.skipIf(!databaseUrl).sequential("production HTTP handlers with real Pos
 
   it("deletes only the disposable account, cascades its data, and revokes its database session", async () => {
     const [deleted, retained] = users;
+    await db.betaInvite.create({ data: { email: deleted.email, active: false } });
     const response = await request("/api/account", deleted, { method: "DELETE" });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ deleted: true });

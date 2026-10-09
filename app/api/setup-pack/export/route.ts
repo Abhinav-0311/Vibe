@@ -1,7 +1,7 @@
 import AdmZip from "adm-zip";
 import { NextResponse } from "next/server";
 import type { SetupPack } from "@/lib/setup-pack/types";
-import { getBetaUser } from "@/lib/auth";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +38,7 @@ function isValidPack(value: unknown): value is SetupPack {
 }
 
 export async function POST(request: Request) {
-  if (!(await getBetaUser())) return NextResponse.json({ error: "Private beta access is required." }, { status: 401 });
+  if (!(await getAuthenticatedUser())) return NextResponse.json({ error: "Sign in with Google to continue." }, { status: 401 });
   try {
     const body = (await request.json()) as { setupPack?: unknown };
     if (!isValidPack(body.setupPack)) {

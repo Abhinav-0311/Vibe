@@ -4,8 +4,8 @@ import { GitHubApiError } from "@/lib/github/github-api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  getBetaUser: vi.fn(),
-  enforceBetaScanQuota: vi.fn(),
+  getAuthenticatedUser: vi.fn(),
+  enforceScanQuota: vi.fn(),
   enforcePublicScanRateLimit: vi.fn(),
   resolveGitHubRepoRevision: vi.fn(),
   downloadGitHubRepoZip: vi.fn(),
@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   reportServerError: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ getBetaUser: mocks.getBetaUser, enforceBetaScanQuota: mocks.enforceBetaScanQuota }));
+vi.mock("@/lib/auth", () => ({ getAuthenticatedUser: mocks.getAuthenticatedUser, enforceScanQuota: mocks.enforceScanQuota }));
 vi.mock("@/lib/scan-rate-limit", () => ({ enforcePublicScanRateLimit: mocks.enforcePublicScanRateLimit }));
 vi.mock("@/lib/github/github-session", () => ({ getGitHubAccessToken: vi.fn() }));
 vi.mock("@/lib/github/github-repo", () => ({ resolveGitHubRepoRevision: mocks.resolveGitHubRepoRevision, downloadGitHubRepoZip: mocks.downloadGitHubRepoZip }));
@@ -30,8 +30,8 @@ import { resolveWorkspaceProjectPath } from "@/lib/workspace-paths";
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.getBetaUser.mockResolvedValue({ id: "test-user" });
-  mocks.enforceBetaScanQuota.mockResolvedValue({ allowed: true });
+  mocks.getAuthenticatedUser.mockResolvedValue({ id: "test-user" });
+  mocks.enforceScanQuota.mockResolvedValue({ allowed: true });
   mocks.enforcePublicScanRateLimit.mockResolvedValue({ allowed: true });
   mocks.resolveGitHubRepoRevision.mockResolvedValue({
     name: "sample", branch: "main", commitSha: "test-revision", isPublic: false,
@@ -55,7 +55,7 @@ async function scan(source: "upload" | "github" | "local", archive?: Buffer) {
 
 describe("scan archive errors", () => {
   it.each(["upload", "github", "local"] as const)("stops the %s scan before any source work when quota is exhausted", async (source) => {
-    mocks.enforceBetaScanQuota.mockResolvedValue({ allowed: false, retryAfterSeconds: 120 });
+    mocks.enforceScanQuota.mockResolvedValue({ allowed: false, retryAfterSeconds: 120 });
     const response = await scan(source);
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("120");
@@ -68,7 +68,7 @@ describe("scan archive errors", () => {
   });
 
   it.each(["upload", "github", "local"] as const)("reports quota-store outages on the %s route as retryable service errors", async (source) => {
-    mocks.enforceBetaScanQuota.mockResolvedValue({ allowed: false, retryAfterSeconds: 60, remaining: 0, unavailable: true });
+    mocks.enforceScanQuota.mockResolvedValue({ allowed: false, retryAfterSeconds: 60, remaining: 0, unavailable: true });
     const response = await scan(source);
     expect(response.status).toBe(503);
     expect(response.headers.get("Retry-After")).toBe("60");

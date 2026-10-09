@@ -29,7 +29,7 @@ export function apiError(
 export function scanQuotaError(quota: { allowed: boolean; retryAfterSeconds: number; unavailable?: boolean }) {
   if (quota.allowed) return null;
   return apiError(
-    quota.unavailable ? "Scanning is temporarily unavailable. Try again shortly." : "Daily beta scan limit reached. Try again later.",
+    quota.unavailable ? "Scanning is temporarily unavailable. Try again shortly." : "Daily scan limit reached. Try again later.",
     quota.unavailable ? "service_unavailable" : "quota_exceeded",
     quota.unavailable ? 503 : 429,
     { retryAfterSeconds: quota.retryAfterSeconds },

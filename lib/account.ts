@@ -1,8 +1,8 @@
-import { getBetaDailyScanLimit } from "@/lib/auth";
+import { getDailyScanLimit } from "@/lib/auth";
 import { scanRetentionDays } from "@/lib/data-retention";
 import { getPrisma } from "@/lib/prisma";
 
-export type BetaAccountSummary = {
+export type AccountSummary = {
   email: string;
   dailyScanLimit: number;
   scansUsedToday: number;
@@ -14,8 +14,8 @@ export function startOfUtcDay(now = new Date()) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-export function buildBetaAccountSummary(email: string, used: number) {
-  const dailyScanLimit = getBetaDailyScanLimit();
+export function buildAccountSummary(email: string, used: number) {
+  const dailyScanLimit = getDailyScanLimit();
   const scansUsedToday = Math.max(0, used);
 
   return {
@@ -24,28 +24,27 @@ export function buildBetaAccountSummary(email: string, used: number) {
     scansUsedToday,
     scansRemainingToday: Math.max(0, dailyScanLimit - scansUsedToday),
     scanRetentionDays: scanRetentionDays(),
-  } satisfies BetaAccountSummary;
+  } satisfies AccountSummary;
 }
 
-export async function getBetaAccountSummary(user: { id: string; email: string }) {
+export async function getAccountSummary(user: { id: string; email: string }) {
   const prisma = getPrisma();
-  if (!prisma) return buildBetaAccountSummary(user.email, 0);
+  if (!prisma) return buildAccountSummary(user.email, 0);
 
   const usage = await prisma.scanQuotaUsage.findUnique({
     where: { userId_windowStart: { userId: user.id, windowStart: startOfUtcDay() } },
     select: { count: true },
   });
 
-  return buildBetaAccountSummary(user.email, usage?.count ?? 0);
+  return buildAccountSummary(user.email, usage?.count ?? 0);
 }
 
-export async function deleteBetaAccount(user: { id: string; email: string }) {
+export async function deleteAccount(user: { id: string; email: string }) {
   const prisma = getPrisma();
   if (!prisma) return false;
 
   const [, deleted] = await prisma.$transaction([
-    // Deleting the invite prevents the same Google account from silently
-    // recreating a beta account after the user has chosen to leave Vibe.
+    // Remove historical enrollment data too; it no longer controls access.
     prisma.betaInvite.deleteMany({ where: { email: user.email } }),
     prisma.user.deleteMany({ where: { id: user.id } }),
   ]);

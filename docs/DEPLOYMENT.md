@@ -2,17 +2,17 @@
 
 ## Release Contract
 
-Vibe is a private beta. Access requires Google sign-in and an active beta invite; saved scans and feedback are scoped to the signed-in user. Keep it invite-only until real beta usage validates the operating limits.
+Vibe accepts verified Google accounts without invitations or manual approval. Google sign-in is still required; saved scans and feedback remain scoped to the signed-in user. Scan quotas and public-endpoint rate limits remain enforced. See [Accounts](./ACCOUNTS.md) for OAuth audience setup and acceptance checks.
 
 ## Scan data retention and monitoring
 
 - Saved scan payloads expire automatically after 30 days by default. Set `VIBE_SCAN_RETENTION_DAYS` to a positive number of days when a shorter policy is required.
 - Expired scans are filtered from every read and are also purged during scan saves and saved-scan reads.
 - Daily scan quota counters are retained for 48 hours, then deleted during the next quota check.
-- Beta users can inspect their remaining daily scan allowance and the retention period from **Beta account**. They can permanently delete their own account, saved scans, feedback, sessions, and connected GitHub credentials from the same control.
-- Core scan and persistence failures emit redacted structured events to Vercel runtime logs. Configure a Vercel log alert or connect an error tracker before inviting beta users.
+- Users can inspect their remaining daily scan allowance and the retention period from **Account**. They can permanently delete their own account, saved scans, feedback, sessions, and connected GitHub credentials from the same control. Signing in again creates a new account; it does not restore deleted reports.
+- Core scan and persistence failures emit redacted structured events to Vercel runtime logs. Error notifications are not configured.
 
-Monitoring decision (2026-10-09): production health passed, but no Vercel drain or application error-tracker integration was found. The current Hobby account's Alerts page requires Pro. The owner explicitly skipped alert setup; no paid upgrade or new service was configured. Runtime logs are available, but there is no verified notification destination. Failures can therefore go unnoticed until someone checks logs or reports them. Revisit alerts before expanding beta access; never intentionally break production to test delivery.
+Monitoring decision (2026-10-09): production health passed, but no Vercel drain or application error-tracker integration was found. The current Hobby account's Alerts page requires Pro. The owner explicitly skipped alert setup; no paid upgrade or new service was configured. Runtime logs are available, but there is no verified notification destination. Failures can therefore go unnoticed until someone checks logs or reports them. Revisit alerts as public usage grows; never intentionally break production to test delivery.
 
 ## Required Services
 
@@ -30,7 +30,8 @@ Monitoring decision (2026-10-09): production health passed, but no Vercel drain 
 - `OPENAI_API_KEY`: required only when AI enhancement is enabled
 - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: required for private repositories
 - `GITHUB_TOKEN_ENCRYPTION_KEY`: random secret containing at least 32 characters
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `NEXTAUTH_SECRET`: required for private-beta sign-in
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `NEXTAUTH_SECRET`: required for Google sign-in
+- `VIBE_DAILY_SCAN_LIMIT`: optional, defaults to 20 scan attempts per user per UTC day; the legacy deployment setting remains a fallback
 - `VIBE_ENABLE_LOCAL_SCAN`: optional. Keep unset or `false` on Vercel. Use `true` only for trusted local/self-hosted environments.
 
 The application normalizes pg's `sslmode=prefer`, `require`, and `verify-ca` aliases to explicit `verify-full`, preserving their current pg 8 certificate-verification behavior before a future pg 9 upgrade. Explicit `uselibpqcompat=true`, `disable`, and local URLs without SSL options are unchanged. No database secret needs to be edited for this application fix. Prisma CLI commands still use the configured URL directly.

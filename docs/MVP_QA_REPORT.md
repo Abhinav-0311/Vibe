@@ -1,5 +1,17 @@
 # MVP QA Report
 
+## Open Registration Update (2026-10-09)
+
+The owner requested removal of beta branding and invitation-only enrollment. Google sign-in now accepts verified Google identities without an invitation lookup. API routes still require valid database sessions and preserve owner-scoped records, quotas, rate limits, retention, and account deletion. The historical release observations below describe earlier commits; references to invite-only access are historical, not the current access contract.
+
+- Local production build, standalone TypeScript, ESLint, Prisma validation, and all **262 tests across 34 files** passed with the disposable database suite enabled.
+- Nineteen new authentication/configuration cases cover verified Google identities, missing/unverified/mismatched profiles, non-Google identities, absent database sessions, no invitation lookups, and legacy quota-setting compatibility.
+- Real HTTP/PostgreSQL acceptance now starts users with no invitations and confirms that an old disabled enrollment record does not deny access. Cross-account reads still fail; deletion removes legacy enrollment data and revokes the deleted session; durable quota/rate-limit assertions still pass.
+- The sign-in screen and account menu no longer display beta/invitation messaging. Desktop and 375-pixel mobile sign-in checks found no horizontal overflow; the sign-in screen has one main landmark, one H1, and a named Google action.
+- No production migration, provider permission, Google Cloud audience setting, paid plan, or monitoring configuration was changed. Historical migrations and the unused authorization table remain for compatibility and account-data cleanup.
+- Google's OAuth audience/publishing status is an independent prerequisite for arbitrary public accounts. A new live Google-account enrollment is not proven by synthetic database-session tests. See [Accounts](./ACCOUNTS.md).
+- CI and deployed verification for this update must be checked against its published commit; older release results below are not proof for this patch. Coverage percentage remains unmeasured.
+
 Baseline hosted release checked: `20e0e93031f3aa8278dacb88b0f0a07b6d5652f1`. Closeout changes and full local verification: 2026-10-09. Hosted acceptance: 2026-10-08/09. The current checks below supersede the historical browser limitations recorded later in this report. Local tests, CI, deployed smoke checks, and unverified operating limits are listed separately.
 
 Closeout code release: `3d13d7510cc7a08e9c6d0bc865cc93e6b967c93d`. GitHub Quality [37923311183](https://github.com/Abhinav-0311/Vibe/actions/runs/37923311183) passed, including the new PostgreSQL service and HTTP tests. Vercel deployment `dpl_82Bw1S6CdU3b13gfd2Lg3goivck9` reached Ready and owns the production alias. On that deployment, application/database health passed, a public self-scan completed at 62/100, and restoring the earlier ZIP report returned 83/100 with the stale success notice cleared. Browser warning/error logs were empty; the deployment-scoped recent warning/error/fatal query returned no records. These observations are bounded checks, not a guarantee of zero future failures.
@@ -15,7 +27,7 @@ Closeout code release: `3d13d7510cc7a08e9c6d0bc865cc93e6b967c93d`. GitHub Qualit
 - `git diff --check`: passed
 - Coverage percentage: not measured; no coverage provider is installed, and no packages were installed for this verification
 
-This validation reflects the current private-beta checkout, including scanner calibration fixtures, per-user beta controls, source-fingerprint caching, and comparable re-scan verification guidance.
+This closeout snapshot predates open registration and includes scanner calibration fixtures, per-user controls, source-fingerprint caching, and comparable re-scan verification guidance.
 
 ## Hosted Release Acceptance (2026-10-08/09)
 
@@ -174,7 +186,7 @@ Environment: Vercel production deployment, verified with Playwright browser auto
 | 1. Error notifications | **Owner-skipped.** Logs remain available; no destination or delivery test. |
 | 2. Fresh Google login/logout | **Passed on production.** Existing invited account signed out and back in. |
 | 3. Account isolation | **Passed locally with real HTTP/PostgreSQL.** Two synthetic database-session users; not two live Google accounts. |
-| 4. Account deletion | **Passed locally with real HTTP/PostgreSQL.** Cascades and session revocation verified. Live destructive browser acceptance needs an explicitly approved disposable invited account. |
+| 4. Account deletion | **Passed locally with real HTTP/PostgreSQL.** Cascades and session revocation verified. Live destructive browser acceptance needs an explicitly approved disposable account. |
 | 5. Load enforcement | **Passed locally.** Twenty concurrent HTTP uploads exercised persistence, quota and rate limits. Hosted capacity/soak tests remain deferred; no replacement staging project or production load test. |
 | 6. Private GitHub / issues | **Optional, not configured in hosted UI; unverified.** No credentials or permissions added. Public GitHub scanning passed. |
 | 7. Live AI enhancement | **Optional, unverified.** No provider key or external source transmission added; deterministic fallback and mocked failure cases remain covered. |
@@ -184,4 +196,4 @@ Environment: Vercel production deployment, verified with Playwright browser auto
 
 ## Release Verdict
 
-All 243 local cases passed, including real HTTP/database isolation, deletion, and bounded concurrency. Closeout code release `3d13d75` passed CI and was verified on production; the earlier hosted scan/fix/re-scan and fresh Google sign-in/out checks are recorded separately above. Owner-skipped alerts and the explicitly unverified boundaries in the single checklist above remain limits, not hidden completion claims. Vibe is suitable to present as a deployed private beta, not as a fully capacity-tested public production service. Keep access invite-only; teams, billing, background jobs, and broad provider integrations remain out of scope.
+The earlier closeout code release `3d13d75` passed all 243 cases, CI, and bounded production checks. The open-registration update above supersedes its access model and increases local coverage to 262 cases; invitation-only operation is no longer required by the application. Owner-skipped alerts, arbitrary-account Google enrollment, private GitHub, live AI, hosted capacity, and full accessibility/performance auditing remain explicit limits. Open registration is not capacity certification. Teams, billing, background jobs, and broad provider integrations remain out of scope.
